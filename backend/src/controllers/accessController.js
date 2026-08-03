@@ -1,0 +1,11 @@
+import * as service from '../services/accessService.js';
+export const list = async (_req, res, next) => { try { res.json(await service.listPending()); } catch (error) { next(error); } };
+export const users = async (req, res, next) => { try { res.json(await service.listUsers(req.query)); } catch (error) { next(error); } };
+export const audit = async (req, res, next) => { try { res.json(await service.listAudit(req.query)); } catch (error) { next(error); } };
+export const get = async (req, res, next) => { try { res.json(await service.getRequest(req.params.id)); } catch (error) { next(error); } };
+export const approve = async (req, res, next) => { try { res.json(await service.approve(req.params.id, req.body, req.user)); } catch (error) { next(error); } };
+export const reject = async (req, res, next) => { try { res.json(await service.rejectWithReason(req.params.id, req.body, req.user)); } catch (error) { next(error); } };
+export const status = async (req, res, next) => { try { res.json(await service.changeStatus(req.params.id, req.body.status, req.user)); } catch (error) { next(error); } };
+export const role = async (req, res, next) => { try { res.json(await service.changeRole(req.params.id, req.body.role, req.user)); } catch (error) { next(error); } };
+export const link = async (req, res, next) => { try { await service.linkOrganization(req.params.id, req.body.organizationId, req.user); res.sendStatus(204); } catch (error) { next(error); } };
+export const unlink = async (req, res, next) => { try { await service.unlinkOrganization(req.params.id, req.params.organizationId, req.user); res.sendStatus(204); } catch (error) { next(error); } };

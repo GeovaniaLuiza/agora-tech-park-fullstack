@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agora_indicadores
+      POSTGRES_USER: agora
+      POSTGRES_PASSWORD: agora_dev
+    ports: ["5435:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+      - ./database/migrations/002_auth_access_control.sql:/docker-entrypoint-initdb.d/002_auth_access_control.sql
+      - ./database/migrations/003_email_identity.sql:/docker-entrypoint-initdb.d/003_email_identity.sql
+      - ./database/migrations/004_email_verification.sql:/docker-entrypoint-initdb.d/004_email_verification.sql
+      - ./database/migrations/005_access_governance.sql:/docker-entrypoint-initdb.d/005_access_governance.sql
+      - ./database/migrations/006_secure_user_defaults.sql:/docker-entrypoint-initdb.d/006_secure_user_defaults.sql
+      - ./database/migrations/007_email_token_delivery.sql:/docker-entrypoint-initdb.d/007_email_token_delivery.sql
+      - ./database/migrations/008_api_workflows.sql:/docker-entrypoint-initdb.d/008_api_workflows.sql
+      - ./database/migrations/009_password_reset.sql:/docker-entrypoint-initdb.d/009_password_reset.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/009_seed.sql
+  mailpit:
+    image: axllent/mailpit:v1.30.6
+    profiles: ["dev-mail"]
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+      MP_DISABLE_VERSION_CHECK: "1"
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes: { postgres_data: {} }

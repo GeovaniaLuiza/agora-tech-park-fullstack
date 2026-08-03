@@ -1,0 +1,19 @@
+export const ROLES = Object.freeze({
+  ADMIN: 'ADMIN',
+  RESEARCHER: 'PESQUISADOR',
+  MANAGER: 'GESTOR',
+  RESIDENT: 'RESIDENTE',
+});
+
+export const ROLE_VALUES = Object.freeze(Object.values(ROLES));
+
+export const USER_STATUS = Object.freeze({
+  EMAIL_PENDING: 'EMAIL_PENDING',
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  REJECTED: 'REJECTED',
+  INACTIVE: 'INACTIVE',
+});
+
+export const ACTIVE_STATUSES = Object.freeze([USER_STATUS.ACTIVE, USER_STATUS.INACTIVE]);
+export const EMAIL_VERIFICATION_PURPOSE = 'EMAIL_VERIFICATION';

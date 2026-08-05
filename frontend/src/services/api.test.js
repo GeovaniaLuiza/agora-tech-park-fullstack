@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiRequest, tokenStore } from './api';
+import { apiRequest, publishForm, tokenStore } from './api';
 describe('armazenamento da sessão', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
   it('usa sessionStorage quando lembrar-me está desmarcado', () => {
@@ -71,5 +71,23 @@ describe('erros da API', () => {
       status: 502,
       message: 'Serviço temporariamente indisponível',
     });
+  });
+});
+
+describe('publicação de formulário', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('envia organizações e residentes selecionados no mesmo comando', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200, headers: new Headers(), text: async () => JSON.stringify({ id: 'form-1' }),
+    });
+    vi.stubGlobal('fetch', fetch);
+
+    await publishForm('form-1', ['org-1'], ['11111111-1111-4111-8111-111111111111']);
+
+    expect(fetch).toHaveBeenCalledWith('http://localhost:3002/api/forms/form-1/publish', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ organizationIds: ['org-1'], recipientIds: ['11111111-1111-4111-8111-111111111111'] }),
+    }));
   });
 });

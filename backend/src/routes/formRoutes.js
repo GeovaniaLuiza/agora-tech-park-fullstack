@@ -7,6 +7,7 @@ const router = Router();
 const manage = [authenticate, authorize('ADMIN', 'PESQUISADOR')];
 
 router.get('/', authenticate, controller.list);
+router.get('/recipients/eligible', ...manage, controller.eligibleRecipients);
 router.post('/', ...manage, validateForm, controller.create);
 router.post('/:id/publish', ...manage, controller.publish);
 router.post('/:id/close', ...manage, controller.close);

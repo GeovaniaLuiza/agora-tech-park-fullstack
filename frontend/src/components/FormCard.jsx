@@ -5,11 +5,12 @@ export default function FormCard({ form, onEdit, onRespond, onDuplicate, onArchi
   const total = Number(form.total ?? form.recipient_count ?? 0);
   const ratio = total ? Math.round((responses / total) * 100) : 0;
   const status = form.status || 'DRAFT';
+  const statusLabel = { ACTIVE: 'Ativo', CLOSED: 'Finalizado', DRAFT: 'Rascunho', ARCHIVED: 'Arquivado' }[status] || status;
   return (
     <article className="form-card">
       <div className="form-card-title">
         <h3>{form.title}</h3>
-        <span className={`status ${status.toLowerCase()}`}>{status}</span>
+        <span className={`status ${status.toLowerCase()}`}>{statusLabel}</span>
       </div>
       <p>Período: {form.period || '—'} · {form.owner || 'Não informado'}</p>
       <div className="response-label"><span>Respostas</span><b>{ratio}% · {responses}/{total}</b></div>

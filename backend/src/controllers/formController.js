@@ -1,6 +1,7 @@
 import * as service from '../services/formService.js';
 
 export const list = async (req, res, next) => { try { res.json(await service.listForms(req.user)); } catch (error) { next(error); } };
+export const eligibleRecipients = async (req, res, next) => { try { res.json(await service.listEligibleRecipients(req.query)); } catch (error) { next(error); } };
 export const get = async (req, res, next) => { try { res.json(await service.getForm(req.params.id, req.user)); } catch (error) { next(error); } };
 export const create = async (req, res, next) => { try { res.status(201).json(await service.createForm(req.body, req.user)); } catch (error) { next(error); } };
 export const update = async (req, res, next) => { try { res.json(await service.updateForm(req.params.id, req.body, req.user)); } catch (error) { next(error); } };

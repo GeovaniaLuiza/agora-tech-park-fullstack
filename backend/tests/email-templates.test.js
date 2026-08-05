@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvedTemplate, verificationTemplate } from '../src/email/templates.js';
+import { approvedTemplate, formInvitationTemplate, verificationTemplate } from '../src/email/templates.js';
 
 describe('templates institucionais de e-mail', () => {
   it('gera confirmação HTML e texto com prazo, análise posterior e link alternativo', () => {
@@ -19,5 +19,15 @@ describe('templates institucionais de e-mail', () => {
 
     expect(template.text).toContain('Acessar a plataforma');
     expect(template.html).not.toMatch(/senha temporária|redefinir senha/i);
+  });
+
+  it('escapa dados do convite e inclui alternativa textual', () => {
+    const template = formInvitationTemplate({
+      name: 'Pessoa <Teste>', formTitle: 'Indicadores <2026>', deadline: '31/08/2026',
+      formUrl: 'https://plataforma.example/resident/forms/1/respond',
+    });
+    expect(template.html).toContain('Indicadores &lt;2026&gt;');
+    expect(template.html).not.toContain('Pessoa <Teste>');
+    expect(template.text).toContain('Responder formulário');
   });
 });

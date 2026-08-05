@@ -1,6 +1,9 @@
 import * as repository from '../repositories/formRepository.js';
 import * as organizations from '../repositories/organizationRepository.js';
+import * as users from '../repositories/userRepository.js';
+import * as notifications from '../repositories/notificationRepository.js';
 import { record } from '../repositories/auditRepository.js';
+import { sendFormInvitation } from './emailService.js';
 import { serviceError } from '../utils/validation.js';
 
 async function requireForm(id, user) {
@@ -18,6 +21,12 @@ async function requireDraft(id) {
 
 export const listForms = (user) => repository.findAll(user);
 export const getForm = (id, user) => requireForm(id, user);
+
+export async function listEligibleRecipients(query = {}) {
+  const raw = Array.isArray(query.organizationId) ? query.organizationId : String(query.organizationId || '').split(',');
+  const organizationIds = raw.map((value) => value.trim()).filter(Boolean);
+  return users.findEligibleFormRecipients({ organizationIds });
+}
 
 export async function createForm(data, user) {
   const form = await repository.create({ ...data, createdBy: user.sub });
@@ -38,21 +47,49 @@ export async function publishForm(id, body, user) {
   if (!questions.length) throw serviceError(422, 'Inclua ao menos uma pergunta antes de publicar', 'FORM_WITHOUT_QUESTIONS');
   if (!form.start_date || !form.end_date) throw serviceError(422, 'Defina o período da coleta', 'FORM_PERIOD_REQUIRED');
   const organizationIds = Array.isArray(body.organizationIds) ? [...new Set(body.organizationIds)] : [];
+  const recipientIds = Array.isArray(body.recipientIds) ? [...new Set(body.recipientIds.filter(Boolean))] : [];
+  if (!recipientIds.length) throw serviceError(422, 'Selecione ao menos um residente do Ágora Tech Park', 'RESIDENT_RECIPIENT_REQUIRED');
+  if (recipientIds.length > 100 || recipientIds.some((id) => !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id))) {
+    throw serviceError(422, 'Lista de residentes destinatários inválida', 'INVALID_RESIDENT_RECIPIENTS');
+  }
   for (const organizationId of organizationIds) {
     if (!await organizations.existsActive(organizationId)) {
       throw serviceError(422, 'Uma organização destinatária é inválida', 'INVALID_ORGANIZATION');
     }
   }
-  const published = await repository.publish(id, organizationIds);
+  const registeredRecipients = await users.findEligibleFormRecipients({ organizationIds, userIds: recipientIds });
+  if (registeredRecipients.length !== recipientIds.length) {
+    throw serviceError(422, 'Um destinatário não é residente ativo ou não possui vínculo válido com a organização selecionada', 'INELIGIBLE_RESIDENT_RECIPIENT');
+  }
+  const effectiveOrganizationIds = organizationIds.length ? organizationIds : [...new Set(registeredRecipients.flatMap((recipient) => recipient.organizations.map((organization) => organization.id)))];
+  const published = await repository.publish(id, effectiveOrganizationIds);
   if (!published) throw serviceError(409, 'O formulário não está mais em rascunho', 'FORM_NOT_DRAFT');
+  const recipientByEmail = new Map(registeredRecipients.map((recipient) => [recipient.email.toLowerCase(), recipient]));
+  let inAppNotifications = 0;
+  try {
+    const createdNotifications = await notifications.createMany(
+      registeredRecipients.map((recipient) => recipient.id),
+      { title: 'Novo formulário disponível', message: published.title, link: `/resident/forms/${id}/respond` },
+    );
+    inAppNotifications = createdNotifications.length;
+  } catch { /* a publicação e os e-mails não devem ser desfeitos por falha no canal interno */ }
+  const deadline = published.end_date ? new Date(published.end_date).toLocaleDateString('pt-BR') : null;
+  const deliveries = await Promise.allSettled([...recipientByEmail.values()].map((recipient) => sendFormInvitation({
+    ...recipient, formId: id, formTitle: published.title, deadline,
+  })));
+  const emailSummary = {
+    requested: deliveries.length,
+    sent: deliveries.filter((delivery) => delivery.status === 'fulfilled').length,
+    failed: deliveries.filter((delivery) => delivery.status === 'rejected').length,
+  };
   await record({
     userId: user.sub,
     action: 'FORM_PUBLISHED',
     entity: 'form',
     entityId: id,
-    details: { targetedOrganizations: organizationIds.length || 'ALL' },
+    details: { targetedOrganizations: effectiveOrganizationIds.length, residentRecipients: recipientIds.length, emailSummary },
   });
-  return published;
+  return { ...published, notificationSummary: { inApp: inAppNotifications, ...emailSummary } };
 }
 
 export async function closeForm(id, user) {

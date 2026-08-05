@@ -54,3 +54,13 @@ export const inactiveTemplate = ({ name }) => layout('Acesso inativado', name, {
   text: 'Seu acesso foi inativado. Entre em contato com a equipe responsável caso precise de orientação.',
   html: 'Seu acesso foi inativado. Entre em contato com a equipe responsável caso precise de orientação.',
 });
+
+export const formInvitationTemplate = ({ name, formTitle, deadline, formUrl }) => layout(
+  'Nova solicitação de indicadores', name,
+  {
+    text: `O formulário "${formTitle}" está disponível para preenchimento${deadline ? ` até ${deadline}` : ''}. Acesse a plataforma para responder ou salvar um rascunho.`,
+    html: `O formulário <strong>${escapeHtml(formTitle)}</strong> está disponível para preenchimento${deadline ? ` até <strong>${escapeHtml(deadline)}</strong>` : ''}. Acesse a plataforma para responder ou salvar um rascunho.`,
+    footer: 'Esta mensagem foi enviada automaticamente pela Plataforma de Indicadores e Governança.',
+  },
+  { label: 'Responder formulário', url: formUrl },
+);

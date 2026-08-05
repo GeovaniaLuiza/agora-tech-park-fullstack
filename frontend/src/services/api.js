@@ -93,7 +93,12 @@ export const getForms = () => apiRequest('/forms');
 export const getForm = (id) => apiRequest(`/forms/${id}`);
 export const createForm = (payload) => apiRequest('/forms', { method: 'POST', body: JSON.stringify(payload) });
 export const updateForm = (id, payload) => apiRequest(`/forms/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-export const publishForm = (id, organizationIds = []) => apiRequest(`/forms/${id}/publish`, { method: 'POST', body: JSON.stringify({ organizationIds }) });
+export const publishForm = (id, organizationIds = [], recipientIds = []) => apiRequest(`/forms/${id}/publish`, { method: 'POST', body: JSON.stringify({ organizationIds, recipientIds }) });
+export const getEligibleFormRecipients = (organizationIds = []) => {
+  const params = new URLSearchParams();
+  organizationIds.forEach((id) => params.append('organizationId', id));
+  return apiRequest(`/forms/recipients/eligible?${params}`);
+};
 export const closeForm = (id) => apiRequest(`/forms/${id}/close`, { method: 'POST', body: '{}' });
 export const duplicateForm = (id) => apiRequest(`/forms/${id}/duplicate`, { method: 'POST', body: '{}' });
 export const archiveForm = (id) => apiRequest(`/forms/${id}/archive`, { method: 'PATCH', body: '{}' });
@@ -126,6 +131,16 @@ export const getAudit = (filters = {}) => apiRequest(`/admin/audit?${new URLSear
 export const getIndicators = (filters = {}) => apiRequest(`/indicators?${new URLSearchParams(filters)}`);
 export const getIndicatorHistory = () => apiRequest('/indicators/history');
 export const getDashboard = () => apiRequest('/indicators/dashboard');
+export const getOperationalDashboard = () => apiRequest('/dashboard/operational-summary');
+export const getInstitutionalDashboard = (filters = {}) => apiRequest(`/dashboard/institutional-summary?${new URLSearchParams(filters)}`);
+export const getDashboardCompanies = (filters = {}) => apiRequest(`/dashboard/companies?${new URLSearchParams(filters)}`);
+export const getDashboardFinancial = (filters = {}) => apiRequest(`/dashboard/financial?${new URLSearchParams(filters)}`);
+export const getDashboardProjects = (filters = {}) => apiRequest(`/dashboard/projects?${new URLSearchParams(filters)}`);
+export const getDashboardEngagement = (filters = {}) => apiRequest(`/dashboard/engagement?${new URLSearchParams(filters)}`);
+export const validateIndicatorSpreadsheet = () => apiRequest('/admin/spreadsheet-imports/validate', { method: 'POST', body: '{}' });
+export const importIndicatorSpreadsheet = (reprocess = false) => apiRequest('/admin/spreadsheet-imports', { method: 'POST', body: JSON.stringify({ reprocess }) });
+export const getNotifications = () => apiRequest('/notifications');
+export const markNotificationRead = (id) => apiRequest(`/notifications/${id}/read`, { method: 'PATCH', body: '{}' });
 
 export async function downloadIndicatorReport(format, filters = {}) {
   const token = tokenStore.get();
@@ -139,6 +154,22 @@ export async function downloadIndicatorReport(format, filters = {}) {
   }
   return {
     blob: await response.blob(),
-    filename: response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || `indicadores.${format === 'pdf' ? 'pdf' : 'xls'}`,
+    filename: response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || `indicadores.${format === 'pdf' ? 'pdf' : format === 'csv' ? 'csv' : 'xls'}`,
+  };
+}
+
+export async function downloadDashboardSpreadsheet() {
+  const token = tokenStore.get();
+  const response = await fetch(`${BASE_URL}/dashboard/export`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    let data = {};
+    try { data = await response.json(); } catch { /* resposta controlada abaixo */ }
+    throw new ApiError(data.message || 'Não foi possível exportar a planilha', response.status, data.code);
+  }
+  return {
+    blob: await response.blob(),
+    filename: response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || 'indicadores-joinville-2025.xlsx',
   };
 }

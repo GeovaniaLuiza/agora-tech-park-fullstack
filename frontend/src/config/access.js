@@ -14,7 +14,7 @@ export const ROUTE_ROLES = {
   '/pesquisa': ['ADMIN', 'PESQUISADOR'],
   '/forms': ['ADMIN', 'PESQUISADOR'],
   '/forms/new': ['ADMIN', 'PESQUISADOR'],
-  '/indicators': ['ADMIN', 'PESQUISADOR', 'GESTOR'],
+  '/indicators': ['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE'],
   '/organizations': ['ADMIN', 'PESQUISADOR', 'GESTOR'],
   '/admin/requests': ['ADMIN'],
   '/resident/forms': ['RESIDENTE'],

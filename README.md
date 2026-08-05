@@ -19,7 +19,7 @@ copy backend\.env.example backend\.env
 npm run dev
 ```
 
-Abra `http://localhost:5173`. A API fica em `http://localhost:3001/api`.
+Abra `http://localhost:5174`. A API fica em `http://localhost:3002/api`.
 
 ## Rotas de exemplo
 
@@ -49,6 +49,19 @@ npm run test --prefix backend
 
 Os testes verificam health check/headers de segurança e validação de payload. Para ver os mockups isoladamente: `/#login` e `/#respond`.
 
+## Indicadores institucionais de 2025
+
+O Dashboard e a tela de Indicadores usam a carga oficial da aba `CI JOINVILLE`, persistida no PostgreSQL.
+Para validar ou importar a planilha no backend:
+
+```powershell
+npm.cmd run indicators:validate --prefix backend
+npm.cmd run indicators:import --prefix backend
+```
+
+O processo é transacional, registra a origem `SPREADSHEET_IMPORT`, audita a operação e impede duplicidade por hash.
+Consulte [a documentação do Dashboard](docs/DASHBOARD_INSTITUCIONAL_2025.md) para endpoints, RBAC e validações.
+
 ## Executar testes
 Copy-Item backend\.env.example backend\.env
 
@@ -62,4 +75,4 @@ npm.cmd run dev
 
 npm.cmd run test --prefix backend
 
-npm.cmd install 
+npm.cmd install

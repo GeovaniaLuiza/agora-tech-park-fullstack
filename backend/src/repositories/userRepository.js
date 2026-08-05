@@ -73,3 +73,39 @@ export async function hasOrganization(userId, organizationId) {
   );
   return rowCount > 0;
 }
+
+export async function findFormRecipients(organizationIds = [], emails = []) {
+  const normalizedEmails = emails.map((email) => email.toLowerCase());
+  const { rows } = await query(
+    `SELECT DISTINCT u.id,u.name,u.email FROM users u
+     WHERE u.status='ACTIVE' AND u.email_verified_at IS NOT NULL
+       AND (
+         LOWER(u.email) = ANY($2::text[])
+         OR (u.role='RESIDENTE' AND EXISTS (
+           SELECT 1 FROM users_organizations uo
+           JOIN organizations o ON o.id=uo.organization_id
+           WHERE uo.user_id=u.id AND uo.active AND o.status='ACTIVE'
+             AND (cardinality($1::uuid[])=0 OR uo.organization_id=ANY($1::uuid[]))
+         ))
+       )
+     ORDER BY u.name`,
+    [organizationIds, normalizedEmails],
+  );
+  return rows;
+}
+
+export async function findEligibleFormRecipients({ organizationIds = [], userIds = [] } = {}) {
+  const { rows } = await query(
+    `SELECT u.id,u.name,u.email,
+       json_agg(DISTINCT jsonb_build_object('id',o.id,'name',o.name) ORDER BY jsonb_build_object('id',o.id,'name',o.name)) AS organizations
+     FROM users u
+     JOIN users_organizations uo ON uo.user_id=u.id AND uo.active
+     JOIN organizations o ON o.id=uo.organization_id AND o.status='ACTIVE'
+     WHERE u.role='RESIDENTE' AND u.status='ACTIVE' AND u.email_verified_at IS NOT NULL
+       AND (cardinality($1::uuid[])=0 OR o.id=ANY($1::uuid[]))
+       AND (cardinality($2::uuid[])=0 OR u.id=ANY($2::uuid[]))
+     GROUP BY u.id,u.name,u.email ORDER BY u.name`,
+    [organizationIds, userIds],
+  );
+  return rows;
+}

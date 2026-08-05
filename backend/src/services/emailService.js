@@ -1,5 +1,5 @@
 import { createSmtpProvider } from '../email/smtpProvider.js';
-import { approvedTemplate, inactiveTemplate, passwordResetTemplate, rejectedTemplate, verificationTemplate, verifiedTemplate } from '../email/templates.js';
+import { approvedTemplate, formInvitationTemplate, inactiveTemplate, passwordResetTemplate, rejectedTemplate, verificationTemplate, verifiedTemplate } from '../email/templates.js';
 
 let provider;
 const getProvider = () => {
@@ -29,3 +29,9 @@ export const sendVerified = ({ email, name }) => send(email, 'E-mail confirmado 
 export const sendApproved = ({ email, name }) => send(email, 'Acesso liberado — Ágora Tech Park', approvedTemplate({ name, loginUrl: new URL('/login', process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5174').toString() }));
 export const sendRejected = ({ email, name }) => send(email, 'Atualização da solicitação — Ágora Tech Park', rejectedTemplate({ name }));
 export const sendInactive = ({ email, name }) => send(email, 'Acesso inativado — Ágora Tech Park', inactiveTemplate({ name }));
+export const sendFormInvitation = ({ email, name, formId, formTitle, deadline }) => {
+  const url = new URL(`/resident/forms/${formId}/respond`, process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5174');
+  return send(email, `Formulário disponível: ${formTitle}`, formInvitationTemplate({
+    name: name || 'respondente', formTitle, deadline, formUrl: url.toString(),
+  }));
+};

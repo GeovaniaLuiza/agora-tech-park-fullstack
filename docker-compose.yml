@@ -6,6 +6,11 @@ services:
       POSTGRES_USER: agora
       POSTGRES_PASSWORD: agora_dev
     ports: ["5435:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agora -d agora_indicadores"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
@@ -17,10 +22,31 @@ services:
       - ./database/migrations/007_email_token_delivery.sql:/docker-entrypoint-initdb.d/007_email_token_delivery.sql
       - ./database/migrations/008_api_workflows.sql:/docker-entrypoint-initdb.d/008_api_workflows.sql
       - ./database/migrations/009_password_reset.sql:/docker-entrypoint-initdb.d/009_password_reset.sql
+      - ./database/migrations/010_notifications_indicator_source.sql:/docker-entrypoint-initdb.d/010_notifications_indicator_source.sql
+      - ./database/migrations/011_dashboard_institutional_indicators.sql:/docker-entrypoint-initdb.d/011_dashboard_institutional_indicators.sql
       - ./database/seed.sql:/docker-entrypoint-initdb.d/009_seed.sql
+  migrate-auth-schema:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: agora_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./database/runtime/ensure_auth_schema.sql:/migrations/ensure_auth_schema.sql:ro
+      - ./database/migrations/010_notifications_indicator_source.sql:/migrations/010_notifications_indicator_source.sql:ro
+      - ./database/migrations/011_dashboard_institutional_indicators.sql:/migrations/011_dashboard_institutional_indicators.sql:ro
+    command:
+      - psql
+      - --host=postgres
+      - --username=agora
+      - --dbname=agora_indicadores
+      - --file=/migrations/ensure_auth_schema.sql
+      - --file=/migrations/010_notifications_indicator_source.sql
+      - --file=/migrations/011_dashboard_institutional_indicators.sql
+    restart: "no"
   mailpit:
     image: axllent/mailpit:v1.30.6
-    profiles: ["dev-mail"]
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: "1"
       MP_SMTP_AUTH_ALLOW_INSECURE: "1"

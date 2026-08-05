@@ -16,9 +16,15 @@ function xmlEscape(value) {
   return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
+const reportValue = (row) => row.value ?? row.text_value ?? (row.json_value ? JSON.stringify(row.json_value) : '');
+
 function excel(rows) {
-  const dataRows = rows.map((row) => `<Row><Cell><Data ss:Type="String">${xmlEscape(row.name)}</Data></Cell><Cell><Data ss:Type="Number">${Number(row.value)}</Data></Cell><Cell><Data ss:Type="String">${xmlEscape(row.period)}</Data></Cell></Row>`).join('');
-  return `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Indicadores"><Table><Row><Cell><Data ss:Type="String">Indicador</Data></Cell><Cell><Data ss:Type="String">Valor</Data></Cell><Cell><Data ss:Type="String">Período</Data></Cell></Row>${dataRows}</Table></Worksheet></Workbook>`;
+  const dataRows = rows.map((row) => {
+    const value = reportValue(row);
+    const type = row.value === null ? 'String' : 'Number';
+    return `<Row><Cell><Data ss:Type="String">${xmlEscape(row.code || '')}</Data></Cell><Cell><Data ss:Type="String">${xmlEscape(row.name)}</Data></Cell><Cell><Data ss:Type="${type}">${xmlEscape(value)}</Data></Cell><Cell><Data ss:Type="String">${xmlEscape(row.unit || '')}</Data></Cell><Cell><Data ss:Type="String">${xmlEscape(row.period)}</Data></Cell><Cell><Data ss:Type="String">${xmlEscape(row.source)}</Data></Cell></Row>`;
+  }).join('');
+  return `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Indicadores"><Table><Row><Cell><Data ss:Type="String">Código</Data></Cell><Cell><Data ss:Type="String">Indicador</Data></Cell><Cell><Data ss:Type="String">Valor</Data></Cell><Cell><Data ss:Type="String">Unidade</Data></Cell><Cell><Data ss:Type="String">Período</Data></Cell><Cell><Data ss:Type="String">Origem</Data></Cell></Row>${dataRows}</Table></Worksheet></Workbook>`;
 }
 
 function pdfEscape(value) {
@@ -26,7 +32,7 @@ function pdfEscape(value) {
 }
 
 function pdf(rows) {
-  const lines = ['Relatorio de indicadores - Agora Tech Park', '', ...rows.map((row) => `${row.name}: ${row.value} (${row.period})`)];
+  const lines = ['Relatorio de indicadores - Centro de Inovacao de Joinville', `Gerado em ${new Date().toLocaleDateString('pt-BR')}`, '', ...rows.map((row) => `${row.name}: ${reportValue(row)} ${row.unit || ''} (${row.period})`)];
   const commands = lines.map((line, index) => `BT /F1 11 Tf 50 ${790 - index * 18} Td (${pdfEscape(line)}) Tj ET`).join('\n');
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
@@ -45,9 +51,13 @@ function pdf(rows) {
 
 export async function exportReport(format, filters, user) {
   const rows = await repository.summary(filters);
-  if (!['pdf', 'excel'].includes(format)) throw serviceError(422, 'Formato de exportação inválido', 'INVALID_EXPORT_FORMAT');
+  if (!['pdf', 'excel', 'csv'].includes(format)) throw serviceError(422, 'Formato de exportação inválido', 'INVALID_EXPORT_FORMAT');
   await record({ userId: user.sub, action: 'INDICATORS_EXPORTED', entity: 'indicator', details: { format, period: filters.period || null } });
-  return format === 'pdf'
-    ? { body: pdf(rows), contentType: 'application/pdf', extension: 'pdf' }
-    : { body: excel(rows), contentType: 'application/vnd.ms-excel; charset=utf-8', extension: 'xls' };
+  if (format === 'pdf') return { body: pdf(rows), contentType: 'application/pdf', extension: 'pdf' };
+  if (format === 'csv') {
+    const escape = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const body = ['Código,Indicador,Valor,Unidade,Período,Origem', ...rows.map((row) => [row.code, row.name, reportValue(row), row.unit, row.period, row.source].map(escape).join(','))].join('\r\n');
+    return { body: `\uFEFF${body}`, contentType: 'text/csv; charset=utf-8', extension: 'csv' };
+  }
+  return { body: excel(rows), contentType: 'application/vnd.ms-excel; charset=utf-8', extension: 'xls' };
 }

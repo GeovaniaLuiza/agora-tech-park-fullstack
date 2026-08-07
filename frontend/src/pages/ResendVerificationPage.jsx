@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Mail } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
-import { resendVerification } from '../services/api';
+import { resendVerification, normalizeApiError } from '../services/api';
 
 const PUBLIC_FEEDBACK = 'Solicitação processada. Se existir um cadastro pendente para este e-mail, uma nova mensagem de confirmação será enviada. Verifique também a caixa de spam.';
 const DELIVERY_ERROR = 'Não foi possível enviar o e-mail de confirmação neste momento. Tente novamente mais tarde.';
-const CONNECTION_ERROR = 'Não foi possível acessar o serviço. Verifique sua conexão e tente novamente.';
 
 function readableDuration(totalSeconds) {
   const seconds = Math.max(1, Number(totalSeconds) || 1);
@@ -20,6 +19,7 @@ export default function ResendVerificationPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const requestInFlight = useRef(false);
+  const emailRef = useRef(null);
   const [email, setEmail] = useState(location.state?.email || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState({ type: null, message: '' });
@@ -36,28 +36,58 @@ export default function ResendVerificationPage() {
 
   const submit = async (event) => {
     event.preventDefault();
-    if (requestInFlight.current || retryAfter > 0) return;
+    // Guard against duplicate submits (extra protection beyond disabled)
+    if (isSubmitting || requestInFlight.current || retryAfter > 0) return;
     requestInFlight.current = true;
     setIsSubmitting(true);
     setFeedback({ type: null, message: '' });
+
     try {
       const result = await resendVerification(email.trim().toLowerCase());
       setFeedback({ type: 'info', message: PUBLIC_FEEDBACK });
       const cooldown = Number(result?.retryAfter ?? result?.retryAfterSeconds) || 0;
       if (cooldown > 0) setRetryAfter(cooldown);
-    } catch (error) {
-      if (error.code === 'EMAIL_DELIVERY_FAILED') {
+    } catch (err) {
+      // Preserve specific backend code mapping (delivery failure)
+      if (err && err.code === 'EMAIL_DELIVERY_FAILED') {
         setFeedback({ type: 'error', message: DELIVERY_ERROR });
-      } else if (error.status === 429) {
-        const seconds = Math.max(1, Number(error.retryAfter ?? error.retryAfterSeconds) || 60);
-        setRetryAfter(seconds);
-        setFeedback({ type: 'warning', message: `Aguarde ${readableDuration(seconds)} antes de solicitar um novo envio.` });
-      } else if (error.status === 400 || error.status === 422) {
-        setFeedback({ type: 'error', message: error.message || 'Informe um endereço de e-mail válido.' });
-      } else if (error.code === 'NETWORK_ERROR' || !error.status) {
-        setFeedback({ type: 'error', message: CONNECTION_ERROR });
-      } else {
-        setFeedback({ type: 'error', message: 'Não foi possível solicitar o reenvio agora. Tente novamente mais tarde.' });
+        return;
+      }
+
+      // Normalize error centrally and handle by type
+      const normalized = normalizeApiError(err);
+
+      // If the server provided a retryAfter value, apply it
+      const serverRetry = Number(err?.retryAfter ?? err?.retryAfterSeconds ?? err?.retryAfterSeconds) || undefined;
+      if (serverRetry && serverRetry > 0) setRetryAfter(serverRetry);
+
+      switch (normalized.type) {
+        case 'NETWORK':
+          setFeedback({ type: 'error', message: normalized.message });
+          break;
+        case 'TIMEOUT':
+          setFeedback({ type: 'error', message: normalized.message });
+          break;
+        case 'UNAVAILABLE':
+          setFeedback({ type: 'error', message: normalized.message });
+          break;
+        case 'VALIDATION':
+          // If there's a field-specific message for email, show it and focus field
+          if (normalized.fieldErrors && normalized.fieldErrors.email) {
+            setFeedback({ type: 'error', message: normalized.fieldErrors.email });
+            if (emailRef.current) emailRef.current.focus();
+          } else {
+            setFeedback({ type: 'error', message: normalized.message || 'Verifique os dados informados e tente novamente.' });
+          }
+          break;
+        case 'CONFLICT':
+        case 'UNAUTHORIZED':
+        case 'FORBIDDEN':
+        case 'SERVER':
+          setFeedback({ type: 'error', message: normalized.message });
+          break;
+        default:
+          setFeedback({ type: 'error', message: normalized.message || 'Ocorreu um erro ao solicitar o reenvio. Tente novamente.' });
       }
     } finally {
       requestInFlight.current = false;
@@ -72,9 +102,11 @@ export default function ResendVerificationPage() {
     <h2>Reenviar confirmação</h2>
     <p>Informe o e-mail utilizado na solicitação de acesso.</p>
     <form className="resend-form" onSubmit={submit}>
-      <label htmlFor="resend-email">E-mail da solicitação<input id="resend-email" type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+      <label htmlFor="resend-email">E-mail da solicitação
+        <input ref={emailRef} id="resend-email" type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+      </label>
       <button type="submit" className="button primary" disabled={isSubmitting || retryAfter > 0}>
-        {isSubmitting ? 'Solicitando...' : retryAfter ? `Tente novamente em ${retryAfter}s` : 'Enviar novo link'}
+        {isSubmitting ? 'Enviando...' : retryAfter ? `Tente novamente em ${retryAfter}s` : 'Enviar novo link'}
       </button>
     </form>
     {feedback.message && <div className={`auth-alert auth-alert--${feedback.type}`} role={feedbackRole} aria-live="polite">{feedback.message}</div>}

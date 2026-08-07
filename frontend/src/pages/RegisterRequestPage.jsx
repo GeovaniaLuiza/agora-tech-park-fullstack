@@ -3,7 +3,7 @@ import { CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 import FormField from '../components/FormField';
-import { registerRequest } from '../services/api';
+import { registerRequest, normalizeApiError } from '../services/api';
 import { normalizeCnpj, validateRegistration } from '../utils/authValidation';
 
 export default function RegisterRequestPage() {
@@ -13,7 +13,7 @@ export default function RegisterRequestPage() {
   const [errors, setErrors] = useState({});
   const [alert, setAlert] = useState('');
   const [outcome, setOutcome] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [show, setShow] = useState(false);
   const [retryAfter, setRetryAfter] = useState(0);
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
@@ -25,25 +25,55 @@ export default function RegisterRequestPage() {
   const submit = async (event) => {
     event.preventDefault();
     if (retryAfter) return;
+    if (isSubmitting) return; // extra guard against double submit
     const next = validateRegistration(form); setErrors(next);
     if (Object.keys(next).length) {
       requestAnimationFrame(() => document.getElementById(Object.keys(next)[0])?.focus());
       return;
     }
-    setLoading(true); setAlert('');
+    setIsSubmitting(true); setAlert('');
     try {
       await registerRequest({ ...form, email: form.email.trim().toLowerCase(), cnpj: normalizeCnpj(form.cnpj) });
       setOutcome('sent');
     } catch (error) {
-      if (error.code === 'EMAIL_DELIVERY_FAILED' && error.requestCreated === true) setOutcome('delivery-failed');
-      else if (error.code === 'EXISTING_ACCESS_REQUEST') setOutcome('existing');
-      else if (error.code === 'RATE_LIMIT_EXCEEDED' || error.status === 429) {
+      const norm = normalizeApiError(error);
+      if (error.code === 'EMAIL_DELIVERY_FAILED' && error.requestCreated === true) {
+        setOutcome('delivery-failed');
+      } else if (error.code === 'EXISTING_ACCESS_REQUEST') {
+        setOutcome('existing');
+      } else if (error.code === 'RATE_LIMIT_EXCEEDED' || error.status === 429) {
         const seconds = Math.max(1, Number(error.retryAfterSeconds) || 60);
         setRetryAfter(seconds);
         setAlert(`Muitas tentativas foram realizadas. Aguarde ${seconds} segundos antes de tentar novamente.`);
-      } else setAlert(error.message || 'Não foi possível enviar a solicitação. Tente novamente mais tarde.');
+      } else if (norm.type === 'NETWORK') {
+        setAlert(norm.message);
+      } else if (norm.type === 'TIMEOUT') {
+        setAlert(norm.message);
+      } else if (norm.type === 'UNAVAILABLE') {
+        setAlert(norm.message);
+      } else if (norm.type === 'VALIDATION') {
+        // Attempt to map field errors to local errors
+        if (norm.fieldErrors && Object.keys(norm.fieldErrors).length) {
+          setErrors((current) => ({ ...current, ...norm.fieldErrors }));
+          requestAnimationFrame(() => {
+            const first = Object.keys(norm.fieldErrors)[0];
+            document.getElementById(first)?.focus();
+          });
+        }
+        setAlert(norm.message || 'Verifique os dados informados e tente novamente.');
+      } else if (norm.type === 'CONFLICT') {
+        setAlert(norm.message || 'Já existe uma solicitação para este e-mail ou CNPJ.');
+      } else if (norm.type === 'UNAUTHORIZED') {
+        setAlert(norm.message);
+      } else if (norm.type === 'FORBIDDEN') {
+        setAlert(norm.message);
+      } else if (norm.type === 'SERVER') {
+        setAlert(norm.message);
+      } else {
+        setAlert(error.message || 'Ocorreu um erro inesperado ao enviar a solicitação. Tente novamente.');
+      }
     }
-    finally { setLoading(false); }
+    finally { setIsSubmitting(false); }
   };
   if (outcome) {
     const content = {
@@ -72,7 +102,7 @@ export default function RegisterRequestPage() {
     <p className="password-hint">Mínimo de 8 caracteres, com letra maiúscula, minúscula e número.</p>
     <div className="auth-grid"><FormField label="CNPJ" name="cnpj" error={errors.cnpj} required><input id="cnpj" inputMode="numeric" value={form.cnpj} onChange={(e) => update('cnpj', normalizeCnpj(e.target.value))} aria-invalid={Boolean(errors.cnpj)} aria-describedby={errors.cnpj ? 'cnpj-error' : undefined} /></FormField><FormField label="Empresa ou startup" name="companyName" error={errors.companyName} required><input id="companyName" value={form.companyName} onChange={(e) => update('companyName', e.target.value)} aria-invalid={Boolean(errors.companyName)} aria-describedby={errors.companyName ? 'companyName-error' : undefined} /></FormField></div>
     <label className="terms"><input id="acceptedTerms" type="checkbox" checked={form.acceptedTerms} onChange={(e) => update('acceptedTerms', e.target.checked)} aria-invalid={Boolean(errors.acceptedTerms)} aria-describedby={errors.acceptedTerms ? 'acceptedTerms-error' : undefined} /> Li e aceito os termos de uso e a política de privacidade.</label>{errors.acceptedTerms && <small id="acceptedTerms-error" className="field-error">{errors.acceptedTerms}</small>}
-    <button className="button primary auth-submit" disabled={loading || retryAfter > 0}>{loading ? 'Enviando...' : retryAfter ? `Tente novamente em ${retryAfter}s` : 'Enviar solicitação'}</button>
+    <button className="button primary auth-submit" disabled={isSubmitting || retryAfter > 0}>{isSubmitting ? 'Enviando...' : retryAfter ? `Tente novamente em ${retryAfter}s` : 'Enviar solicitação'}</button>
     <small>Já possui acesso? <button className="link-button" type="button" onClick={() => navigate('/login')}>Entrar</button></small>
   </form></AuthLayout>;
 }

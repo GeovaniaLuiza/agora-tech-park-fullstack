@@ -1,4 +1,5 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
+﻿const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
+const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 30000;
 
 export const tokenStore = {
   get: () => {
@@ -33,52 +34,110 @@ export class ApiError extends Error {
 
 export async function apiRequest(path, options = {}) {
   const token = tokenStore.get();
+  const controller = new AbortController();
+  const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS;
+  const fetchOptions = {
+    ...options,
+    signal: controller.signal,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: 'Bearer ' + token } : {}),
+      ...options.headers,
+    },
+  };
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
-      ...options,
-      headers: {
-        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options.headers,
-      },
-    });
-  } catch {
-    throw new ApiError(
-      'Não foi possível acessar o serviço. Verifique sua conexão e tente novamente.',
-      0,
-      'NETWORK_ERROR',
-      { networkError: true },
-    );
+    response = await fetch(`${BASE_URL}${path}`, fetchOptions);
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      throw new ApiError('A solicitação demorou mais que o esperado. Tente novamente em alguns instantes.', 0, 'TIMEOUT', { timeout: true });
+    }
+    throw new ApiError('Não foi possível acessar o serviço. Verifique sua conexão e tente novamente.', 0, 'NETWORK_ERROR', { networkError: true });
+  } finally {
+    clearTimeout(timeoutId);
   }
+
   const rawBody = response.status === 204 ? '' : await response.text();
   let data = null;
   if (rawBody) {
-    try { data = JSON.parse(rawBody); }
-    catch { data = { message: rawBody }; }
+    try { data = JSON.parse(rawBody); } catch { data = { message: rawBody }; }
   }
+
   if (!response.ok) {
     if (response.status === 401 && token) {
       tokenStore.clear();
       window.dispatchEvent(new Event('auth:unauthorized'));
     }
-    const retryAfterSeconds = Number(
-      data?.retryAfter ?? data?.retryAfterSeconds ?? response.headers.get('Retry-After'),
-    ) || undefined;
-    throw new ApiError(
-      data?.message || 'Não foi possível concluir a operação',
-      response.status,
-      data?.code,
-      {
-        retryAfterSeconds,
-        retryAfter: retryAfterSeconds,
-        requestCreated: data?.requestCreated,
-        notificationSent: data?.notificationSent,
-        nextAction: data?.nextAction,
-      },
-    );
+    const retryAfterSeconds = Number(data?.retryAfter ?? data?.retryAfterSeconds ?? response.headers.get('Retry-After')) || undefined;
+    throw new ApiError(data?.message || 'Não foi possível concluir a operação', response.status, data?.code, {
+      retryAfterSeconds,
+      retryAfter: retryAfterSeconds,
+      requestCreated: data?.requestCreated,
+      notificationSent: data?.notificationSent,
+      nextAction: data?.nextAction,
+      fields: data?.error?.fields ?? data?.fields ?? undefined,
+    });
   }
+
   return data;
+}
+
+export function normalizeApiError(error) {
+  const out = {
+    type: 'UNKNOWN',
+    message: error?.message || 'Ocorreu um erro inesperado. Tente novamente.',
+    fieldErrors: error?.fields || {},
+    status: error?.status || 0,
+    code: error?.code,
+    details: { ...(error?.details || {}) },
+  };
+  if (!error) return out;
+
+  if (error?.networkError === true || (!error.status && error.code === 'NETWORK_ERROR')) {
+    out.type = 'NETWORK';
+    out.message = 'Não foi possível acessar o serviço. Verifique sua conexão e tente novamente.';
+    return out;
+  }
+
+  if (error?.timeout === true || error.code === 'TIMEOUT') {
+    out.type = 'TIMEOUT';
+    out.message = 'A solicitação demorou mais que o esperado. Tente novamente em alguns instantes.';
+    return out;
+  }
+
+  const status = Number(error.status) || 0;
+  if ([502, 503, 504].includes(status)) {
+    out.type = 'UNAVAILABLE';
+    out.message = 'O serviço está temporariamente indisponível. Tente novamente em alguns minutos.';
+    return out;
+  }
+  if (status === 401) {
+    out.type = 'UNAUTHORIZED';
+    out.message = 'Sua sessão não é válida ou expirou. Faça login novamente.';
+    return out;
+  }
+  if (status === 403) {
+    out.type = 'FORBIDDEN';
+    out.message = 'Você não possui permissão para realizar esta operação.';
+    return out;
+  }
+  if (status === 409) {
+    out.type = 'CONFLICT';
+    out.message = error.message || 'Conflito ao processar a solicitação.';
+    return out;
+  }
+  if (status === 400 || status === 422) {
+    out.type = 'VALIDATION';
+    out.message = error.message || 'Verifique os dados informados e tente novamente.';
+    return out;
+  }
+  if (status === 500) {
+    out.type = 'SERVER';
+    out.message = 'Não foi possível processar sua solicitação no momento. Tente novamente mais tarde.';
+    return out;
+  }
+  return out;
 }
 
 export const login = (email, password) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
@@ -145,7 +204,7 @@ export const markNotificationRead = (id) => apiRequest(`/notifications/${id}/rea
 export async function downloadIndicatorReport(format, filters = {}) {
   const token = tokenStore.get();
   const response = await fetch(`${BASE_URL}/indicators/export/${format}?${new URLSearchParams(filters)}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: token ? { Authorization: 'Bearer ' + token } : {},
   });
   if (!response.ok) {
     let data = {};
@@ -161,7 +220,7 @@ export async function downloadIndicatorReport(format, filters = {}) {
 export async function downloadDashboardSpreadsheet() {
   const token = tokenStore.get();
   const response = await fetch(`${BASE_URL}/dashboard/export`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: token ? { Authorization: 'Bearer ' + token } : {},
   });
   if (!response.ok) {
     let data = {};

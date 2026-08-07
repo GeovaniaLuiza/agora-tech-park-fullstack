@@ -53,7 +53,7 @@ export async function apiRequest(path, options = {}) {
     if (err && err.name === 'AbortError') {
       throw new ApiError('A solicitação demorou mais que o esperado. Tente novamente em alguns instantes.', 0, 'TIMEOUT', { timeout: true });
     }
-    throw new ApiError('Não foi possível acessar o serviço. Verifique sua conexão e tente novamente.', 0, 'NETWORK_ERROR', { networkError: true });
+    throw new ApiError('Não foi possível conectar ao servidor. Verifique se o serviço está disponível e tente novamente.', 0, 'NETWORK_ERROR', { networkError: true });
   } finally {
     clearTimeout(timeoutId);
   }
@@ -96,7 +96,7 @@ export function normalizeApiError(error) {
 
   if (error?.networkError === true || (!error.status && error.code === 'NETWORK_ERROR')) {
     out.type = 'NETWORK';
-    out.message = 'Não foi possível acessar o serviço. Verifique sua conexão e tente novamente.';
+    out.message = 'Não foi possível conectar ao servidor. Verifique se o serviço está disponível e tente novamente.';
     return out;
   }
 

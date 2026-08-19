@@ -2,6 +2,8 @@ import * as responses from '../repositories/responseRepository.js';
 import { hasOrganization } from '../repositories/userRepository.js';
 import { record } from '../repositories/auditRepository.js';
 import { serviceError } from '../utils/validation.js';
+import { responsesSubmitted } from '../observability/metrics.js';
+import { processLinkedAnswers } from './indicatorValueService.js';
 
 async function assertOrganizationAccess(user, organizationId) {
   if (!organizationId) throw serviceError(422, 'Organização obrigatória', 'ORGANIZATION_REQUIRED');
@@ -18,6 +20,7 @@ async function validateCollection(formId, organizationId) {
   if (form.start_date && now < new Date(form.start_date)) throw serviceError(409, 'O período de resposta ainda não começou', 'COLLECTION_NOT_STARTED');
   if (form.end_date && now > new Date(form.end_date)) throw serviceError(409, 'O prazo desta coleta terminou', 'COLLECTION_CLOSED');
   if (!form.targeted) throw serviceError(403, 'Este formulário não foi destinado à sua organização', 'ORGANIZATION_NOT_TARGETED');
+  return form;
 }
 
 async function validateAnswers(formId, answers, requireComplete) {
@@ -35,7 +38,7 @@ async function validateAnswers(formId, answers, requireComplete) {
     if (question.type === 'NUMBER' && !/^-?\d+$/.test(value)) throw serviceError(422, `Resposta inválida para "${question.label}"`, 'INVALID_ANSWER');
     if (question.type === 'DECIMAL' && !Number.isFinite(Number(value.replace(',', '.')))) throw serviceError(422, `Resposta inválida para "${question.label}"`, 'INVALID_ANSWER');
     if (question.type === 'OPTION' && !question.options.includes(value)) throw serviceError(422, `Opção inválida para "${question.label}"`, 'INVALID_OPTION');
-    normalized.push({ questionId: question.id, value });
+    normalized.push({ questionId: question.id, value, indicator_id: question.indicator_id || null });
   }
   if (requireComplete) {
     const answered = new Set(normalized.map((answer) => answer.questionId));
@@ -48,22 +51,28 @@ async function validateAnswers(formId, answers, requireComplete) {
 async function write(formId, body, user, submit) {
   if (user.role !== 'RESIDENTE') throw serviceError(403, 'Apenas residentes preenchem respostas', 'FORBIDDEN');
   await assertOrganizationAccess(user, body.organizationId);
-  await validateCollection(formId, body.organizationId);
+  const form = await validateCollection(formId, body.organizationId);
   const answers = await validateAnswers(formId, body.answers, submit);
   const result = await (submit ? responses.submit : responses.saveDraft)({
     formId,
     organizationId: body.organizationId,
     userId: user.sub,
     answers,
+    processSubmission: submit ? async (responseId, client) => {
+      const indicatorsUpdated = form.indicator_year
+        ? await processLinkedAnswers({ responseId, organizationId: body.organizationId,
+          centerId: form.innovation_center_id, year: form.indicator_year,
+          month: form.indicator_month, userId: user.sub, answers }, client)
+        : 0;
+      await record({ userId: user.sub, action: 'RESPONSE_SUBMITTED', entity: 'response', entityId: responseId,
+        details: { formId, organizationId: body.organizationId, indicatorsUpdated } }, client);
+      return indicatorsUpdated;
+    } : null,
   });
   if (result.conflict) throw serviceError(409, 'A resposta já foi enviada e precisa ser reaberta antes de ser alterada', 'RESPONSE_ALREADY_SUBMITTED');
-  await record({
-    userId: user.sub,
-    action: submit ? 'RESPONSE_SUBMITTED' : 'RESPONSE_DRAFT_SAVED',
-    entity: 'response',
-    entityId: result.id,
-    details: { formId, organizationId: body.organizationId },
-  });
+  if (submit) responsesSubmitted.inc();
+  if (!submit) await record({ userId: user.sub, action: 'RESPONSE_DRAFT_SAVED', entity: 'response',
+    entityId: result.id, details: { formId, organizationId: body.organizationId } });
   return result;
 }
 

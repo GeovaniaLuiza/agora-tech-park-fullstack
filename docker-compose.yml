@@ -24,6 +24,8 @@ services:
       - ./database/migrations/009_password_reset.sql:/docker-entrypoint-initdb.d/009_password_reset.sql
       - ./database/migrations/010_notifications_indicator_source.sql:/docker-entrypoint-initdb.d/010_notifications_indicator_source.sql
       - ./database/migrations/011_dashboard_institutional_indicators.sql:/docker-entrypoint-initdb.d/011_dashboard_institutional_indicators.sql
+      - ./database/migrations/012_form_respondents.sql:/docker-entrypoint-initdb.d/012_form_respondents.sql
+      - ./database/migrations/013_indicator_management.sql:/docker-entrypoint-initdb.d/013_indicator_management.sql
       - ./database/seed.sql:/docker-entrypoint-initdb.d/009_seed.sql
   migrate-auth-schema:
     image: postgres:16-alpine
@@ -36,6 +38,8 @@ services:
       - ./database/runtime/ensure_auth_schema.sql:/migrations/ensure_auth_schema.sql:ro
       - ./database/migrations/010_notifications_indicator_source.sql:/migrations/010_notifications_indicator_source.sql:ro
       - ./database/migrations/011_dashboard_institutional_indicators.sql:/migrations/011_dashboard_institutional_indicators.sql:ro
+      - ./database/migrations/012_form_respondents.sql:/migrations/012_form_respondents.sql:ro
+      - ./database/migrations/013_indicator_management.sql:/migrations/013_indicator_management.sql:ro
     command:
       - psql
       - --host=postgres
@@ -44,6 +48,8 @@ services:
       - --file=/migrations/ensure_auth_schema.sql
       - --file=/migrations/010_notifications_indicator_source.sql
       - --file=/migrations/011_dashboard_institutional_indicators.sql
+      - --file=/migrations/012_form_respondents.sql
+      - --file=/migrations/013_indicator_management.sql
     restart: "no"
   mailpit:
     image: axllent/mailpit:v1.30.6

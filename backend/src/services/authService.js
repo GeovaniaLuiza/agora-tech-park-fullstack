@@ -3,13 +3,18 @@ import jwt from 'jsonwebtoken';
 import * as users from '../repositories/userRepository.js';
 import * as verificationTokens from '../repositories/emailVerificationRepository.js';
 import * as passwordResetTokens from '../repositories/passwordResetRepository.js';
+import * as notifications from '../repositories/notificationRepository.js';
 import * as emailService from './emailService.js';
 import { record } from '../repositories/auditRepository.js';
 import { serviceError } from '../utils/validation.js';
 import { ROLE_VALUES, ROLES, USER_STATUS } from '../domain/accessControl.js';
 import { classifyEmailError } from '../email/smtpProvider.js';
+import { logger } from '../observability/logger.js';
+import { emailFailures } from '../observability/metrics.js';
 
 const genericLoginError = () => serviceError(401, 'E-mail ou senha inválidos.', 'INVALID_CREDENTIALS');
+const MAX_AVATAR_DATA_LENGTH = 2_800_000;
+const AVATAR_DATA_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 const acceptedResend = Object.freeze({
   message: 'Solicitação processada. Se existir um cadastro pendente para este e-mail, uma nova mensagem de confirmação será enviada.',
   status: 'REQUEST_ACCEPTED',
@@ -23,7 +28,8 @@ const acceptedPasswordReset = Object.freeze({
 
 async function recordDeliveryFailure(userId, type, error) {
   const reason = classifyEmailError(error);
-  console.error(`[email] Falha de entrega (${type}:${reason})`);
+  emailFailures.inc({ purpose: type, reason });
+  logger.error({ event: 'email_delivery_failed', purpose: type, reason }, 'Email delivery failed');
   await record({ action: 'EMAIL_DELIVERY_FAILED', entityId: userId, details: { type, reason } }).catch(() => {});
 }
 
@@ -33,11 +39,11 @@ export async function login({ email, password }, ipAddress) {
   if (user.status === USER_STATUS.EMAIL_PENDING || !user.email_verified_at) throw serviceError(403, 'Confirme seu e-mail antes de continuar.', 'EMAIL_NOT_VERIFIED');
   if (user.status === USER_STATUS.PENDING) throw serviceError(403, 'Seu e-mail foi confirmado e sua solicitação está aguardando análise.', 'APPROVAL_PENDING');
   if (user.status !== USER_STATUS.ACTIVE || !ROLE_VALUES.includes(user.role)) {
-    throw serviceError(403, 'Esta conta não está disponível para acesso. Entre em contato com o Ágora Tech Park.', 'ACCOUNT_UNAVAILABLE');
+    throw serviceError(403, 'Esta conta não está disponível no momento. Verifique se seu acesso está ativo e se sua organização está vinculada. Se precisar, contate o administrador do Ágora Tech Park.', 'ACCOUNT_UNAVAILABLE');
   }
   const profile = await users.findPublicProfile(user.id);
   if (user.role === ROLES.RESIDENT && !profile.organizations.length) {
-    throw serviceError(403, 'Esta conta não está disponível para acesso. Entre em contato com o Ágora Tech Park.', 'ACCOUNT_UNAVAILABLE');
+    throw serviceError(403, 'Esta conta não está disponível no momento. Verifique se seu acesso está ativo e se sua organização está vinculada. Se precisar, contate o administrador do Ágora Tech Park.', 'ACCOUNT_UNAVAILABLE');
   }
   await users.recordLogin(user.id, (client) =>
     record({ userId: user.id, action: 'USER_LOGIN', entityId: user.id, ipAddress }, client));
@@ -104,6 +110,19 @@ export async function verifyEmail(rawToken, ipAddress) {
   catch (error) {
     notificationSent = false;
     await recordDeliveryFailure(result.user.id, 'VERIFIED', error);
+  }
+  // A solicitação só fica disponível para análise depois da confirmação do e-mail.
+  // Nesse ponto, avise todos os administradores ativos no canal interno.
+  try {
+    const adminIds = await users.findActiveAdminIds();
+    await notifications.createMany(adminIds, {
+      title: 'Nova solicitação de acesso',
+      message: `${result.user.name} confirmou o e-mail e aguarda análise.`,
+      link: '/admin/solicitacoes',
+    });
+  } catch (error) {
+    // A confirmação não deve falhar caso o canal interno esteja temporariamente indisponível.
+    logger.error({ event: 'notification_creation_failed', err: error }, 'Failed to create access request notification');
   }
   return {
     message: 'E-mail confirmado com sucesso. Sua solicitação de acesso foi encaminhada para análise da equipe do Ágora Tech Park.',
@@ -179,5 +198,14 @@ export async function resetPassword(token, password, ipAddress) {
 }
 
 export const me = (userId) => users.findPublicProfile(userId);
+export async function updateAvatar(userId, avatarData) {
+  if (avatarData !== null && (typeof avatarData !== 'string' || avatarData.length > MAX_AVATAR_DATA_LENGTH || !AVATAR_DATA_PATTERN.test(avatarData))) {
+    throw serviceError(422, 'Envie uma imagem JPG, PNG ou WebP de até 2 MB.', 'INVALID_AVATAR');
+  }
+  const profile = await users.updateAvatar(userId, avatarData);
+  if (!profile) throw serviceError(404, 'Usuário não encontrado.', 'USER_NOT_FOUND');
+  await record({ userId, action: 'USER_AVATAR_UPDATED', entity: 'user', entityId: userId });
+  return { ...profile, organizations: await users.organizationsForUser(userId) };
+}
 export const logout = (userId, ipAddress) =>
   record({ userId, action: 'USER_LOGOUT', entityId: userId, ipAddress });

@@ -10,11 +10,12 @@ export const ROLE_HOME = {
 export const ROUTE_ROLES = {
   '/admin': ['ADMIN'],
   '/admin/solicitacoes': ['ADMIN'],
-  '/dashboard': ['ADMIN', 'PESQUISADOR', 'GESTOR'],
+  '/dashboard': ['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE'],
   '/pesquisa': ['ADMIN', 'PESQUISADOR'],
   '/forms': ['ADMIN', 'PESQUISADOR'],
   '/forms/new': ['ADMIN', 'PESQUISADOR'],
   '/indicators': ['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE'],
+  '/indicators/catalog': ['ADMIN', 'PESQUISADOR'],
   '/organizations': ['ADMIN', 'PESQUISADOR', 'GESTOR'],
   '/admin/requests': ['ADMIN'],
   '/resident/forms': ['RESIDENTE'],

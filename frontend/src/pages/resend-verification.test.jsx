@@ -65,9 +65,9 @@ describe('reenvio de confirmação', () => {
     api.resendVerification.mockImplementation(() => new Promise((resolve) => { resolveRequest = resolve; }));
     renderPage();
     fillAndSubmit();
-    fireEvent.submit(screen.getByRole('button', { name: /solicitando/i }).closest('form'));
+    fireEvent.submit(screen.getByRole('button', { name: /enviando/i }).closest('form'));
 
-    expect(screen.getByRole('button', { name: /solicitando/i }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: /enviando/i }).disabled).toBe(true);
     expect(api.resendVerification).toHaveBeenCalledTimes(1);
     await act(async () => resolveRequest({ status: 'REQUEST_ACCEPTED' }));
     expect(await screen.findByRole('status')).toBeTruthy();

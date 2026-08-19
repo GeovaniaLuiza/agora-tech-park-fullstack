@@ -1,0 +1,15 @@
+{
+  "annotations": { "list": [] }, "editable": true, "graphTooltip": 1,
+  "panels": [
+    { "type": "stat", "title": "Usuários ativos (30 dias)", "id": 1, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "agora_business_entities{entity=\"active_users\"}" }], "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 } },
+    { "type": "stat", "title": "Formulários publicados", "id": 2, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "agora_business_entities{entity=\"published_forms\"}" }], "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 } },
+    { "type": "stat", "title": "Respostas submetidas", "id": 3, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "agora_business_entities{entity=\"submitted_responses\"}" }], "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 } },
+    { "type": "stat", "title": "Notificações não lidas", "id": 4, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "agora_business_entities{entity=\"unread_notifications\"}" }], "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 } },
+    { "type": "timeseries", "title": "Falhas de login", "id": 5, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "sum by (reason) (rate(agora_login_failures_total[5m]))", "legendFormat": "{{reason}}" }], "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 } },
+    { "type": "timeseries", "title": "Falhas de e-mail", "id": 6, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "sum by (purpose, reason) (rate(agora_email_failures_total[5m]))", "legendFormat": "{{purpose}} / {{reason}}" }], "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 } },
+    { "type": "timeseries", "title": "Eventos de formulário e resposta", "id": 7, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "rate(agora_forms_created_total[5m])", "legendFormat": "criados" }, { "refId": "B", "expr": "rate(agora_forms_published_total[5m])", "legendFormat": "publicados" }, { "refId": "C", "expr": "rate(agora_responses_submitted_total[5m])", "legendFormat": "respostas" }], "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }, "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 } }
+  ],
+  "refresh": "1m", "schemaVersion": 41, "tags": ["agora", "negocio"],
+  "templating": { "list": [{ "name": "DS_PROMETHEUS", "type": "datasource", "query": "prometheus", "label": "Prometheus" }] },
+  "time": { "from": "now-24h", "to": "now" }, "title": "Ágora — Aplicação", "uid": "agora-application", "version": 1
+}

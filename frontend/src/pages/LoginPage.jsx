@@ -33,14 +33,14 @@ export default function LoginPage() {
       const messages = {
         EMAIL_NOT_VERIFIED: 'Confirme seu e-mail antes de continuar.',
         APPROVAL_PENDING: 'Seu e-mail foi confirmado e sua solicitação está aguardando análise.',
-        ACCOUNT_UNAVAILABLE: 'Esta conta não está disponível para acesso. Entre em contato com o Ágora Tech Park.',
+        ACCOUNT_UNAVAILABLE: 'Esta conta não está disponível no momento. Verifique se seu acesso está ativo e se sua organização está vinculada. Se precisar, contate o administrador do Ágora Tech Park.',
       };
       setAlert(messages[error.code] || 'E-mail ou senha inválidos.');
     }
     finally { setLoading(false); }
   };
   return <AuthLayout><form className="auth-form" onSubmit={submit} noValidate>
-    <h2>Bem-vindo de volta</h2><p>Acesse o painel de indicadores.</p>
+    <h2>Bem-vindo</h2><p>Acesse o painel de indicadores.</p>
     <div className="auth-alert" aria-live="polite">{alert || sessionError}</div>
     <FormField label="E-mail" name="email" error={errors.email} required><input ref={emailRef} id="email" type="email" autoComplete="email" value={form.email} onChange={(e) => update('email', e.target.value)} aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? 'email-error' : undefined} /></FormField>
     <FormField label="Senha" name="password" error={errors.password} required><div className="password-input"><input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={form.password} onChange={(e) => update('password', e.target.value)} aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? 'password-error' : undefined} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ocultar senha' : 'Exibir senha'}>{showPassword ? <EyeOff /> : <Eye />}</button></div></FormField>

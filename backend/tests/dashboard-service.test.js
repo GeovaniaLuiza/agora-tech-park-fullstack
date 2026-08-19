@@ -4,7 +4,7 @@ import { normalizeFilters } from '../src/services/dashboardService.js';
 describe('filtros do dashboard institucional', () => {
   it('normaliza ano, mês, categoria, intervalo e origem', () => {
     expect(normalizeFilters({ year: '2025', month: '6', category: 'Financeiro', startDate: '2025-06-01', endDate: '2025-06-30' })).toEqual({
-      year: 2025, month: 6, category: 'Financeiro', sourceType: 'SPREADSHEET_IMPORT', startDate: '2025-06-01', endDate: '2025-06-30',
+      year: 2025, month: 6, category: 'Financeiro', sourceType: 'LIVE', centerId: null, startDate: '2025-06-01', endDate: '2025-06-30',
     });
   });
 

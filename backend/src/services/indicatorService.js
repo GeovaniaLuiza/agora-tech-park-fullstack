@@ -31,8 +31,53 @@ function pdfEscape(value) {
   return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '?').replace(/[()\\]/g, '\\$&');
 }
 
-function pdf(rows) {
-  const lines = ['Relatorio de indicadores - Centro de Inovacao de Joinville', `Gerado em ${new Date().toLocaleDateString('pt-BR')}`, '', ...rows.map((row) => `${row.name}: ${reportValue(row)} ${row.unit || ''} (${row.period})`)];
+function pdf(rows, filters = {}, user = {}) {
+  const generated = new Date();
+  const date = generated.toLocaleDateString('pt-BR');
+  const time = generated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const values = rows.map((row) => reportValue(row));
+  const hasValue = (value) => value !== '' && value !== null && value !== undefined;
+  const withData = values.filter(hasValue).length;
+  const withoutData = rows.length - withData;
+  const lines = [
+    'RELATORIO DE INDICADORES',
+    `Centro de Inovacao: ${filters.center || 'Centro de Inovacao'}`,
+    `Periodo de referencia: ${filters.period || 'Todos os periodos'}`,
+    `Data de geracao: ${date} as ${time}`,
+    `Gerado por: ${user.email || user.name || 'Sistema'}`,
+    '',
+    '1. RESUMO EXECUTIVO',
+    `Total de indicadores: ${rows.length}`,
+    'Indicadores atingidos: Nao informado (metas nao cadastradas)',
+    'Indicadores parcialmente atingidos: Nao informado',
+    'Indicadores nao atingidos: Nao informado',
+    `Indicadores sem dados: ${withoutData}`,
+    'Percentual geral de atingimento: Nao informado',
+    '',
+    '2. INDICADORES',
+    'Indicador | Meta | Resultado | Atingimento | Status',
+    ...rows.map((row, index) => `${row.name || row.code} | Nao informado | ${hasValue(values[index]) ? values[index] : 'Sem dados'} | Nao informado | ${hasValue(values[index]) ? 'Acompanhamento' : 'Sem dados'}`),
+    '',
+    '3. DETALHAMENTO DOS INDICADORES',
+    ...rows.flatMap((row, index) => [`${row.name || row.code}`, `Descricao: ${row.description || 'Nao informada'}`, `Eixo/Categoria: ${row.category || 'Nao informado'}`, `Unidade de medida: ${row.unit || 'Nao informada'}`, 'Meta: Nao informada', `Resultado: ${hasValue(values[index]) ? values[index] : 'Sem dados'}`, 'Percentual de atingimento: Nao informado', `Status: ${hasValue(values[index]) ? 'Acompanhamento' : 'Sem dados'}`, `Periodo: ${row.period || filters.period || 'Nao informado'}`, `Responsavel: ${user.email || user.name || 'Sistema'}`, `Fonte dos dados: ${row.source || 'Nao informada'}`, `Ultima atualizacao: ${date}`, '']),
+    '4. EVOLUCAO DOS INDICADORES',
+    'Historico disponivel conforme os filtros selecionados.',
+    '',
+    '5. FILTROS APLICADOS',
+    `Centro de Inovacao: ${filters.center || 'Todos'}`,
+    `Periodo: ${filters.period || 'Todos'}`,
+    `Categoria/Eixo: ${filters.category || 'Todas'}`,
+    `Status: ${filters.status || 'Todos'}`,
+    `Indicadores selecionados: ${rows.length}`,
+    '',
+    '6. INFORMACOES DA EXPORTACAO',
+    'Formato: PDF',
+    `Data e hora da exportacao: ${date} as ${time}`,
+    `Usuario responsavel: ${user.email || user.name || 'Sistema'}`,
+    `Quantidade de indicadores: ${rows.length}`,
+    '',
+    'Documento gerado automaticamente pela Plataforma de Indicadores.',
+  ];
   const commands = lines.map((line, index) => `BT /F1 11 Tf 50 ${790 - index * 18} Td (${pdfEscape(line)}) Tj ET`).join('\n');
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
@@ -53,7 +98,7 @@ export async function exportReport(format, filters, user) {
   const rows = await repository.summary(filters);
   if (!['pdf', 'excel', 'csv'].includes(format)) throw serviceError(422, 'Formato de exportação inválido', 'INVALID_EXPORT_FORMAT');
   await record({ userId: user.sub, action: 'INDICATORS_EXPORTED', entity: 'indicator', details: { format, period: filters.period || null } });
-  if (format === 'pdf') return { body: pdf(rows), contentType: 'application/pdf', extension: 'pdf' };
+  if (format === 'pdf') return { body: pdf(rows, filters, user), contentType: 'application/pdf', extension: 'pdf' };
   if (format === 'csv') {
     const escape = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
     const body = ['Código,Indicador,Valor,Unidade,Período,Origem', ...rows.map((row) => [row.code, row.name, reportValue(row), row.unit, row.period, row.source].map(escape).join(','))].join('\r\n');

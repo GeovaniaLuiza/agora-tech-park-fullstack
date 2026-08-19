@@ -8,8 +8,12 @@ const manage = [authenticate, authorize('ADMIN', 'PESQUISADOR')];
 
 router.get('/', authenticate, controller.list);
 router.get('/recipients/eligible', ...manage, controller.eligibleRecipients);
+router.get('/indicator-definitions', ...manage, controller.indicatorDefinitions);
 router.post('/', ...manage, validateForm, controller.create);
+router.put('/:id/audience', ...manage, controller.saveAudience);
 router.post('/:id/publish', ...manage, controller.publish);
+router.get('/:id/respondents', ...manage, controller.respondents);
+router.post('/:id/respondents/:userId/resend', ...manage, controller.resend);
 router.post('/:id/close', ...manage, controller.close);
 router.post('/:id/duplicate', ...manage, controller.duplicate);
 router.patch('/:id/archive', ...manage, controller.archive);

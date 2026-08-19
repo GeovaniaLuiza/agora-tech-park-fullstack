@@ -5,12 +5,12 @@ import jwt from 'jsonwebtoken';
 
 const userRepo = vi.hoisted(() => ({
   findByEmail: vi.fn(), findById: vi.fn(), findPublicProfile: vi.fn(),
-  createPending: vi.fn(), hasOrganization: vi.fn(), organizationsForUser: vi.fn(), recordLogin: vi.fn(),
+  createPending: vi.fn(), hasOrganization: vi.fn(), organizationsForUser: vi.fn(), recordLogin: vi.fn(), findActiveAdminIds: vi.fn(),
 }));
 const auditRepo = vi.hoisted(() => ({ record: vi.fn(), list: vi.fn() }));
 const accessRepo = vi.hoisted(() => ({
   listPending: vi.fn(), approve: vi.fn(), findRequest: vi.fn(), reject: vi.fn(), setStatus: vi.fn(), setRole: vi.fn(), linkOrganization: vi.fn(),
-  organizationExists: vi.fn(), userHasOrganization: vi.fn(),
+  organizationExists: vi.fn(), userHasOrganization: vi.fn(), createManagedUser: vi.fn(), listUsers: vi.fn(),
 }));
 const responseRepo = vi.hoisted(() => ({
   submit: vi.fn(), saveDraft: vi.fn(), history: vi.fn(), findByFormAndOrganization: vi.fn(),
@@ -23,12 +23,16 @@ const verificationRepo = vi.hoisted(() => ({
   markDelivered: vi.fn(),
   markDeliveryFailed: vi.fn(),
 }));
-const emailService = vi.hoisted(() => ({ sendVerification: vi.fn(), sendVerified: vi.fn(), sendApproved: vi.fn(), sendRejected: vi.fn(), sendInactive: vi.fn() }));
+const passwordResetRepo = vi.hoisted(() => ({ issue: vi.fn() }));
+const emailService = vi.hoisted(() => ({ sendVerification: vi.fn(), sendVerified: vi.fn(), sendApproved: vi.fn(), sendRejected: vi.fn(), sendInactive: vi.fn(), sendPasswordReset: vi.fn() }));
+const notificationRepo = vi.hoisted(() => ({ createMany: vi.fn() }));
 vi.mock('../src/repositories/userRepository.js', () => userRepo);
+vi.mock('../src/repositories/notificationRepository.js', () => notificationRepo);
 vi.mock('../src/repositories/auditRepository.js', () => auditRepo);
 vi.mock('../src/repositories/accessRepository.js', () => accessRepo);
 vi.mock('../src/repositories/responseRepository.js', () => responseRepo);
 vi.mock('../src/repositories/emailVerificationRepository.js', () => verificationRepo);
+vi.mock('../src/repositories/passwordResetRepository.js', () => passwordResetRepo);
 vi.mock('../src/services/emailService.js', () => emailService);
 
 import app from '../src/app.js';
@@ -45,6 +49,8 @@ beforeEach(() => {
   userRepo.findById.mockImplementation(async (id) => id === activeUser.id ? activeUser : resident);
   userRepo.findPublicProfile.mockImplementation(async (id) => ({ ...(id === activeUser.id ? activeUser : resident), organizations: id === activeUser.id ? [] : [{ id: '55555555-5555-5555-5555-555555555555' }] }));
   userRepo.recordLogin.mockImplementation(async (_id, audit) => audit({ query: vi.fn() }));
+  userRepo.findActiveAdminIds.mockResolvedValue([activeUser.id]);
+  notificationRepo.createMany.mockResolvedValue([]);
   accessRepo.organizationExists.mockResolvedValue(true);
   accessRepo.userHasOrganization.mockResolvedValue(true);
   accessRepo.reject.mockImplementation(async (_id, _adminId, _reason, audit) => {
@@ -58,6 +64,8 @@ beforeEach(() => {
   emailService.sendVerified.mockResolvedValue({});
   emailService.sendApproved.mockResolvedValue({});
   emailService.sendRejected.mockResolvedValue({});
+  emailService.sendPasswordReset.mockResolvedValue({});
+  passwordResetRepo.issue.mockResolvedValue({ rawToken: 'managed-user-password-token', expiresHours: 1 });
   responseRepo.submissionContext.mockResolvedValue({
     id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     status: 'ACTIVE',
@@ -148,6 +156,10 @@ describe('autenticação e solicitação de acesso', () => {
     verificationRepo.verify.mockResolvedValueOnce({ state: 'VERIFIED', user: resident });
     const valid = await request(app).post('/api/auth/verify-email').send({ token: rawToken });
     expect(valid.status).toBe(200);
+    expect(notificationRepo.createMany).toHaveBeenCalledWith([activeUser.id], expect.objectContaining({
+      title: 'Nova solicitação de acesso',
+      link: '/admin/solicitacoes',
+    }));
     expect(valid.body).not.toHaveProperty('token');
     expect(valid.body).not.toHaveProperty('user');
     expect(emailService.sendVerified).toHaveBeenCalled();
@@ -175,6 +187,31 @@ describe('autenticação e solicitação de acesso', () => {
     expect((await request(app).post('/api/auth/login').send({ email: resident.email, password: 'Senha123' })).body.code).toBe('EMAIL_NOT_VERIFIED');
     userRepo.findByEmail.mockResolvedValue({ ...resident, status: 'PENDING', email_verified_at: new Date().toISOString(), password_hash: passwordHash });
     expect((await request(app).post('/api/auth/login').send({ email: resident.email, password: 'Senha123' })).body.code).toBe('APPROVAL_PENDING');
+  });
+  it('bloqueia conta inativa, perfil inválido e residente sem organização ativa', async () => {
+    userRepo.findByEmail.mockResolvedValue({ ...activeUser, status: 'INACTIVE', password_hash: passwordHash });
+    let response = await request(app).post('/api/auth/login').send({ email: activeUser.email, password: 'Senha123' });
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({ code: 'ACCOUNT_UNAVAILABLE', message: expect.stringContaining('não está disponível') });
+
+    userRepo.findByEmail.mockResolvedValue({ ...activeUser, role: 'PERFIL_INVALIDO', password_hash: passwordHash });
+    response = await request(app).post('/api/auth/login').send({ email: activeUser.email, password: 'Senha123' });
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('ACCOUNT_UNAVAILABLE');
+
+    userRepo.findByEmail.mockResolvedValue({ ...resident, password_hash: passwordHash });
+    userRepo.findPublicProfile.mockResolvedValue({ ...resident, organizations: [] });
+    response = await request(app).post('/api/auth/login').send({ email: resident.email, password: 'Senha123' });
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({ code: 'ACCOUNT_UNAVAILABLE', message: expect.stringContaining('não está disponível') });
+  });
+
+  it('permite residente ativo com organização ativa', async () => {
+    userRepo.findByEmail.mockResolvedValue({ ...resident, password_hash: passwordHash });
+    userRepo.findPublicProfile.mockResolvedValue({ ...resident, organizations: [{ id: '55555555-5555-5555-5555-555555555555' }] });
+    const response = await request(app).post('/api/auth/login').send({ email: resident.email, password: 'Senha123' });
+    expect(response.status).toBe(200);
+    expect(response.body.user.role).toBe('RESIDENTE');
   });
   it('reenvio mantém resposta 202 idêntica para conta inexistente, confirmada ou não elegível', async () => {
     userRepo.findByEmail
@@ -315,6 +352,38 @@ describe('autenticação e solicitação de acesso', () => {
 });
 
 describe('RBAC administrativo e isolamento do residente', () => {
+  it('permite ADMIN cadastrar todos os perfis e exige organização para residente', async () => {
+    accessRepo.createManagedUser.mockImplementation(async (payload, audit) => {
+      const created = { id: '77777777-7777-7777-7777-777777777777', name: payload.name, email: payload.email, role: payload.role, status: 'ACTIVE' };
+      await audit({ query: vi.fn() }, created);
+      return created;
+    });
+    const authorization = { Authorization: `Bearer ${tokenFor(activeUser)}` };
+    const created = await request(app).post('/api/admin/users').set(authorization).send({ name: 'Nova Admin', email: 'nova.admin@agora.test', role: 'ADMIN' });
+    expect(created.status).toBe(201);
+    expect(created.body.role).toBe('ADMIN');
+    expect(created.body.invitationSent).toBe(true);
+    expect(emailService.sendPasswordReset).toHaveBeenCalled();
+    const invalidResident = await request(app).post('/api/admin/users').set(authorization).send({ name: 'Novo Residente', email: 'residente.novo@agora.test', role: 'RESIDENTE' });
+    expect(invalidResident.status).toBe(422);
+    expect(invalidResident.body.code).toBe('ORGANIZATION_REQUIRED');
+  });
+  it('valida nome com caracteres Unicode e rejeita nome ou e-mail malformado', async () => {
+    const authorization = { Authorization: `Bearer ${tokenFor(activeUser)}` };
+    accessRepo.createManagedUser.mockImplementation(async (payload) => ({ id: '77777777-7777-7777-7777-777777777777', ...payload, status: 'ACTIVE' }));
+    const accented = await request(app).post('/api/admin/users').set(authorization)
+      .send({ name: 'João D’Ávila', email: 'joao.davila@agora.test', role: 'GESTOR' });
+    expect(accented.status).toBe(201);
+    expect(accented.body.name).toBe('João D’Ávila');
+    const invalidName = await request(app).post('/api/admin/users').set(authorization)
+      .send({ name: '<script>', email: 'nome@agora.test', role: 'GESTOR' });
+    expect(invalidName.status).toBe(422);
+    expect(invalidName.body.code).toBe('INVALID_NAME');
+    const invalidEmail = await request(app).post('/api/admin/users').set(authorization)
+      .send({ name: 'Nome Válido', email: 'nome@dominio', role: 'GESTOR' });
+    expect(invalidEmail.status).toBe(422);
+    expect(invalidEmail.body.code).toBe('INVALID_EMAIL');
+  });
   it('permite aprovação apenas para ADMIN', async () => {
     accessRepo.findRequest.mockResolvedValue({ ...resident, role: null, status: 'PENDING', email_verified_at: new Date().toISOString() });
     accessRepo.approve.mockImplementation(async (_payload, audit) => {

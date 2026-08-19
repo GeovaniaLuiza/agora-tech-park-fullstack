@@ -7,7 +7,8 @@ import * as repository from '../repositories/spreadsheetImportRepository.js';
 import { record } from '../repositories/auditRepository.js';
 import { serviceError } from '../utils/validation.js';
 
-const DEFAULT_FILE = fileURLToPath(new URL('../../../frontend/imgs/Indicadores Rede de Centros de Inovação 2025_Joinville.xlsx', import.meta.url));
+const DEFAULT_YEAR = 2026;
+const DEFAULT_FILE = fileURLToPath(new URL('../../../frontend/imgs/Indicadores Rede de Centros de Inovação 2026_Joinville.xlsx', import.meta.url));
 
 export function configuredSpreadsheetPath() {
   return process.env.INDICATOR_SPREADSHEET_PATH
@@ -29,7 +30,7 @@ export async function exportSource(user) {
     userId: user.sub,
     action: 'SPREADSHEET_EXPORTED',
     entity: 'spreadsheet_import',
-    details: { fileName: source.fileName, fileHash: source.fileHash, sheetName: 'CI JOINVILLE', year: 2025 },
+    details: { fileName: source.fileName, fileHash: source.fileHash, sheetName: 'CI JOINVILLE', year: DEFAULT_YEAR },
   });
   return { body: source.body, fileName: source.fileName };
 }
@@ -51,13 +52,13 @@ export async function validateSource() {
 
 export async function importSource(user, { reprocess = false } = {}) {
   const source = await readSource();
-  const duplicate = await repository.findImported(source.fileHash, 'CI JOINVILLE', 2025);
+  const duplicate = await repository.findImported(source.fileHash, 'CI JOINVILLE', DEFAULT_YEAR);
   if (duplicate && !reprocess) return { ...duplicate, duplicate: true };
-  const previous = await repository.findImportedYear('CI JOINVILLE', 2025);
-  if (previous && !reprocess) throw serviceError(409, 'Já existe uma importação de 2025. Reprocessamento exige autorização explícita.', 'IMPORT_REPROCESS_REQUIRED', { importId: previous.id });
+  const previous = await repository.findImportedYear('CI JOINVILLE', DEFAULT_YEAR);
+  if (previous && !reprocess) throw serviceError(409, 'Já existe uma importação de 2026. Reprocessamento exige autorização explícita.', 'IMPORT_REPROCESS_REQUIRED', { importId: previous.id });
   const parsed = await parseIndicatorWorkbook(source.filePath);
   if (parsed.errors.some((error) => error.code === 'REFERENCE_MISMATCH')) {
-    throw serviceError(422, 'Os totais da planilha não coincidem com as referências de 2025', 'SPREADSHEET_REFERENCE_MISMATCH', { errors: parsed.errors });
+    throw serviceError(422, 'Os totais da planilha não coincidem com as referências de 2026', 'SPREADSHEET_REFERENCE_MISMATCH', { errors: parsed.errors });
   }
   const result = await repository.persistImport({ ...source, parsed, userId: user?.sub || null, reprocess });
   if (result.conflict) throw serviceError(409, 'Já existe uma importação para este período', 'IMPORT_REPROCESS_REQUIRED', { importId: result.id });

@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   getEligibleFormRecipients: vi.fn(),
   createForm: vi.fn(),
   addFormQuestion: vi.fn(),
+  saveFormAudience: vi.fn(),
 }));
 
 vi.mock('./contexts/AuthContext', () => ({ useAuth: () => auth.value }));
@@ -27,6 +28,7 @@ vi.mock('./services/api', async (original) => ({
   getEligibleFormRecipients: api.getEligibleFormRecipients,
   createForm: api.createForm,
   addFormQuestion: api.addFormQuestion,
+  saveFormAudience: api.saveFormAudience,
 }));
 
 import App from './App';
@@ -38,6 +40,7 @@ beforeEach(() => {
   api.getEligibleFormRecipients.mockResolvedValue([]);
   api.createForm.mockResolvedValue({ id: 'form-1' });
   api.addFormQuestion.mockResolvedValue({ id: 'question-1' });
+  api.saveFormAudience.mockResolvedValue({});
   auth.value = {
     user: { id: '1', name: 'Admin Teste', role: 'ADMIN', organizations: [] },
     loading: false,
@@ -92,4 +95,5 @@ describe('roteamento principal', () => {
     expect(api.addFormQuestion).not.toHaveBeenCalled();
     await waitFor(() => expect(window.location.pathname).toBe('/forms'));
   });
+
 });

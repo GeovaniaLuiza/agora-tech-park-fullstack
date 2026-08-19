@@ -1,9 +1,26 @@
 {
   "name": "agora-indicadores",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <25"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "install:all": "npm install --prefix backend && npm install --prefix frontend"
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "lint": "eslint backend/src backend/scripts backend/tests frontend/src frontend/vite.config.js scripts",
+    "test": "npm test --prefix backend && npm test --prefix frontend",
+    "test:coverage": "npm run test:coverage --prefix backend && npm run test:coverage --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "audit": "npm audit --audit-level=high && npm audit --prefix backend --audit-level=high && npm audit --prefix frontend --audit-level=high"
   },
-  "devDependencies": { "concurrently": "^9.1.2" }
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^16.5.0"
+  }
 }

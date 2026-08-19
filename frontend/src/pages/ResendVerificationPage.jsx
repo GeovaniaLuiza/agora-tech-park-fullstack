@@ -58,7 +58,9 @@ export default function ResendVerificationPage() {
       const normalized = normalizeApiError(err);
 
       // If the server provided a retryAfter value, apply it
-      const serverRetry = Number(err?.retryAfter ?? err?.retryAfterSeconds ?? err?.retryAfterSeconds) || undefined;
+      const serverRetry = Number(
+        err?.retryAfter ?? err?.retryAfterSeconds ?? normalized.details?.retryAfterSeconds,
+      ) || undefined;
       if (serverRetry && serverRetry > 0) setRetryAfter(serverRetry);
 
       switch (normalized.type) {
@@ -70,6 +72,12 @@ export default function ResendVerificationPage() {
           break;
         case 'UNAVAILABLE':
           setFeedback({ type: 'error', message: normalized.message });
+          break;
+        case 'RATE_LIMIT':
+          setFeedback({
+            type: 'warning',
+            message: `Muitas tentativas. Aguarde ${readableDuration(serverRetry)} antes de tentar novamente.`,
+          });
           break;
         case 'VALIDATION':
           // If there's a field-specific message for email, show it and focus field

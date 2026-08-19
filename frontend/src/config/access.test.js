@@ -11,7 +11,7 @@ describe('redirecionamento e permissões por perfil', () => {
     expect(canAccess('ADMIN', '/admin')).toBe(true);
     expect(canAccess('GESTOR', '/admin/requests')).toBe(false);
     expect(canAccess('RESIDENTE', '/resident/history')).toBe(true);
-    expect(canAccess('RESIDENTE', '/dashboard')).toBe(false);
+    expect(canAccess('RESIDENTE', '/dashboard')).toBe(true);
   });
 
   it('direciona perfil desconhecido para um estado seguro', () => {

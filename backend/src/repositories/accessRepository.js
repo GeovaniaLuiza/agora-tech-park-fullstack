@@ -24,6 +24,29 @@ export async function listUsers({ status = null, role = null } = {}) {
   return rows;
 }
 
+export async function createManagedUser({ name, email, passwordHash, role, organizationId, adminId }, audit) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `INSERT INTO users(name,email,password_hash,role,status,email_verified_at,approved_by,approved_at)
+       VALUES($1,$2,$3,$4,'ACTIVE',NOW(),$5,NOW())
+       RETURNING id,name,email,role,status,email_verified_at,created_at`,
+      [name, email, passwordHash, role, adminId],
+    );
+    if (organizationId) await client.query(
+      `INSERT INTO users_organizations(user_id,organization_id,active,unlinked_at)
+       VALUES($1,$2,TRUE,NULL)`, [rows[0].id, organizationId],
+    );
+    await audit(client, rows[0]);
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
+}
+
 export async function findRequest(id, client = { query }) {
   const { rows } = await client.query(`SELECT ${columns} FROM users u WHERE u.id=$1`, [id]);
   return rows[0];

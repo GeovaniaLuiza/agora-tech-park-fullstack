@@ -5,6 +5,7 @@ import * as notifications from '../repositories/notificationRepository.js';
 import { record } from '../repositories/auditRepository.js';
 import { sendFormInvitation } from './emailService.js';
 import { serviceError } from '../utils/validation.js';
+import { emailFailures, formsCreated, formsPublished } from '../observability/metrics.js';
 
 async function requireForm(id, user) {
   const form = await repository.findById(id, user);
@@ -19,8 +20,37 @@ async function requireDraft(id) {
   return form;
 }
 
+function validatedFormData(data) {
+  const fields = [data.innovationCenterId, data.indicatorYear, data.indicatorMonth];
+  const informed = fields.filter((value) => value !== undefined && value !== null && value !== '').length;
+  if (informed && informed !== fields.length) {
+    throw serviceError(422, 'Para coletar indicadores, informe o Centro de Inovação, o ano e o mês de referência.', 'INVALID_INDICATOR_PERIOD');
+  }
+  if (!informed) return { ...data, innovationCenterId: null, indicatorYear: null, indicatorMonth: null };
+  const year = Number(data.indicatorYear); const month = Number(data.indicatorMonth);
+  if (!Number.isInteger(year) || year < 2000 || year > 2200 || !Number.isInteger(month) || month < 1 || month > 12) {
+    throw serviceError(422, 'Período de referência inválido', 'INVALID_INDICATOR_PERIOD');
+  }
+  return { ...data, indicatorYear: year, indicatorMonth: month };
+}
+
 export const listForms = (user) => repository.findAll(user);
 export const getForm = (id, user) => requireForm(id, user);
+export const listIndicatorDefinitions = (category) => repository.indicatorDefinitions(category || null);
+
+async function prepareIndicatorQuestion(data, formId, questionId = null) {
+  if (!data.indicatorId) return data;
+  const definition = await repository.findDefinitionById(data.indicatorId);
+  if (!definition?.active || definition.calculation_type !== 'MANUAL') {
+    throw serviceError(422, 'Indicador inexistente, inativo ou não coletável', 'INVALID_INDICATOR');
+  }
+  if (await repository.indicatorAlreadyLinked(formId, data.indicatorId, questionId)) {
+    throw serviceError(409, 'Este indicador já está vinculado ao formulário', 'INDICATOR_ALREADY_LINKED');
+  }
+  const type = definition.value_type === 'INTEGER' ? 'NUMBER'
+    : ['NUMBER', 'DECIMAL', 'CURRENCY', 'PERCENT', 'PERCENTAGE'].includes(definition.value_type) ? 'DECIMAL' : 'TEXT';
+  return { ...data, label: definition.name, type };
+}
 
 export async function listEligibleRecipients(query = {}) {
   const raw = Array.isArray(query.organizationId) ? query.organizationId : String(query.organizationId || '').split(',');
@@ -29,16 +59,39 @@ export async function listEligibleRecipients(query = {}) {
 }
 
 export async function createForm(data, user) {
-  const form = await repository.create({ ...data, createdBy: user.sub });
+  const form = await repository.create({ ...validatedFormData(data), createdBy: user.sub });
   await record({ userId: user.sub, action: 'FORM_CREATED', entity: 'form', entityId: form.id });
+  formsCreated.inc();
   return form;
 }
 
 export async function updateForm(id, data, user) {
   await requireDraft(id);
-  const form = await repository.update(id, data);
+  const form = await repository.update(id, validatedFormData(data));
   await record({ userId: user.sub, action: 'FORM_UPDATED', entity: 'form', entityId: id });
   return form;
+}
+
+export async function saveAudience(id, body, user) {
+  await requireDraft(id);
+  const organizationIds = Array.isArray(body.organizationIds) ? body.organizationIds.filter(Boolean) : [];
+  const recipientIds = Array.isArray(body.recipientIds) ? body.recipientIds.filter(Boolean) : [];
+  if (new Set(organizationIds).size !== organizationIds.length || new Set(recipientIds).size !== recipientIds.length) {
+    throw serviceError(422, 'Organizações e respondentes não podem ser duplicados', 'DUPLICATE_FORM_RECIPIENT');
+  }
+  for (const organizationId of organizationIds) {
+    if (!await organizations.existsActive(organizationId)) throw serviceError(422, 'Uma organização destinatária é inválida', 'INVALID_ORGANIZATION');
+  }
+  const eligible = recipientIds.length ? await users.findEligibleFormRecipients({ organizationIds, userIds: recipientIds }) : [];
+  if (eligible.length !== recipientIds.length) throw serviceError(422, 'Um destinatário não é elegível', 'INELIGIBLE_RESIDENT_RECIPIENT');
+  const effectiveOrganizationIds = organizationIds.length ? organizationIds : [...new Set(eligible.flatMap((recipient) => recipient.organizations.map((organization) => organization.id)))];
+  const respondents = eligible.map((recipient) => {
+    const organization = recipient.organizations.find(({ id: organizationId }) => effectiveOrganizationIds.includes(organizationId));
+    return { ...recipient, organizationId: organization.id };
+  });
+  if (!await repository.saveAudience(id, effectiveOrganizationIds, respondents)) throw serviceError(409, 'Somente formulários em rascunho podem ser alterados', 'FORM_NOT_DRAFT');
+  await record({ userId: user.sub, action: 'FORM_RESPONDENT_ASSIGNED', entity: 'form', entityId: id, details: { respondents: recipientIds.length } });
+  return { organizationIds: effectiveOrganizationIds, respondentIds: recipientIds };
 }
 
 export async function publishForm(id, body, user) {
@@ -46,8 +99,15 @@ export async function publishForm(id, body, user) {
   const questions = await repository.questions(id);
   if (!questions.length) throw serviceError(422, 'Inclua ao menos uma pergunta antes de publicar', 'FORM_WITHOUT_QUESTIONS');
   if (!form.start_date || !form.end_date) throw serviceError(422, 'Defina o período da coleta', 'FORM_PERIOD_REQUIRED');
-  const organizationIds = Array.isArray(body.organizationIds) ? [...new Set(body.organizationIds)] : [];
-  const recipientIds = Array.isArray(body.recipientIds) ? [...new Set(body.recipientIds.filter(Boolean))] : [];
+  if (questions.some((question) => question.indicator_id)
+      && (!form.innovation_center_id || !form.indicator_year || !form.indicator_month)) {
+    throw serviceError(422, 'Para publicar indicadores, informe o Centro de Inovação, o ano e o mês de referência.', 'INDICATOR_PERIOD_REQUIRED');
+  }
+  const organizationIds = Array.isArray(body.organizationIds) ? body.organizationIds.filter(Boolean) : [];
+  const recipientIds = Array.isArray(body.recipientIds) ? body.recipientIds.filter(Boolean) : [];
+  if (new Set(organizationIds).size !== organizationIds.length || new Set(recipientIds).size !== recipientIds.length) {
+    throw serviceError(422, 'Organizações e respondentes não podem ser duplicados', 'DUPLICATE_FORM_RECIPIENT');
+  }
   if (!recipientIds.length) throw serviceError(422, 'Selecione ao menos um residente do Ágora Tech Park', 'RESIDENT_RECIPIENT_REQUIRED');
   if (recipientIds.length > 100 || recipientIds.some((id) => !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id))) {
     throw serviceError(422, 'Lista de residentes destinatários inválida', 'INVALID_RESIDENT_RECIPIENTS');
@@ -62,26 +122,22 @@ export async function publishForm(id, body, user) {
     throw serviceError(422, 'Um destinatário não é residente ativo ou não possui vínculo válido com a organização selecionada', 'INELIGIBLE_RESIDENT_RECIPIENT');
   }
   const effectiveOrganizationIds = organizationIds.length ? organizationIds : [...new Set(registeredRecipients.flatMap((recipient) => recipient.organizations.map((organization) => organization.id)))];
-  const published = await repository.publish(id, effectiveOrganizationIds);
+  const respondents = registeredRecipients.map((recipient) => {
+    const organization = recipient.organizations.find(({ id: organizationId }) => effectiveOrganizationIds.includes(organizationId));
+    if (!organization) throw serviceError(422, 'Cada respondente deve estar vinculado a uma organização destinatária ativa', 'RESPONDENT_ORGANIZATION_REQUIRED');
+    return { ...recipient, organizationId: organization.id, organizationName: organization.name };
+  });
+  const published = await repository.publish(id, effectiveOrganizationIds, respondents);
   if (!published) throw serviceError(409, 'O formulário não está mais em rascunho', 'FORM_NOT_DRAFT');
-  const recipientByEmail = new Map(registeredRecipients.map((recipient) => [recipient.email.toLowerCase(), recipient]));
   let inAppNotifications = 0;
   try {
     const createdNotifications = await notifications.createMany(
-      registeredRecipients.map((recipient) => recipient.id),
+      respondents.map((recipient) => recipient.id),
       { title: 'Novo formulário disponível', message: published.title, link: `/resident/forms/${id}/respond` },
     );
     inAppNotifications = createdNotifications.length;
   } catch { /* a publicação e os e-mails não devem ser desfeitos por falha no canal interno */ }
-  const deadline = published.end_date ? new Date(published.end_date).toLocaleDateString('pt-BR') : null;
-  const deliveries = await Promise.allSettled([...recipientByEmail.values()].map((recipient) => sendFormInvitation({
-    ...recipient, formId: id, formTitle: published.title, deadline,
-  })));
-  const emailSummary = {
-    requested: deliveries.length,
-    sent: deliveries.filter((delivery) => delivery.status === 'fulfilled').length,
-    failed: deliveries.filter((delivery) => delivery.status === 'rejected').length,
-  };
+  const emailSummary = await deliverInvitations(published, respondents, user, 'FORM_EMAIL_SENT');
   await record({
     userId: user.sub,
     action: 'FORM_PUBLISHED',
@@ -89,7 +145,43 @@ export async function publishForm(id, body, user) {
     entityId: id,
     details: { targetedOrganizations: effectiveOrganizationIds.length, residentRecipients: recipientIds.length, emailSummary },
   });
+  formsPublished.inc();
   return { ...published, notificationSummary: { inApp: inAppNotifications, ...emailSummary } };
+}
+
+async function deliverInvitations(form, respondents, actor, successAction) {
+  const deadline = form.end_date ? new Date(form.end_date).toLocaleDateString('pt-BR') : null;
+  const deliveries = await Promise.allSettled(respondents.map((respondent) => sendFormInvitation({
+    ...respondent, formId: form.id, formTitle: form.title, deadline,
+  })));
+  const result = { requested: respondents.length, sent: 0, failed: 0 };
+  await Promise.all(deliveries.map(async (delivery, index) => {
+    const respondent = respondents[index];
+    if (delivery.status === 'fulfilled') {
+      result.sent += 1;
+      await repository.recordDelivery(form.id, respondent.id, { status: 'SENT' });
+      await record({ userId: actor.sub, action: successAction, entity: 'form', entityId: form.id, details: { respondentId: respondent.id } });
+    } else {
+      result.failed += 1;
+      emailFailures.inc({ purpose: 'FORM_INVITATION', reason: 'delivery_failed' });
+      await repository.recordDelivery(form.id, respondent.id, { status: 'FAILED', error: String(delivery.reason?.message || 'Falha SMTP').slice(0, 1000) });
+      await record({ userId: actor.sub, action: 'FORM_EMAIL_FAILED', entity: 'form', entityId: form.id, details: { respondentId: respondent.id } });
+    }
+  }));
+  return result;
+}
+
+export async function listRespondents(id, user) {
+  await requireForm(id, user);
+  return repository.respondents(id);
+}
+
+export async function resendInvitation(id, userId, user) {
+  const form = await requireForm(id, user);
+  if (form.status !== 'ACTIVE') throw serviceError(409, 'O formulário ainda não foi publicado', 'FORM_NOT_ACTIVE');
+  const respondent = await repository.respondent(id, userId);
+  if (!respondent) throw serviceError(404, 'Respondente não encontrado', 'FORM_RESPONDENT_NOT_FOUND');
+  return { respondentId: userId, ...await deliverInvitations(form, [{ ...respondent, organizationName: respondent.organization_name }], user, 'FORM_EMAIL_RESENT') };
 }
 
 export async function closeForm(id, user) {
@@ -140,7 +232,7 @@ export async function listQuestionOptions(formId, questionId, user) {
 
 export async function createQuestion(formId, data, user) {
   await requireDraft(formId);
-  const question = await repository.addQuestion(formId, data);
+  const question = await repository.addQuestion(formId, await prepareIndicatorQuestion(data, formId));
   if (!question) throw serviceError(409, 'Não foi possível alterar este formulário', 'FORM_NOT_DRAFT');
   await record({ userId: user.sub, action: 'FORM_QUESTION_CREATED', entity: 'form', entityId: formId });
   return question;
@@ -148,7 +240,7 @@ export async function createQuestion(formId, data, user) {
 
 export async function editQuestion(formId, questionId, data, user) {
   await requireDraft(formId);
-  const question = await repository.updateQuestion(formId, questionId, data);
+  const question = await repository.updateQuestion(formId, questionId, await prepareIndicatorQuestion(data, formId, questionId));
   if (!question) throw serviceError(404, 'Pergunta não encontrada', 'QUESTION_NOT_FOUND');
   await record({ userId: user.sub, action: 'FORM_QUESTION_UPDATED', entity: 'form', entityId: formId });
   return question;

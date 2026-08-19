@@ -11,10 +11,10 @@ import { formatDate } from '../utils/formatters.js';
 import {
   downloadDashboardSpreadsheet, getDashboardCompanies, getDashboardEngagement,
   getDashboardFinancial, getDashboardProjects, getInstitutionalDashboard,
-  getOperationalDashboard,
+  getOperationalDashboard, getInnovationCenters,
 } from '../services/api.js';
 
-const initialFilters = { year: '2025', month: '', category: '', sourceType: 'SPREADSHEET_IMPORT' };
+const initialFilters = { year: String(new Date().getFullYear()), month: '', category: '', sourceType: 'LIVE', centerId: '' };
 const icons = {
   EMPRESAS_ATIVAS_TOTAL: <Building2 />, NOVAS_EMPRESAS_ATIVAS: <BriefcaseBusiness />,
   STARTUPS_ATIVAS: <Rocket />, COLABORADORES_EMPRESAS: <Users />, OCUPACAO_PREDIO: <Landmark />,
@@ -35,6 +35,7 @@ export default function DashboardPage() {
   const [sections, setSections] = useState({ institutional: sectionInitial, companies: sectionInitial, financial: sectionInitial, projects: sectionInitial, engagement: sectionInitial });
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [centers, setCenters] = useState([]);
 
   const query = useMemo(() => Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== '')), [filters]);
   const loadOperational = useCallback(() => {
@@ -52,7 +53,8 @@ export default function DashboardPage() {
   const loadEngagement = useCallback(() => loadSection('engagement', getDashboardEngagement), [loadSection]);
 
   useEffect(() => { loadOperational(); }, [loadOperational]);
-  useEffect(() => { loadInstitutional(); loadCompanies(); loadFinancial(); loadProjects(); loadEngagement(); }, [loadInstitutional, loadCompanies, loadFinancial, loadProjects, loadEngagement]);
+  useEffect(() => { getInnovationCenters().then((items) => { setCenters(items); setFilters((current) => ({ ...current, centerId: current.centerId || items[0]?.id || '' })); }).catch(() => {}); }, []);
+  useEffect(() => { if (!filters.centerId) return; loadInstitutional(); loadCompanies(); loadFinancial(); loadProjects(); loadEngagement(); }, [filters.centerId, loadInstitutional, loadCompanies, loadFinancial, loadProjects, loadEngagement]);
 
   const clearFilters = () => setFilters(initialFilters);
   const exportReport = async () => {
@@ -71,8 +73,8 @@ export default function DashboardPage() {
   const projects = sections.projects.data?.series || [];
   const engagement = sections.engagement.data?.series || [];
   return <div className="content executive-dashboard">
-    <div className="dashboard-page-head"><div><span>PAINEL EXECUTIVO</span><h2>Centro de Inovação de Joinville</h2><p>Resultados institucionais consolidados e operação da plataforma.</p></div><div className="dashboard-head-actions"><small>Última atualização: {formatDate(sections.institutional.data?.lastUpdate)}</small><button className="button secondary" disabled={exporting} onClick={exportReport}><Download />{exporting ? 'Exportando...' : 'Exportar relatório'}</button></div></div>
-    <DashboardFilters filters={filters} categories={sections.institutional.data?.categories || []} onChange={setFilters} onClear={clearFilters} />
+    <div className="dashboard-page-head"><div><span>PAINEL EXECUTIVO</span><h2>{centers.find((center) => center.id === filters.centerId)?.name || 'Centro de Inovação'}</h2><p>Resultados institucionais consolidados e operação da plataforma.</p></div><div className="dashboard-head-actions"><small>Última atualização: {formatDate(sections.institutional.data?.lastUpdate)}</small><button className="button secondary" disabled={exporting} onClick={exportReport}><Download />{exporting ? 'Exportando...' : 'Exportar relatório'}</button></div></div>
+    <DashboardFilters filters={filters} centers={centers} categories={sections.institutional.data?.categories || []} onChange={setFilters} onClear={clearFilters} />
     {exportError && <div className="error" role="alert">{exportError}</div>}
 
     {operational.loading ? <LoadingState /> : operational.error ? <ErrorState message={operational.error} onRetry={loadOperational} /> : <OperationalSummary data={operational.data} />}

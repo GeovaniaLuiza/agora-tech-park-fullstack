@@ -12,7 +12,7 @@ export async function authenticate(req, res, next) {
       return res.status(401).json({ message: 'Sessão inválida ou expirada' });
     }
     if (user.role === ROLES.RESIDENT && !user.organizations.length) return res.status(401).json({ message: 'Sessão inválida ou expirada' });
-    req.user = { sub: user.id, role: user.role, status: user.status };
+    req.user = { sub: user.id, email: user.email, name: user.name, role: user.role, status: user.status };
     next();
   } catch {
     return res.status(401).json({ message: 'Sessão inválida ou expirada' });

@@ -1,0 +1,30 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SendDeploymentToTaggedInstance",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": [
+        "arn:aws:ssm:AWS_REGION::document/AWS-RunShellScript",
+        "arn:aws:ec2:AWS_REGION:ACCOUNT_ID:instance/INSTANCE_ID"
+      ]
+    },
+    {
+      "Sid": "ReadDeploymentCommand",
+      "Effect": "Allow",
+      "Action": ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DeployAmplifyArtifact",
+      "Effect": "Allow",
+      "Action": [
+        "amplify:CreateDeployment",
+        "amplify:StartDeployment",
+        "amplify:GetJob"
+      ],
+      "Resource": "arn:aws:amplify:AWS_REGION:ACCOUNT_ID:apps/AMPLIFY_APP_ID/branches/main/jobs/*"
+    }
+  ]
+}

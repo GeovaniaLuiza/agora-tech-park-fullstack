@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { forgotPassword, login, logout, me, registerRequest, resendVerification, resetPassword, verifyEmail } from '../controllers/authController.js';
+import { forgotPassword, login, logout, me, registerRequest, resendVerification, resetPassword, updateAvatar, verifyEmail } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/auth.js';
 import { validateForgotPassword, validateLogin, validatePasswordReset, validateRegisterRequest, validateResend, validateVerification } from '../middlewares/authValidation.js';
 import { createEmailRateLimiter, createRateLimiter, RATE_LIMIT_CONFIG } from '../middlewares/rateLimits.js';
@@ -23,4 +23,5 @@ router.post('/forgot-password',validateForgotPassword,forgotPasswordLimit,forgot
 router.post('/reset-password',validatePasswordReset,verifyLimit,resetPassword);
 router.post('/logout',authenticate,logout);
 router.get('/me',authenticate,me);
+router.patch('/me/avatar',authenticate,updateAvatar);
 export default router;

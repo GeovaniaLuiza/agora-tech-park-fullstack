@@ -10,13 +10,13 @@ const GROUPS = Object.freeze({
 });
 
 export function normalizeFilters(query = {}) {
-  const year = Number(query.year || 2025);
+  const year = Number(query.year || new Date().getFullYear());
   const month = query.month === undefined || query.month === '' ? null : Number(query.month);
   if (!Number.isInteger(year) || year < 2000 || year > 2200) throw serviceError(422, 'Ano inválido', 'INVALID_YEAR');
   if (month !== null && (!Number.isInteger(month) || month < 1 || month > 12)) throw serviceError(422, 'Mês inválido', 'INVALID_MONTH');
-  const sourceType = query.sourceType || SOURCE_TYPES.SPREADSHEET;
+  const sourceType = query.sourceType || SOURCE_TYPES.LIVE;
   if (!Object.values(SOURCE_TYPES).includes(sourceType)) throw serviceError(422, 'Origem inválida', 'INVALID_SOURCE_TYPE');
-  return { year, month, category: query.category || null, sourceType, startDate: query.startDate || null, endDate: query.endDate || null };
+  return { year, month, category: query.category || null, sourceType, centerId: query.centerId || null, startDate: query.startDate || null, endDate: query.endDate || null };
 }
 
 function toCard(row) {
@@ -62,7 +62,7 @@ export async function institutionalSummary(rawFilters) {
     repository.institutionalCards(filters), repository.categories(), repository.latestImport(filters.year),
   ]);
   const selected = rows.filter((row) => DASHBOARD_CODES.includes(row.code)).map(toCard);
-  return { period: filters.month ? `${String(filters.month).padStart(2, '0')}/${filters.year}` : String(filters.year), filters, categories, lastUpdate: latestImport?.imported_at || selected[0]?.updatedAt || null, source: latestImport ? { type: SOURCE_TYPES.SPREADSHEET, fileName: latestImport.file_name, sheetName: latestImport.sheet_name } : null, cards: selected };
+  return { period: filters.month ? `${String(filters.month).padStart(2, '0')}/${filters.year}` : String(filters.year), filters, categories, lastUpdate: selected[0]?.updatedAt || latestImport?.imported_at || null, source: filters.sourceType === SOURCE_TYPES.LIVE ? { type: SOURCE_TYPES.LIVE, fileName: 'Cadastros e lançamentos consolidados' } : latestImport ? { type: SOURCE_TYPES.SPREADSHEET, fileName: latestImport.file_name, sheetName: latestImport.sheet_name } : null, cards: selected };
 }
 
 async function section(name, rawFilters) {

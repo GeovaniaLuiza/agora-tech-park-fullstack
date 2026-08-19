@@ -1,6 +1,6 @@
 import { pool, query } from '../db/pool.js';
 
-const publicColumns = 'u.id,u.name,u.email,u.role,u.status,u.email_verified_at,u.approved_at,u.last_login_at,u.created_at';
+const publicColumns = 'u.id,u.name,u.email,u.role,u.status,u.avatar_data,u.email_verified_at,u.approved_at,u.last_login_at,u.created_at';
 
 export async function findByEmail(email) {
   const { rows } = await query('SELECT * FROM users WHERE email=$1', [email]);
@@ -10,6 +10,13 @@ export async function findByEmail(email) {
 export async function findById(id) {
   const { rows } = await query(`SELECT ${publicColumns} FROM users u WHERE u.id=$1`, [id]);
   return rows[0];
+}
+
+export async function findActiveAdminIds() {
+  const { rows } = await query(
+    "SELECT id FROM users WHERE role='ADMIN' AND status='ACTIVE'",
+  );
+  return rows.map(({ id }) => id);
 }
 
 export async function organizationsForUser(userId) {
@@ -23,6 +30,15 @@ export async function findPublicProfile(id) {
   const user = await findById(id);
   if (!user) return null;
   return { ...user, organizations: await organizationsForUser(id) };
+}
+
+export async function updateAvatar(userId, avatarData) {
+  const { rows } = await query(
+    `UPDATE users SET avatar_data=$2, updated_at=NOW() WHERE id=$1
+     RETURNING id,name,email,role,status,avatar_data,email_verified_at,approved_at,last_login_at,created_at`,
+    [userId, avatarData],
+  );
+  return rows[0];
 }
 
 export async function createPending({ name, email, passwordHash, cnpj, companyName }, audit) {

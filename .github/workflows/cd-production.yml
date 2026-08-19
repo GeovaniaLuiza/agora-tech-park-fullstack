@@ -1,0 +1,116 @@
+name: CD Production
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy and smoke test
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
+      AMPLIFY_BRANCH: ${{ vars.AMPLIFY_BRANCH || 'main' }}
+      API_URL: ${{ vars.PRODUCTION_API_URL }}
+      FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+      SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: frontend-dist
+          path: frontend-dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Validate deployment configuration
+        env:
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+        run: |
+          for value in AWS_ROLE_ARN AWS_REGION EC2_INSTANCE_ID AMPLIFY_APP_ID API_URL FRONTEND_URL VITE_API_URL; do
+            test -n "${!value}" || { echo "Missing production variable: $value"; exit 1; }
+          done
+          test "$VITE_API_URL" = "${API_URL%/}/api" || {
+            echo "VITE_API_URL must equal PRODUCTION_API_URL + /api"
+            exit 1
+          }
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: agora-${{ github.run_id }}
+      - name: Deploy backend through Systems Manager
+        run: |
+          parameters="$(jq -cn --arg command "sudo /opt/agora/bin/deploy-backend.sh $RELEASE_SHA" '{commands:[$command]}')"
+          command_id="$(aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "Deploy Agora $RELEASE_SHA" \
+            --parameters "$parameters" \
+            --timeout-seconds 900 \
+            --query 'Command.CommandId' \
+            --output text)"
+
+          set +e
+          aws ssm wait command-executed --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID"
+          set -e
+          aws ssm get-command-invocation --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID"
+          status="$(aws ssm get-command-invocation \
+            --command-id "$command_id" \
+            --instance-id "$EC2_INSTANCE_ID" \
+            --query Status \
+            --output text)"
+          test "$status" = "Success"
+      - name: Deploy tested frontend artifact to Amplify
+        run: |
+          (cd frontend-dist && zip -qr ../frontend-dist.zip .)
+          deployment="$(aws amplify create-deployment \
+            --app-id "$AMPLIFY_APP_ID" \
+            --branch-name "$AMPLIFY_BRANCH")"
+          upload_url="$(jq -r '.zipUploadUrl' <<<"$deployment")"
+          job_id="$(jq -r '.jobId' <<<"$deployment")"
+          curl --fail --silent --show-error -T frontend-dist.zip "$upload_url"
+          aws amplify start-deployment \
+            --app-id "$AMPLIFY_APP_ID" \
+            --branch-name "$AMPLIFY_BRANCH" \
+            --job-id "$job_id" >/dev/null
+
+          for attempt in {1..60}; do
+            status="$(aws amplify get-job \
+              --app-id "$AMPLIFY_APP_ID" \
+              --branch-name "$AMPLIFY_BRANCH" \
+              --job-id "$job_id" \
+              --query 'job.summary.status' \
+              --output text)"
+            case "$status" in
+              SUCCEED) break ;;
+              FAILED|CANCELLED) echo "Amplify deployment failed: $status"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          test "$status" = "SUCCEED"
+      - name: Production smoke tests
+        run: node scripts/smoke-test.mjs

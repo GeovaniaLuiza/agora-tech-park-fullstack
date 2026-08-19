@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  forms: { findState: vi.fn(), questions: vi.fn(), publish: vi.fn() },
+  forms: { findState: vi.fn(), questions: vi.fn(), publish: vi.fn(), recordDelivery: vi.fn() },
   organizations: { existsActive: vi.fn() },
   users: { findEligibleFormRecipients: vi.fn() },
   notifications: { createMany: vi.fn() },
@@ -30,6 +30,7 @@ beforeEach(() => {
   mocks.organizations.existsActive.mockResolvedValue(true);
   mocks.users.findEligibleFormRecipients.mockResolvedValue([{ id: residentId, name: 'Ana Costa', email: 'ana@agoratechpark.com.br', organizations: [{ id: organizationId, name: 'Marina Tech' }] }]);
   mocks.forms.publish.mockResolvedValue({ id: formId, title: 'Coleta', end_date: '2025-12-31' });
+  mocks.forms.recordDelivery.mockResolvedValue({ status: 'SENT' });
   mocks.notifications.createMany.mockResolvedValue([{ id: 'n1' }]);
   mocks.sendFormInvitation.mockResolvedValue({ accepted: true });
   mocks.audit.mockResolvedValue();
@@ -51,9 +52,10 @@ describe('destinatários de formulários', () => {
 
   it('publica, notifica e envia somente para residente elegível', async () => {
     const result = await publishForm(formId, { organizationIds: [], recipientIds: [residentId] }, manager);
-    expect(mocks.forms.publish).toHaveBeenCalledWith(formId, [organizationId]);
+    expect(mocks.forms.publish).toHaveBeenCalledWith(formId, [organizationId], [expect.objectContaining({ id: residentId, organizationId })]);
     expect(mocks.notifications.createMany).toHaveBeenCalledWith([residentId], expect.any(Object));
     expect(mocks.sendFormInvitation).toHaveBeenCalledWith(expect.objectContaining({ email: 'ana@agoratechpark.com.br', formId }));
     expect(result.notificationSummary).toEqual({ inApp: 1, requested: 1, sent: 1, failed: 0 });
   });
+
 });

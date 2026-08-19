@@ -1,0 +1,28 @@
+[Unit]
+Description=Agora Tech Park API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agora
+Group=agora
+WorkingDirectory=/opt/agora/current/backend
+EnvironmentFile=/opt/agora/shared/backend.env
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/agora
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agora-api
+
+[Install]
+WantedBy=multi-user.target
+

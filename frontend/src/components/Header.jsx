@@ -41,7 +41,7 @@ export default function Header({ title, subtitle, setOpen }) {
           </section>}
         </div>
         <button className="profile-button" aria-label="Abrir meu perfil" onClick={() => navigate('/perfil')}>
-          <span className="avatar">{initials}</span>
+          <span className="avatar">{user?.avatar_data ? <img src={user.avatar_data} alt={`Foto de perfil de ${name}`} /> : initials}</span>
           <span className="profile"><strong>{name}</strong><span>{roleLabel}</span></span>
           <UserRound className="profile-icon" />
         </button>

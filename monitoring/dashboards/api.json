@@ -1,0 +1,13 @@
+{
+  "annotations": { "list": [] }, "editable": true, "graphTooltip": 1,
+  "panels": [
+    { "type": "timeseries", "title": "Requests/min", "id": 1, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "60 * sum(rate(agora_http_requests_total[5m]))" }], "fieldConfig": { "defaults": { "unit": "reqpm" }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 } },
+    { "type": "timeseries", "title": "Latência média e p95", "id": 2, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "sum(rate(agora_http_request_duration_seconds_sum[5m])) / clamp_min(sum(rate(agora_http_request_duration_seconds_count[5m])), 0.001)", "legendFormat": "média" }, { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(agora_http_request_duration_seconds_bucket[5m])))", "legendFormat": "p95" }], "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 } },
+    { "type": "timeseries", "title": "HTTP por classe", "id": 3, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "sum by (status_code) (rate(agora_http_requests_total[5m]))", "legendFormat": "HTTP {{status_code}}" }], "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 } },
+    { "type": "stat", "title": "API disponível", "id": 4, "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "targets": [{ "refId": "A", "expr": "max(up{job=~\".*agora_api.*\"})" }], "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }], "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 } }
+  ],
+  "refresh": "1m", "schemaVersion": 41, "tags": ["agora", "api"],
+  "templating": { "list": [{ "name": "DS_PROMETHEUS", "type": "datasource", "query": "prometheus", "label": "Prometheus" }] },
+  "time": { "from": "now-6h", "to": "now" }, "title": "Ágora — API", "uid": "agora-api", "version": 1
+}
+

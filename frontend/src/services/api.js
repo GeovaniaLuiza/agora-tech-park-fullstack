@@ -96,7 +96,7 @@ export function normalizeApiError(error) {
 
   if (error?.networkError === true || (!error.status && error.code === 'NETWORK_ERROR')) {
     out.type = 'NETWORK';
-    out.message = 'Não foi possível conectar ao servidor. Verifique se o serviço está disponível e tente novamente.';
+    out.message = 'Não foi possível acessar o serviço. Verifique se ele está disponível e tente novamente.';
     return out;
   }
 
@@ -107,6 +107,14 @@ export function normalizeApiError(error) {
   }
 
   const status = Number(error.status) || 0;
+  if (status === 429) {
+    out.type = 'RATE_LIMIT';
+    out.details.retryAfterSeconds = Number(
+      error.retryAfter ?? error.retryAfterSeconds ?? error.details?.retryAfterSeconds,
+    ) || undefined;
+    out.message = error.message || 'Muitas tentativas. Aguarde antes de tentar novamente.';
+    return out;
+  }
   if ([502, 503, 504].includes(status)) {
     out.type = 'UNAVAILABLE';
     out.message = 'O serviço está temporariamente indisponível. Tente novamente em alguns minutos.';
@@ -148,16 +156,21 @@ export const forgotPassword = (email) => apiRequest('/auth/forgot-password', { m
 export const resetPassword = (token, password, confirmPassword) => apiRequest('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password, confirmPassword }) });
 export const logout = () => apiRequest('/auth/logout', { method: 'POST', body: '{}' });
 export const getMe = () => apiRequest('/auth/me');
+export const updateAvatar = (avatarData) => apiRequest('/auth/me/avatar', { method: 'PATCH', body: JSON.stringify({ avatarData }) });
 export const getForms = () => apiRequest('/forms');
 export const getForm = (id) => apiRequest(`/forms/${id}`);
 export const createForm = (payload) => apiRequest('/forms', { method: 'POST', body: JSON.stringify(payload) });
 export const updateForm = (id, payload) => apiRequest(`/forms/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 export const publishForm = (id, organizationIds = [], recipientIds = []) => apiRequest(`/forms/${id}/publish`, { method: 'POST', body: JSON.stringify({ organizationIds, recipientIds }) });
+export const saveFormAudience = (id, organizationIds = [], recipientIds = []) => apiRequest(`/forms/${id}/audience`, { method: 'PUT', body: JSON.stringify({ organizationIds, recipientIds }) });
+export const getFormRespondents = (id) => apiRequest(`/forms/${id}/respondents`);
+export const resendFormInvitation = (formId, userId) => apiRequest(`/forms/${formId}/respondents/${userId}/resend`, { method: 'POST', body: '{}' });
 export const getEligibleFormRecipients = (organizationIds = []) => {
   const params = new URLSearchParams();
   organizationIds.forEach((id) => params.append('organizationId', id));
   return apiRequest(`/forms/recipients/eligible?${params}`);
 };
+export const getFormIndicatorDefinitions = (category = '') => apiRequest(`/forms/indicator-definitions?${new URLSearchParams(category ? { category } : {})}`);
 export const closeForm = (id) => apiRequest(`/forms/${id}/close`, { method: 'POST', body: '{}' });
 export const duplicateForm = (id) => apiRequest(`/forms/${id}/duplicate`, { method: 'POST', body: '{}' });
 export const archiveForm = (id) => apiRequest(`/forms/${id}/archive`, { method: 'PATCH', body: '{}' });
@@ -182,13 +195,32 @@ export const approveAccessRequest = (id, payload) => apiRequest(`/admin/access-r
 export const getAccessRequest = (id) => apiRequest(`/admin/access-requests/${id}`);
 export const rejectAccessRequest = (id, reason) => apiRequest(`/admin/access-requests/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
 export const getUsers = (filters = {}) => apiRequest(`/admin/users?${new URLSearchParams(filters)}`);
+export const createUser = (payload) => apiRequest('/admin/users', { method: 'POST', body: JSON.stringify(payload) });
 export const changeUserStatus = (id, status) => apiRequest(`/admin/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+export const deleteUser = (id) => apiRequest(`/admin/users/${id}`, { method: 'DELETE' });
 export const changeUserRole = (id, role) => apiRequest(`/admin/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) });
 export const linkUserOrganization = (id, organizationId) => apiRequest(`/admin/users/${id}/organizations`, { method: 'POST', body: JSON.stringify({ organizationId }) });
 export const unlinkUserOrganization = (id, organizationId) => apiRequest(`/admin/users/${id}/organizations/${organizationId}`, { method: 'DELETE' });
 export const getAudit = (filters = {}) => apiRequest(`/admin/audit?${new URLSearchParams(filters)}`);
+export const clearAudit = () => apiRequest('/admin/audit', { method: 'DELETE' });
 export const getIndicators = (filters = {}) => apiRequest(`/indicators?${new URLSearchParams(filters)}`);
 export const getIndicatorHistory = () => apiRequest('/indicators/history');
+export const getIndicatorDefinitions = (includeInactive = false) => apiRequest(`/indicator-management/definitions?${new URLSearchParams({ includeInactive })}`);
+export const createIndicatorDefinition = (payload) => apiRequest('/indicator-management/definitions', { method: 'POST', body: JSON.stringify(payload) });
+export const updateIndicatorDefinition = (id, payload) => apiRequest(`/indicator-management/definitions/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+export const deleteIndicatorDefinition = (id) => apiRequest(`/indicator-management/definitions/${id}`, { method: 'DELETE' });
+export const getInnovationCenters = () => apiRequest('/indicator-management/innovation-centers');
+export const updateInnovationCenter = (id, payload) => apiRequest(`/indicator-management/innovation-centers/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+export const getIndicatorMetadata = (centerId) => apiRequest(`/indicator-management/metadata?${new URLSearchParams({ centerId })}`);
+export const getManagedIndicatorValues = (filters) => apiRequest(`/indicator-management/values?${new URLSearchParams(filters)}`);
+export const getManagedIndicatorHistory = (centerId, indicatorId) => apiRequest(`/indicator-management/values/history?${new URLSearchParams({ centerId, indicatorId })}`);
+export const saveManagedIndicatorValue = (payload) => apiRequest('/indicator-management/values', { method: 'POST', body: JSON.stringify(payload) });
+export const deleteManagedIndicatorValue = (id) => apiRequest(`/indicator-management/values/${id}`, { method: 'DELETE' });
+export const setIndicatorApplicability = (indicatorId, payload) => apiRequest(`/indicator-management/applicability/${indicatorId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+export const getIndicatorRecords = (type, filters) => apiRequest(`/indicator-management/records/${type}?${new URLSearchParams(filters)}`);
+export const createIndicatorRecord = (type, payload) => apiRequest(`/indicator-management/records/${type}`, { method: 'POST', body: JSON.stringify(payload) });
+export const updateIndicatorRecord = (type, id, payload) => apiRequest(`/indicator-management/records/${type}/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+export const deleteIndicatorRecord = (type, id) => apiRequest(`/indicator-management/records/${type}/${id}`, { method: 'DELETE' });
 export const getDashboard = () => apiRequest('/indicators/dashboard');
 export const getOperationalDashboard = () => apiRequest('/dashboard/operational-summary');
 export const getInstitutionalDashboard = (filters = {}) => apiRequest(`/dashboard/institutional-summary?${new URLSearchParams(filters)}`);
@@ -229,6 +261,6 @@ export async function downloadDashboardSpreadsheet() {
   }
   return {
     blob: await response.blob(),
-    filename: response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || 'indicadores-joinville-2025.xlsx',
+    filename: response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || 'indicadores-joinville-2026.xlsx',
   };
 }

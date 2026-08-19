@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  quality:
+    name: Lint and dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run audit
+
+  backend-unit:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --prefix backend
+      - run: npm run test:coverage --prefix backend
+      - uses: actions/upload-artifact@v7
+        with:
+          name: backend-coverage
+          path: backend/coverage/lcov.info
+          if-no-files-found: error
+
+  frontend-unit-build:
+    name: Frontend tests and build
+    runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: ${{ vars.VITE_API_URL || 'http://localhost:3002/api' }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npm run test:coverage --prefix frontend
+      - run: npm run build --prefix frontend
+      - uses: actions/upload-artifact@v7
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  backend-integration:
+    name: PostgreSQL integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: agora_test
+          POSTGRES_USER: agora_test
+          POSTGRES_PASSWORD: agora_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agora_test -d agora_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://agora_test:agora_test_password@localhost:5432/agora_test
+      JWT_SECRET: integration-test-secret-with-at-least-32-characters
+      FRONTEND_URL: http://localhost:5174
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --prefix backend
+      - run: npm run migrate --prefix backend
+      - run: npm run test:integration --prefix backend
+
+  sonar:
+    name: SonarQube Cloud Quality Gate
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: [quality, backend-unit, frontend-unit-build, backend-integration]
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'GeovaniaLuiza_agora-tech-park-fullstack' }}
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'geovanialuiza' }}
+      SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - name: Require Sonar credentials
+        run: test -n "$SONAR_TOKEN" || (echo "Configure o secret SONAR_TOKEN" && exit 1)
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: backend-coverage
+          path: backend/coverage
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+      - name: Sonar analysis and Quality Gate
+        uses: SonarSource/sonarqube-scan-action@v8.1.0
+        with:
+          args: >-
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
+      - name: Enforce Critical and High severities
+        run: node scripts/check-sonar-quality.mjs

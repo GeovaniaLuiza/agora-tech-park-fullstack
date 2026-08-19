@@ -2,7 +2,7 @@ import { pool, query } from '../db/pool.js';
 
 export async function submissionContext(formId, organizationId) {
   const { rows } = await query(
-    `SELECT f.id,f.status,f.start_date,f.end_date,
+    `SELECT f.id,f.status,f.start_date,f.end_date,f.innovation_center_id,f.indicator_year,f.indicator_month,
       (NOT EXISTS (SELECT 1 FROM form_organizations fo WHERE fo.form_id=f.id)
        OR EXISTS (SELECT 1 FROM form_organizations fo WHERE fo.form_id=f.id AND fo.organization_id=$2)) AS targeted
      FROM forms f WHERE f.id=$1`,
@@ -13,16 +13,17 @@ export async function submissionContext(formId, organizationId) {
 
 export async function formQuestions(formId) {
   const { rows } = await query(
-    `SELECT q.id,q.label,q.type,q.required,
+    `SELECT q.id,q.label,q.type,q.required,qil.indicator_id,
       COALESCE(json_agg(qo.value ORDER BY qo.created_at) FILTER (WHERE qo.id IS NOT NULL),'[]') AS options
      FROM questions q LEFT JOIN question_options qo ON qo.question_id=q.id
-     WHERE q.form_id=$1 GROUP BY q.id ORDER BY q.position,q.created_at`,
+     LEFT JOIN question_indicator_links qil ON qil.question_id=q.id AND qil.active
+     WHERE q.form_id=$1 GROUP BY q.id,qil.indicator_id ORDER BY q.position,q.created_at`,
     [formId],
   );
   return rows;
 }
 
-async function persist({ formId, organizationId, userId, answers, submit }) {
+async function persist({ formId, organizationId, userId, answers, submit, processSubmission }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -57,8 +58,10 @@ async function persist({ formId, organizationId, userId, answers, submit }) {
         [responseId, answer.questionId, String(answer.value)],
       );
     }
+    let indicatorsUpdated = 0;
+    if (submit && processSubmission) indicatorsUpdated = await processSubmission(responseId, client);
     await client.query('COMMIT');
-    return { id: responseId, status: submit ? 'SUBMITTED' : (current.rows[0]?.status || 'DRAFT') };
+    return { id: responseId, status: submit ? 'SUBMITTED' : (current.rows[0]?.status || 'DRAFT'), indicatorsUpdated };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

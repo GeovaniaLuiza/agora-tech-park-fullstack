@@ -16,7 +16,7 @@ export const exportSpreadsheet = async (req, res, next) => {
   try {
     const file = await exportSource(req.user);
     res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.set('Content-Disposition', 'attachment; filename="indicadores-joinville-2025.xlsx"');
+    res.set('Content-Disposition', 'attachment; filename="indicadores-joinville-2026.xlsx"');
     res.set('X-Source-Filename', encodeURIComponent(file.fileName));
     res.send(file.body);
   } catch (error) { next(error); }

@@ -1,4 +1,5 @@
 export const SOURCE_TYPES = Object.freeze({
+  LIVE: 'LIVE',
   SPREADSHEET: 'SPREADSHEET_IMPORT',
   FORM: 'FORM_RESPONSE',
   MANUAL: 'MANUAL_ENTRY',
@@ -29,24 +30,24 @@ export const INDICATOR_CATALOG = Object.freeze([
   { row: 49, code: 'PESSOAS_CAPACITADAS', name: 'Nº de Pessoas Capacitadas', category: 'Capacitações', unit: 'PESSOA', valueType: 'NUMBER', aggregation: 'SUM' },
   { row: 54, code: 'FUNCOES_ATIVAS', name: 'Nº de Funções Ativas', category: 'Funções e programas', unit: 'UNIDADE', valueType: 'NUMBER', aggregation: 'COUNT' },
   { row: 64, code: 'PROGRAMAS_INICIADOS', name: 'Nº de Programas Iniciados', category: 'Funções e programas', unit: 'UNIDADE', valueType: 'NUMBER', aggregation: 'SUM' },
-  { row: 86, code: 'EVENTOS_REALIZADOS', name: 'Nº de Eventos Realizados', category: 'Impacto e engajamento', unit: 'UNIDADE', valueType: 'NUMBER', aggregation: 'SUM' },
-  { row: 723, code: 'MANTENEDORES', name: 'Nº de Mantenedores', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'COUNT', annualColumn: 2 },
-  { row: 739, code: 'IES_REGIAO', name: 'Nº de Instituições de Ensino Superior na Região', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'LAST_VALUE' },
-  { row: 740, code: 'IES_ATENDIDAS', name: 'Nº de Instituições de Ensino Superior Atendidas', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'LAST_VALUE' },
-  { row: 755, code: 'MUNICIPIOS_REGIAO', name: 'Nº de Municípios na Região', category: 'Ecossistema', unit: 'MUNICÍPIO', valueType: 'NUMBER', aggregation: 'LAST_VALUE' },
-  { row: 756, code: 'MUNICIPIOS_ATENDIDOS', name: 'Nº de Municípios Atendidos', category: 'Ecossistema', unit: 'MUNICÍPIO', valueType: 'NUMBER', aggregation: 'LAST_VALUE' },
-  { row: 768, code: 'ENTIDADES_REGIAO', name: 'Nº de Entidades na Região', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'LAST_VALUE', annualColumn: 2 },
-  { row: 769, code: 'ENTIDADES_ATENDIDAS', name: 'Nº de Entidades Atendidas', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'LAST_VALUE', annualColumn: 2 },
-  { row: 786, code: 'GRANDES_EMPRESAS_REGIAO', name: 'Nº de Grandes Empresas na Região', category: 'Ecossistema', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'LAST_VALUE', annualColumn: 2 },
-  { row: 787, code: 'GRANDES_EMPRESAS_ATENDIDAS', name: 'Nº de Grandes Empresas Atendidas', category: 'Ecossistema', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'LAST_VALUE', annualColumn: 2 },
-  { row: 802, code: 'EMPRESAS_PRE_INCUBADAS', name: 'Nº de Empresas Pré-Incubadas', category: 'Empreendedorismo', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'SUM' },
-  { row: 857, code: 'EMPRESAS_INCUBADAS', name: 'Nº de Empresas Incubadas', category: 'Empreendedorismo', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'COUNT', annualColumn: 2 },
-  { row: 866, code: 'EMPRESAS_ACELERADAS', name: 'Nº de Empresas Aceleradas', category: 'Empreendedorismo', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'COUNT', annualColumn: 2 },
-  { row: 874, code: 'EMPRESAS_RESIDENTES', name: 'Nº de Empresas Residentes', category: 'Empresas e ecossistema', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'SUM' },
-  { row: 954, code: 'GRANDES_EMPRESAS_APOIADAS', name: 'Nº de Grandes Empresas Apoiadas', category: 'Inovação aberta', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'COUNT', annualColumn: 2 },
-  { row: 966, code: 'FASE_CENTRO', name: 'Fase do Centro', category: 'Diagnóstico', unit: 'TEXTO', valueType: 'TEXT', aggregation: 'MANUAL', annualColumn: 2 },
-  { row: 967, code: 'INSTALACOES_CENTRO', name: 'Prédio / Instalações físicas', category: 'Diagnóstico', unit: 'TEXTO', valueType: 'TEXT', aggregation: 'MANUAL', annualColumn: 2 },
-  { row: 968, code: 'LEI_INOVACAO_EXISTENTE', name: 'Lei de Inovação', category: 'Diagnóstico', unit: 'TEXTO', valueType: 'TEXT', aggregation: 'MANUAL', annualColumn: 2 },
+  { row: 87, code: 'EVENTOS_REALIZADOS', name: 'Nº de Eventos Realizados', category: 'Impacto e engajamento', unit: 'UNIDADE', valueType: 'NUMBER', aggregation: 'SUM' },
+  { row: 1370, code: 'MANTENEDORES', name: 'Nº de Mantenedores', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'COUNT', annualColumn: 2 },
+  { row: 1386, code: 'IES_REGIAO', name: 'Nº de Instituições de Ensino Superior na Região', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'LAST_VALUE' },
+  { row: 1387, code: 'IES_ATENDIDAS', name: 'Nº de Instituições de Ensino Superior Atendidas', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'LAST_VALUE' },
+  { row: 1400, code: 'MUNICIPIOS_REGIAO', name: 'Nº de Municípios na Região', category: 'Ecossistema', unit: 'MUNICÍPIO', valueType: 'NUMBER', aggregation: 'LAST_VALUE' },
+  { row: 1401, code: 'MUNICIPIOS_ATENDIDOS', name: 'Nº de Municípios Atendidos', category: 'Ecossistema', unit: 'MUNICÍPIO', valueType: 'NUMBER', aggregation: 'LAST_VALUE' },
+  { row: 1413, code: 'ENTIDADES_REGIAO', name: 'Nº de Entidades na Região', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'LAST_VALUE', annualColumn: 2 },
+  { row: 1414, code: 'ENTIDADES_ATENDIDAS', name: 'Nº de Entidades Atendidas', category: 'Ecossistema', unit: 'ORGANIZAÇÃO', valueType: 'NUMBER', aggregation: 'LAST_VALUE', annualColumn: 2 },
+  { row: 1431, code: 'GRANDES_EMPRESAS_REGIAO', name: 'Nº de Grandes Empresas na Região', category: 'Ecossistema', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'LAST_VALUE', annualColumn: 2 },
+  { row: 1432, code: 'GRANDES_EMPRESAS_ATENDIDAS', name: 'Nº de Grandes Empresas Atendidas', category: 'Ecossistema', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'LAST_VALUE', annualColumn: 2 },
+  { row: 1447, code: 'EMPRESAS_PRE_INCUBADAS', name: 'Nº de Empresas Pré-Incubadas', category: 'Empreendedorismo', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'SUM' },
+  { row: 1480, code: 'EMPRESAS_INCUBADAS', name: 'Nº de Empresas Incubadas', category: 'Empreendedorismo', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'COUNT', annualColumn: 2 },
+  { row: 1512, code: 'EMPRESAS_ACELERADAS', name: 'Nº de Empresas Aceleradas', category: 'Empreendedorismo', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'COUNT', annualColumn: 2 },
+  { row: 1516, code: 'EMPRESAS_RESIDENTES', name: 'Nº de Empresas Residentes', category: 'Empresas e ecossistema', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'SUM' },
+  { row: 1601, code: 'GRANDES_EMPRESAS_APOIADAS', name: 'Nº de Grandes Empresas Apoiadas', category: 'Inovação aberta', unit: 'EMPRESA', valueType: 'NUMBER', aggregation: 'COUNT', annualColumn: 2 },
+  { row: 1616, code: 'FASE_CENTRO', name: 'Fase do Centro', category: 'Diagnóstico', unit: 'TEXTO', valueType: 'TEXT', aggregation: 'MANUAL', annualColumn: 2 },
+  { row: 1617, code: 'INSTALACOES_CENTRO', name: 'Prédio / Instalações físicas', category: 'Diagnóstico', unit: 'TEXTO', valueType: 'TEXT', aggregation: 'MANUAL', annualColumn: 2 },
+  { row: 1618, code: 'LEI_INOVACAO_EXISTENTE', name: 'Lei de Inovação', category: 'Diagnóstico', unit: 'TEXTO', valueType: 'TEXT', aggregation: 'MANUAL', annualColumn: 2 },
 ]);
 
 export const DASHBOARD_CODES = Object.freeze([
@@ -77,3 +78,6 @@ export const REFERENCE_TOTALS_2025 = Object.freeze({
   PROGRAMAS_INICIADOS: 19,
   FUNCOES_ATIVAS: 7,
 });
+
+// A planilha 2026 é o novo modelo de coleta e não possui totais históricos fixos.
+export const REFERENCE_TOTALS_2026 = Object.freeze({});

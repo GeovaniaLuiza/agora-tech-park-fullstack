@@ -1,0 +1,51 @@
+groups:
+  - name: agora-availability
+    interval: 1m
+    rules:
+      - alert: AgoraApiDown
+        expr: up{job=~".*agora_api.*"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: API Ágora indisponível
+          description: O endpoint de métricas não responde há cinco minutos.
+      - alert: AgoraDatabaseDown
+        expr: agora_database_up == 0
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: PostgreSQL indisponível para a aplicação
+          description: A API não consegue consultar o banco há três minutos.
+      - alert: AgoraHealthCheckFailed
+        expr: probe_success{job=~".*agora.*health.*"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: Health check público falhou
+          description: Requer Synthetic Monitoring apontando para /api/health.
+
+  - name: agora-capacity
+    interval: 1m
+    rules:
+      - alert: AgoraHighHttp5xxRate
+        expr: sum(rate(agora_http_requests_total{status_code=~"5.."}[5m])) / clamp_min(sum(rate(agora_http_requests_total[5m])), 0.001) > 0.05
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: Taxa de HTTP 5xx acima de 5%
+          description: O erro permanece elevado há dez minutos.
+      - alert: AgoraHighCpu
+        expr: 100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 90
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: CPU acima de 90%
+          description: Uso sustentado por quinze minutos para evitar ruído.
+      - alert: AgoraDiskAlmostFull
+        expr: 100 * (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) > 85
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: Disco acima de 85%
+          description: Verifique backups, logs do journald e releases antigas.
+

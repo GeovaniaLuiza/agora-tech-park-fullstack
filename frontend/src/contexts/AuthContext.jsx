@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getMe, login as apiLogin, logout as apiLogout, tokenStore } from '../services/api';
+import { getMe, login as apiLogin, logout as apiLogout, tokenStore, updateAvatar as apiUpdateAvatar } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -63,9 +63,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   const clearSessionError = useCallback(() => setSessionError(''), []);
+  const updateAvatar = useCallback(async (avatarData) => {
+    const data = await apiUpdateAvatar(avatarData);
+    setUser(data.user);
+    return data.user;
+  }, []);
   const value = useMemo(
-    () => ({ user, loading, sessionError, login, logout, restoreSession, clearSessionError }),
-    [user, loading, sessionError, login, logout, restoreSession, clearSessionError],
+    () => ({ user, loading, sessionError, login, logout, restoreSession, clearSessionError, updateAvatar }),
+    [user, loading, sessionError, login, logout, restoreSession, clearSessionError, updateAvatar],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

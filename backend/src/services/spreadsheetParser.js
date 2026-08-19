@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { INDICATOR_CATALOG, REFERENCE_TOTALS_2025, SOURCE_TYPES } from '../domain/indicatorCatalog.js';
+import { INDICATOR_CATALOG, REFERENCE_TOTALS_2025, REFERENCE_TOTALS_2026, SOURCE_TYPES } from '../domain/indicatorCatalog.js';
 
 const MONTH_COLUMNS = Object.freeze(Array.from({ length: 12 }, (_, index) => index + 2));
 
@@ -19,11 +19,14 @@ export function parseBrazilianNumber(value, valueType = 'NUMBER') {
   if (typeof raw !== 'string') return Number.isFinite(Number(raw)) ? Number(raw) : null;
   let text = raw.trim();
   if (!text || /^(n\/?d|não se aplica)$/i.test(text)) return null;
+  if (/^#(?:REF!|DIV\/0!|VALUE!|N\/A|NAME\?)/i.test(text)) return null;
   const percent = text.includes('%') || valueType === 'PERCENT';
   text = text.replace(/R\$/gi, '').replace(/\s/g, '');
   if (/^-?\d+(\.\d+)?$/.test(text)) return percent && text.includes('%') ? Number(text.replace('%', '')) / 100 : Number(text);
   text = text.replace(/%/g, '').replace(/\./g, '').replace(',', '.');
-  const parsed = Number(text.replace(/[^0-9.-]/g, ''));
+  const numericText = text.replace(/[^0-9.-]/g, '');
+  if (!numericText || numericText === '-' || numericText === '.') return null;
+  const parsed = Number(numericText);
   if (!Number.isFinite(parsed)) return null;
   return percent ? parsed / 100 : parsed;
 }
@@ -51,7 +54,7 @@ function recordFor(definition, year, month, rawValue) {
 
 function collectOpenInnovation(worksheet) {
   const organizations = [];
-  for (let row = 956; row <= 964; row += 1) {
+  for (let row = 1603; row <= 1614; row += 1) {
     const name = String(unwrapCellValue(worksheet.getCell(row, 1).value) ?? '').trim();
     if (!name) continue;
     organizations.push({
@@ -64,7 +67,7 @@ function collectOpenInnovation(worksheet) {
   return organizations;
 }
 
-export async function parseIndicatorWorkbook(filePath, { sheetName = 'CI JOINVILLE', year = 2025 } = {}) {
+export async function parseIndicatorWorkbook(filePath, { sheetName = 'CI JOINVILLE', year = 2026 } = {}) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(filePath);
   const worksheet = workbook.getWorksheet(sheetName);
@@ -101,7 +104,8 @@ export async function parseIndicatorWorkbook(filePath, { sheetName = 'CI JOINVIL
   values.push({ code: 'INOVACAO_ABERTA_ORGANIZACOES', year, month: null, periodStart: annualPeriod.start, periodEnd: annualPeriod.end, jsonValue: openInnovation, sourceType: SOURCE_TYPES.SPREADSHEET });
 
   const annualByCode = new Map(values.filter((value) => value.month === null).map((value) => [value.code, value.numericValue]));
-  for (const [code, expected] of Object.entries(REFERENCE_TOTALS_2025)) {
+  const referenceTotals = year === 2025 ? REFERENCE_TOTALS_2025 : REFERENCE_TOTALS_2026;
+  for (const [code, expected] of Object.entries(referenceTotals)) {
     const actual = annualByCode.get(code);
     if (actual === undefined || Math.abs(actual - expected) > 0.0001) errors.push({ code: 'REFERENCE_MISMATCH', indicatorCode: code, expected, actual: actual ?? null });
   }

@@ -1,13 +1,13 @@
-import { BarChart3, ClipboardList, Database, FilePlus2, History, LayoutDashboard, LogOut, Settings, ShieldCheck, Users, X } from 'lucide-react';
+import { BarChart3, Building2, CalendarDays, ClipboardList, Database, History, LayoutDashboard, LogOut, Settings, ShieldCheck, Users, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
 const entries = [
   ['/dashboard', 'Dashboard', LayoutDashboard, ['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']],
-  ['/pesquisa', 'Área de pesquisa', ClipboardList, ['PESQUISADOR']],
   ['/forms', 'Formulários', ClipboardList, ['ADMIN', 'PESQUISADOR']],
-  ['/forms/new', 'Criar formulário', FilePlus2, ['ADMIN', 'PESQUISADOR']],
   ['/indicators', 'Indicadores', BarChart3, ['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']],
+  ['/indicadores/importar-eventos', 'Importar eventos', CalendarDays, ['ADMIN', 'PESQUISADOR']],
+  ['/indicadores/importar-residentes', 'Importar residentes', Building2, ['ADMIN', 'PESQUISADOR']],
   ['/indicators/catalog', 'Cadastro de indicadores', Database, ['ADMIN', 'PESQUISADOR']],
   ['/organizations', 'Organizações', Users, ['ADMIN', 'PESQUISADOR', 'GESTOR']],
   ['/admin/solicitacoes', 'Solicitações', ShieldCheck, ['ADMIN']],

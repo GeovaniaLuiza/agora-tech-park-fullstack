@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BriefcaseBusiness, Building2, Download, GraduationCap, Landmark, Rocket, Users, WalletCards } from 'lucide-react';
+import { BriefcaseBusiness, Building2, CalendarDays, Download, GraduationCap, Landmark, Rocket, Users, WalletCards } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardFilters from '../components/dashboard/DashboardFilters.jsx';
 import KpiCard from '../components/dashboard/KpiCard.jsx';
@@ -24,6 +24,7 @@ const icons = {
   RESULTADO_ANUAL_CENTRO: <WalletCards />, CAPACITACOES_REALIZADAS: <GraduationCap />,
   EMPRESAS_CAPACITADAS: <GraduationCap />, PESSOAS_CAPACITADAS: <GraduationCap />,
   PROGRAMAS_INICIADOS: <Rocket />, FUNCOES_ATIVAS: <Users />,
+  EMPRESAS_RESIDENTES: <Building2 />, EVENTOS_REALIZADOS: <CalendarDays />,
 };
 
 const sectionInitial = { loading: true, data: null, error: '' };
@@ -61,7 +62,7 @@ export default function DashboardPage() {
     setExporting(true);
     setExportError('');
     try {
-      const report = await downloadDashboardSpreadsheet();
+      const report = await downloadDashboardSpreadsheet(query);
       const url = URL.createObjectURL(report.blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = report.filename; anchor.click(); URL.revokeObjectURL(url);
     } catch (error) {
       setExportError(error.message || 'Não foi possível exportar o relatório.');
@@ -85,10 +86,10 @@ export default function DashboardPage() {
 
     <section aria-labelledby="charts-title"><div className="section-heading"><div><span>SÉRIES MENSAIS</span><h2 id="charts-title">Evolução dos indicadores</h2></div></div>
       <div className="dashboard-chart-grid">
-        {sections.companies.loading ? <LoadingState cards={2} /> : sections.companies.error ? <ErrorState message={sections.companies.error} onRetry={loadCompanies} /> : <><DashboardChart title="Evolução das empresas ativas" series={companies.filter((item) => item.code === 'EMPRESAS_ATIVAS_TOTAL')} /><DashboardChart title="Novas empresas por mês" type="bar" series={companies.filter((item) => item.code === 'NOVAS_EMPRESAS_ATIVAS')} /></>}
+        {sections.companies.loading ? <LoadingState cards={3} /> : sections.companies.error ? <ErrorState message={sections.companies.error} onRetry={loadCompanies} /> : <><DashboardChart title="Evolução das empresas ativas" series={companies.filter((item) => item.code === 'EMPRESAS_ATIVAS_TOTAL')} /><DashboardChart title="Novas empresas por mês" type="bar" series={companies.filter((item) => item.code === 'NOVAS_EMPRESAS_ATIVAS')} /><DashboardChart title="Empresas residentes por mês" type="bar" series={companies.filter((item) => item.code === 'EMPRESAS_RESIDENTES')} /></>}
         {sections.projects.loading ? <LoadingState cards={1} /> : sections.projects.error ? <ErrorState message={sections.projects.error} onRetry={loadProjects} /> : <DashboardChart title="Projetos submetidos e ganhos" type="bar" series={projects.filter((item) => ['PROJETOS_SUBMETIDOS', 'PROJETOS_GANHOS'].includes(item.code))} />}
         {sections.financial.loading ? <LoadingState cards={1} /> : sections.financial.error ? <ErrorState message={sections.financial.error} onRetry={loadFinancial} /> : <DashboardChart title="Receita, despesas e resultado" series={financial} />}
-        {sections.engagement.loading ? <LoadingState cards={2} /> : sections.engagement.error ? <ErrorState message={sections.engagement.error} onRetry={loadEngagement} /> : <><DashboardChart title="Visitantes por mês" type="bar" series={engagement.filter((item) => item.code === 'VISITANTES_CENTRO')} /><CapacitationChart series={engagement.filter((item) => ['CAPACITACOES_REALIZADAS', 'EMPRESAS_CAPACITADAS', 'PESSOAS_CAPACITADAS'].includes(item.code))} /></>}
+        {sections.engagement.loading ? <LoadingState cards={3} /> : sections.engagement.error ? <ErrorState message={sections.engagement.error} onRetry={loadEngagement} /> : <><DashboardChart title="Visitantes por mês" type="bar" series={engagement.filter((item) => item.code === 'VISITANTES_CENTRO')} /><DashboardChart title="Eventos realizados por mês" type="bar" series={engagement.filter((item) => item.code === 'EVENTOS_REALIZADOS')} /><CapacitationChart series={engagement.filter((item) => ['CAPACITACOES_REALIZADAS', 'EMPRESAS_CAPACITADAS', 'PESSOAS_CAPACITADAS'].includes(item.code))} /></>}
       </div>
     </section>
     <div className="dashboard-footer-link"><button className="button secondary" onClick={() => navigate('/indicators')}>Ver todos os indicadores</button></div>

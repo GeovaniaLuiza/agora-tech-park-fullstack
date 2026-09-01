@@ -52,4 +52,15 @@ describe('serviço central de cálculo de indicadores', () => {
     const inactive = calculate(definitions, [{ record_type: 'MAINTAINER', name: 'Mantenedor', start_date: '2026-01-01', active: false }]);
     expect(value(inactive, 'MANTENEDORES', 8)).toBe(0);
   });
+
+  it('calcula empresas residentes ativas em cada mês importado', () => {
+    const definitions = [definition('EMPRESAS_RESIDENTES', 'AUTOMATIC', 'SUM')];
+    const rows = calculate(definitions, [
+      { record_type: 'RESIDENT_COMPANY', name: 'Residente A', start_date: '2026-01-15', end_date: '2026-03-10', active: true },
+      { record_type: 'RESIDENT_COMPANY', name: 'Residente B', start_date: '2026-02-01', end_date: null, active: true },
+    ]);
+    expect(value(rows, 'EMPRESAS_RESIDENTES', 1)).toBe(1);
+    expect(value(rows, 'EMPRESAS_RESIDENTES', 2)).toBe(2);
+    expect(value(rows, 'EMPRESAS_RESIDENTES', 4)).toBe(1);
+  });
 });

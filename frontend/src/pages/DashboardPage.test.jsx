@@ -19,11 +19,11 @@ const series = (code, name, values, unit = 'UNIDADE') => ({ code, name, unit, va
 beforeEach(() => {
   api.getInnovationCenters.mockResolvedValue([{ id: 'center-1', name: 'Centro de Inovação de Joinville' }]);
   api.getOperationalDashboard.mockResolvedValue({ active_organizations: 4, active_forms: 2, response_rate: 50, monitored_indicators: 42 });
-  api.getInstitutionalDashboard.mockResolvedValue({ lastUpdate: '2026-08-04T12:00:00Z', categories: ['Financeiro'], source: { fileName: 'Indicadores Rede de Centros de Inovação 2025_Joinville.xlsx' }, cards: [{ code: 'RECEITA_TOTAL_CENTRO', title: 'Receita Total do Centro', description: 'Receita anual', value: 1829191, valueType: 'CURRENCY', unit: 'BRL', period: '2025', updatedAt: '2026-08-04T12:00:00Z', variationPercent: null }] });
-  api.getDashboardCompanies.mockResolvedValue({ series: [series('EMPRESAS_ATIVAS_TOTAL', 'Empresas ativas', [39, 41]), series('NOVAS_EMPRESAS_ATIVAS', 'Novas empresas', [1, 2])] });
+  api.getInstitutionalDashboard.mockResolvedValue({ lastUpdate: '2026-08-04T12:00:00Z', categories: ['Financeiro'], source: { fileName: 'Indicadores Rede de Centros de Inovação 2025_Joinville.xlsx' }, cards: [{ code: 'RECEITA_TOTAL_CENTRO', title: 'Receita Total do Centro', description: 'Receita anual', value: 1829191, valueType: 'CURRENCY', unit: 'BRL', period: '2025', updatedAt: '2026-08-04T12:00:00Z', variationPercent: null }, { code: 'EMPRESAS_RESIDENTES', title: 'Nº de Empresas Residentes', value: 74, valueType: 'NUMBER', unit: 'EMPRESA', period: '2026', updatedAt: '2026-09-01T12:00:00Z', variationPercent: null }] });
+  api.getDashboardCompanies.mockResolvedValue({ series: [series('EMPRESAS_ATIVAS_TOTAL', 'Empresas ativas', [39, 41]), series('NOVAS_EMPRESAS_ATIVAS', 'Novas empresas', [1, 2]), series('EMPRESAS_RESIDENTES', 'Empresas residentes', [72, 74])] });
   api.getDashboardFinancial.mockResolvedValue({ series: [series('RESULTADO_ANUAL_CENTRO', 'Resultado', [37459, 66647, 28892, 56604, 6467, -8494], 'BRL')] });
   api.getDashboardProjects.mockResolvedValue({ series: [series('PROJETOS_SUBMETIDOS', 'Projetos submetidos', [1]), series('PROJETOS_GANHOS', 'Projetos ganhos', [0])] });
-  api.getDashboardEngagement.mockResolvedValue({ series: [series('VISITANTES_CENTRO', 'Visitantes', [116]), series('CAPACITACOES_REALIZADAS', 'Capacitações', [3])] });
+  api.getDashboardEngagement.mockResolvedValue({ series: [series('VISITANTES_CENTRO', 'Visitantes', [116]), series('EVENTOS_REALIZADOS', 'Eventos realizados', [8, 12]), series('CAPACITACOES_REALIZADAS', 'Capacitações', [3])] });
   api.downloadDashboardSpreadsheet.mockResolvedValue({ blob: new Blob(['x']), filename: 'indicadores-joinville-2025.xlsx' });
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
@@ -39,6 +39,9 @@ describe('DashboardPage', () => {
     expect(screen.getByLabelText('Ano').tagName).toBe('SELECT');
     expect(screen.getByRole('option', { name: '2025' })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Centro de Inovação de Joinville' })).toBeTruthy();
+    expect(screen.getByText('Nº de Empresas Residentes')).toBeTruthy();
+    expect(screen.getByRole('img', { name: /Empresas residentes por mês/ })).toBeTruthy();
+    expect(screen.getByRole('img', { name: /Eventos realizados por mês/ })).toBeTruthy();
   });
 
   it('recarrega as seções institucionais ao alterar categoria', async () => {
@@ -47,6 +50,16 @@ describe('DashboardPage', () => {
     fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Financeiro' } });
     await waitFor(() => expect(api.getInstitutionalDashboard).toHaveBeenLastCalledWith(expect.objectContaining({ category: 'Financeiro', year: '2026' })));
     expect(api.getOperationalDashboard).toHaveBeenCalledOnce();
+  });
+
+  it('exporta o relatório com os filtros atuais do dashboard', async () => {
+    api.downloadDashboardSpreadsheet.mockRejectedValueOnce(new Error('Download simulado'));
+    render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+    await screen.findByRole('option', { name: 'Centro de Inovação de Joinville' });
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar relatório' }));
+    await waitFor(() => expect(api.downloadDashboardSpreadsheet).toHaveBeenCalledWith(expect.objectContaining({
+      year: String(new Date().getFullYear()), sourceType: 'LIVE', centerId: 'center-1',
+    })));
   });
 
   it('isola falha de uma seção e oferece nova tentativa', async () => {

@@ -261,8 +261,8 @@ export async function deleteRecord(id, userId) {
 export async function recordsForCalculation(centerId, year) {
   const { rows } = await query(
     `SELECT * FROM indicator_records WHERE innovation_center_id=$1 AND deleted_at IS NULL
-       AND ((year IS NULL AND event_at IS NULL AND start_date IS NULL) OR year=$2 OR EXTRACT(YEAR FROM event_at)=$2
-         OR (start_date<=make_date($2,12,31) AND (end_date IS NULL OR end_date>=make_date($2,1,1))))`,
+       AND ((year IS NULL AND event_at IS NULL AND start_date IS NULL) OR year=$2::int OR EXTRACT(YEAR FROM event_at)=$2::int
+         OR (start_date<=make_date($2::int,12,31) AND (end_date IS NULL OR end_date>=make_date($2::int,1,1))))`,
     [centerId, year],
   );
   return rows;

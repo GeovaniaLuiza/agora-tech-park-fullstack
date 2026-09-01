@@ -3,7 +3,7 @@ import { canAccess, homeForRole } from './access';
 
 describe('redirecionamento e permissões por perfil', () => {
   it.each([
-    ['ADMIN', '/admin'], ['PESQUISADOR', '/pesquisa'], ['GESTOR', '/dashboard'], ['RESIDENTE', '/residente'],
+    ['ADMIN', '/admin'], ['PESQUISADOR', '/forms'], ['GESTOR', '/dashboard'], ['RESIDENTE', '/residente'],
   ])('direciona %s para %s', (role, path) => expect(homeForRole(role)).toBe(path));
 
   it('protege páginas administrativas e de residente', () => {

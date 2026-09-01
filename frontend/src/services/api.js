@@ -77,6 +77,7 @@ export async function apiRequest(path, options = {}) {
       notificationSent: data?.notificationSent,
       nextAction: data?.nextAction,
       fields: data?.error?.fields ?? data?.fields ?? undefined,
+      previousImport: data?.previousImport,
     });
   }
 
@@ -233,6 +234,34 @@ export const importIndicatorSpreadsheet = (reprocess = false) => apiRequest('/ad
 export const getNotifications = () => apiRequest('/notifications');
 export const markNotificationRead = (id) => apiRequest(`/notifications/${id}/read`, { method: 'PATCH', body: '{}' });
 
+export const getIndicatorImportOptions = () => apiRequest('/indicator-imports/options');
+export const getIndicatorImportBatch = (id) => apiRequest(`/indicator-imports/batches/${id}`);
+export const getIndicatorImportDraft = (type, centerId) => apiRequest(`/indicator-imports/${type}/draft?${new URLSearchParams({ centerId })}`);
+export const saveIndicatorImportReview = (id, items) => apiRequest(`/indicator-imports/batches/${id}/review`, { method: 'PUT', body: JSON.stringify({ items }) });
+export const groupImportedEvents = (id, payload) => apiRequest(`/indicator-imports/batches/${id}/group-events`, { method: 'POST', body: JSON.stringify(payload) });
+export const confirmIndicatorImport = (id) => apiRequest(`/indicator-imports/batches/${id}/confirm`, { method: 'POST', body: '{}' });
+export const getOfficialWorkbookStatus = (centerId, year = 2026) => apiRequest(`/indicator-imports/export/status?${new URLSearchParams({ centerId, year })}`);
+
+export const uploadIndicatorImport = (type, centerId, file, reprocess = false) => apiRequest(
+  `/indicator-imports/${type}/preview?${new URLSearchParams({ centerId, fileName: file.name, reprocess })}`,
+  { method: 'POST', body: file, headers: { 'Content-Type': file.type }, timeout: 120000 },
+);
+
+export async function downloadOfficialIndicatorWorkbook(payload) {
+  const token = tokenStore.get();
+  const response = await fetch(`${BASE_URL}/indicator-imports/export`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new ApiError(data.message || 'Não foi possível gerar a planilha oficial.', response.status, data.code);
+  }
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/)?.[1];
+  return { blob: await response.blob(), filename: encoded ? decodeURIComponent(encoded) : 'Indicadores Rede de Centros de Inovação 2026_Joinville_atualizado.xlsx' };
+}
+
 export async function downloadIndicatorReport(format, filters = {}) {
   const token = tokenStore.get();
   const response = await fetch(`${BASE_URL}/indicators/export/${format}?${new URLSearchParams(filters)}`, {
@@ -249,9 +278,9 @@ export async function downloadIndicatorReport(format, filters = {}) {
   };
 }
 
-export async function downloadDashboardSpreadsheet() {
+export async function downloadDashboardSpreadsheet(filters = {}) {
   const token = tokenStore.get();
-  const response = await fetch(`${BASE_URL}/dashboard/export`, {
+  const response = await fetch(`${BASE_URL}/dashboard/export?${new URLSearchParams(filters)}`, {
     headers: token ? { Authorization: 'Bearer ' + token } : {},
   });
   if (!response.ok) {
@@ -261,6 +290,6 @@ export async function downloadDashboardSpreadsheet() {
   }
   return {
     blob: await response.blob(),
-    filename: response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || 'indicadores-joinville-2026.xlsx',
+    filename: response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || 'relatorio-indicadores.xlsx',
   };
 }

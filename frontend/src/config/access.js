@@ -2,7 +2,7 @@ export const USER_ROLES = ['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE'];
 
 export const ROLE_HOME = {
   ADMIN: '/admin',
-  PESQUISADOR: '/pesquisa',
+  PESQUISADOR: '/forms',
   GESTOR: '/dashboard',
   RESIDENTE: '/residente',
 };
@@ -11,11 +11,12 @@ export const ROUTE_ROLES = {
   '/admin': ['ADMIN'],
   '/admin/solicitacoes': ['ADMIN'],
   '/dashboard': ['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE'],
-  '/pesquisa': ['ADMIN', 'PESQUISADOR'],
   '/forms': ['ADMIN', 'PESQUISADOR'],
   '/forms/new': ['ADMIN', 'PESQUISADOR'],
   '/indicators': ['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE'],
   '/indicators/catalog': ['ADMIN', 'PESQUISADOR'],
+  '/indicadores/importar-eventos': ['ADMIN', 'PESQUISADOR'],
+  '/indicadores/importar-residentes': ['ADMIN', 'PESQUISADOR'],
   '/organizations': ['ADMIN', 'PESQUISADOR', 'GESTOR'],
   '/admin/requests': ['ADMIN'],
   '/resident/forms': ['RESIDENTE'],

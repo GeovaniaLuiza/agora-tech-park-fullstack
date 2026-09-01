@@ -26,6 +26,7 @@ services:
       - ./database/migrations/011_dashboard_institutional_indicators.sql:/docker-entrypoint-initdb.d/011_dashboard_institutional_indicators.sql
       - ./database/migrations/012_form_respondents.sql:/docker-entrypoint-initdb.d/012_form_respondents.sql
       - ./database/migrations/013_indicator_management.sql:/docker-entrypoint-initdb.d/013_indicator_management.sql
+      - ./database/migrations/016_indicator_imports.sql:/docker-entrypoint-initdb.d/016_indicator_imports.sql
       - ./database/seed.sql:/docker-entrypoint-initdb.d/009_seed.sql
   migrate-auth-schema:
     image: postgres:16-alpine
@@ -40,6 +41,7 @@ services:
       - ./database/migrations/011_dashboard_institutional_indicators.sql:/migrations/011_dashboard_institutional_indicators.sql:ro
       - ./database/migrations/012_form_respondents.sql:/migrations/012_form_respondents.sql:ro
       - ./database/migrations/013_indicator_management.sql:/migrations/013_indicator_management.sql:ro
+      - ./database/migrations/016_indicator_imports.sql:/migrations/016_indicator_imports.sql:ro
     command:
       - psql
       - --host=postgres
@@ -50,6 +52,7 @@ services:
       - --file=/migrations/011_dashboard_institutional_indicators.sql
       - --file=/migrations/012_form_respondents.sql
       - --file=/migrations/013_indicator_management.sql
+      - --file=/migrations/016_indicator_imports.sql
     restart: "no"
   mailpit:
     image: axllent/mailpit:v1.30.6

@@ -22,8 +22,8 @@ jobs:
     name: Lint and dependency audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6.4.0
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -36,8 +36,8 @@ jobs:
     name: Backend unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6.4.0
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -56,8 +56,8 @@ jobs:
     env:
       VITE_API_URL: ${{ vars.VITE_API_URL || 'http://localhost:3002/api' }}
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6.4.0
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -100,8 +100,8 @@ jobs:
       JWT_SECRET: integration-test-secret-with-at-least-32-characters
       FRONTEND_URL: http://localhost:5174
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-node@v6.4.0
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -121,10 +121,10 @@ jobs:
       SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'geovanialuiza' }}
       SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v6.4.0
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
@@ -139,7 +139,7 @@ jobs:
           name: frontend-coverage
           path: frontend/coverage
       - name: Sonar analysis and Quality Gate
-        uses: SonarSource/sonarqube-scan-action@v8.1.0
+        uses: SonarSource/sonarqube-scan-action@v8.2.1
         with:
           args: >-
             -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}

@@ -66,7 +66,7 @@ export async function upsertAnnualValue({ indicatorId, centerId, year, sourceTyp
     `INSERT INTO indicator_values(indicator_id,organization_id,innovation_center_id,year,month,
        period_start,period_end,numeric_value,text_value,source_type,source_id,created_by,updated_by,consolidated_at)
      SELECT d.id,(array_agg(v.organization_id ORDER BY v.month DESC))[1],$2,$3,NULL,
-       make_date($3,1,1),make_date($3,12,31),
+       make_date($3::int,1,1),make_date($3::int,12,31),
        CASE WHEN COALESCE(d.annual_aggregation,d.aggregation_type)='AVERAGE' THEN AVG(v.numeric_value)
          WHEN COALESCE(d.annual_aggregation,d.aggregation_type)='LAST_VALUE' THEN
            (array_agg(v.numeric_value ORDER BY v.month DESC) FILTER (WHERE v.numeric_value IS NOT NULL))[1]

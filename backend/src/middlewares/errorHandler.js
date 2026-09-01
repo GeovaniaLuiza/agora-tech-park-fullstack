@@ -1,8 +1,9 @@
 import { logger } from '../observability/logger.js';
 
-export function errorHandler(error, _req, res, _next) {
+export function errorHandler(error, req, res, _next) {
   if (error?.type === 'entity.too.large' || error?.status === 413) {
-    return res.status(413).json({ message: 'A imagem é muito grande. Envie uma foto JPG, PNG ou WebP de até 2 MB.', code: 'PAYLOAD_TOO_LARGE' });
+    const spreadsheet = req.originalUrl?.includes('/indicator-imports/');
+    return res.status(413).json({ message: spreadsheet ? 'A planilha excede o limite de 10 MB.' : 'A imagem é muito grande. Envie uma foto JPG, PNG ou WebP de até 2 MB.', code: 'PAYLOAD_TOO_LARGE' });
   }
   // Detect database connection failures (pg Pool AggregateError or direct ECONNREFUSED)
   try {

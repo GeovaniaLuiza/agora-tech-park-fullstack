@@ -94,3 +94,34 @@ export async function latestImport(year) {
   );
   return rows[0] || null;
 }
+
+export async function indicatorReportRows({ year, month = null, category = null, sourceType, centerId = null, startDate = null, endDate = null }) {
+  const { rows } = await query(
+    `WITH ranked_values AS (
+       SELECT candidate.*,ROW_NUMBER() OVER (
+         PARTITION BY candidate.indicator_id,candidate.innovation_center_id,candidate.year,COALESCE(candidate.month,0)
+         ORDER BY CASE candidate.source_type WHEN 'FORM_RESPONSE' THEN 1 WHEN 'SYSTEM_CALCULATION' THEN 2 WHEN 'MANUAL_ENTRY' THEN 3 ELSE 4 END,
+           candidate.updated_at DESC
+       ) AS source_rank
+       FROM indicator_values candidate
+       WHERE candidate.deleted_at IS NULL
+         AND candidate.year=$1
+         AND ($2::int IS NULL OR candidate.month=$2)
+         AND (($3='LIVE' AND candidate.source_type IN ('FORM_RESPONSE','MANUAL_ENTRY','SYSTEM_CALCULATION','SPREADSHEET_IMPORT')) OR candidate.source_type=$3)
+     )
+     SELECT d.code,d.name,d.description,d.category,d.unit,d.value_type,
+       c.name AS center_name,v.numeric_value,v.text_value,v.json_value,v.year,v.month,
+       v.period_start,v.period_end,v.source_type,v.consolidated_at,v.updated_at
+     FROM ranked_values v
+     JOIN indicator_definitions d ON d.id=v.indicator_id
+     JOIN innovation_centers c ON c.id=v.innovation_center_id
+     WHERE v.source_rank=1 AND d.active
+       AND v.innovation_center_id=COALESCE($7::uuid,(SELECT id FROM innovation_centers WHERE active ORDER BY name LIMIT 1))
+       AND ($4::text IS NULL OR d.category=$4)
+       AND ($5::date IS NULL OR v.period_end IS NULL OR v.period_end >= $5::date)
+       AND ($6::date IS NULL OR v.period_start IS NULL OR v.period_start <= $6::date)
+     ORDER BY d.category,d.name,v.month NULLS LAST`,
+    [year, month, sourceType, category, startDate, endDate, centerId],
+  );
+  return rows;
+}

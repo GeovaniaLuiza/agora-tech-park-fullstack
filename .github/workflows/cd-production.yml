@@ -36,7 +36,7 @@ jobs:
       SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
       SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ env.RELEASE_SHA }}
       - uses: actions/download-artifact@v8.0.1

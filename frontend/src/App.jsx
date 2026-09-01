@@ -9,10 +9,10 @@ import StatCard from './components/StatCard';
 import FormCard from './components/FormCard';
 import { useForms } from './hooks/useForms';
 import {
-  addFormQuestion, addQuestionOption, archiveForm, changeUserRole, changeUserStatus, clearAudit,
+  addFormQuestion, addQuestionOption, archiveForm, clearAudit,
   createForm, downloadIndicatorReport, duplicateForm, getAudit, getEligibleFormRecipients, getForm,
   getFormQuestions, getFormResponse, getFormIndicatorDefinitions, getIndicatorHistory, getIndicators, getInnovationCenters, getOrganizations, getQuestionOptions,
-  getResponseHistory, getUsers, getFormRespondents, publishForm, saveFormAudience, saveResponseDraft, submitResponse,
+  getResponseHistory, getFormRespondents, publishForm, saveFormAudience, saveResponseDraft, submitResponse,
   createOrganization, updateOrganization, inactivateOrganization, updateForm, updateFormQuestion,
 } from './services/api';
 import { useAuth } from './contexts/AuthContext.jsx';
@@ -27,6 +27,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import IndicatorCatalogPage from './pages/IndicatorCatalogPage.jsx';
 import AdminUsersPage from './pages/AdminUsersPage.jsx';
+import IndicatorImportPage from './pages/IndicatorImportPage.jsx';
 import { homeForRole } from './config/access';
 import { formatIndicatorValue } from './utils/formatters.js';
 
@@ -36,13 +37,14 @@ const pageMeta = {
   '/forms/new': ['Criar formulário', 'Construa o formulário sem escrever código'],
   '/indicators': ['Indicadores', 'Dashboard estratégico do ecossistema'],
   '/indicators/catalog': ['Cadastro de indicadores', 'Administre o catálogo usado pelos formulários e dashboards'],
+  '/indicadores/importar-eventos': ['Importar eventos', 'Revise reservas antes de atualizar os indicadores'],
+  '/indicadores/importar-residentes': ['Importar empresas residentes', 'Consolide contratos do HUB, MOB e UNI'],
   '/organizations': ['Organizações', 'Empresas e centros cadastrados no Ágora Tech Park'],
   '/admin': ['Aprovações', 'Valide novos usuários e vínculos'],
   '/admin/solicitacoes': ['Solicitações', 'Valide novos usuários, perfis e vínculos'],
   '/admin/usuarios': ['Usuários', 'Gerencie perfis e situação de acesso'],
   '/admin/auditoria': ['Auditoria', 'Histórico de ações críticas'],
   '/perfil': ['Meu perfil', 'Dados da sua conta e vínculos'],
-  '/pesquisa': ['Área de pesquisa', 'Gerencie coletas de indicadores'],
   '/residente': ['Formulários disponíveis', 'Coletas destinadas à sua organização'],
   '/resident/history': ['Histórico de respostas', 'Formulários respondidos pela sua organização'],
   respond: ['Responder formulário', 'Preenchimento pela organização vinculada'],
@@ -241,6 +243,8 @@ function Indicators() {
   const [error, setError] = useState('');
   useEffect(() => { getIndicatorHistory().then(setPeriods).catch((reason) => setError(reason.message)); }, []);
   useEffect(() => { getIndicators({ ...(period ? { period } : {}), ...(search ? { name: search } : {}) }).then((rows) => setItems(rows.map((row) => ({ ...row, source: indicatorSourceLabels[row.source] || row.source })))).catch((reason) => setError(reason.message)); }, [period, search]);
+  const currentYear = String(new Date().getFullYear());
+  const availableYears = [...new Set(periods.map(String))].filter((value) => value !== currentYear);
   const download = async (format) => {
     try {
       const report = await downloadIndicatorReport(format, period ? { period } : {});
@@ -250,7 +254,7 @@ function Indicators() {
     } catch (reason) { setError(reason.message); }
   };
   const canExport = user.role !== 'RESIDENTE';
-  return <div className="content indicators-page"><div className="source-notice"><strong>Fonte consolidada dos Centros de Inovação</strong><span>Respostas de formulários alimentam automaticamente estes indicadores e o dashboard.</span></div><div className="toolbar"><label className="field-search"><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar indicador ou código..." /></label><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="">{new Date().getFullYear()}</option>{periods.map((value) => <option key={value}>{value}</option>)}</select>{canExport && <><Button variant="secondary" className="push" onClick={() => download('pdf')}><Download />PDF</Button><Button variant="secondary" onClick={() => download('excel')}><Download />Excel</Button><Button variant="secondary" onClick={() => download('csv')}><Download />CSV</Button></>}</div><ErrorMessage message={error} /><section className="metric-grid">{items.map((item) => <article className="panel metric indicator-card" key={item.id}><div><span>{item.category}</span><code>{item.code}</code></div><h3>{item.name}</h3><h2>{item.json_value ? `${item.json_value.length} organizações` : formatIndicatorValue(item.value ?? item.text_value, item.value_type, item.unit)}</h2><p>{item.description}</p>{Array.isArray(item.json_value) && <div className="indicator-details" aria-label={`Detalhamento de ${item.name}`}>{item.json_value.map((detail) => <div key={detail.organization}><strong>{detail.organization}</strong><span>Desafios: {detail.challenges} · Soluções: {detail.solutions} · Negócios: {detail.deals}</span></div>)}</div>}<footer><em>{item.period}</em><small>{item.source}</small></footer></article>)}</section>{!items.length && !error && <article className="panel empty-state">Nenhum indicador encontrado para os filtros.</article>}</div>;
+  return <div className="content indicators-page"><div className="source-notice"><strong>Fonte consolidada dos Centros de Inovação</strong><span>Respostas de formulários alimentam automaticamente estes indicadores e o dashboard.</span></div><div className="toolbar"><label className="field-search"><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar indicador ou código..." /></label><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="">{currentYear}</option>{availableYears.map((value) => <option key={value}>{value}</option>)}</select>{canExport && <><Button variant="secondary" className="push" onClick={() => download('pdf')}><Download />PDF</Button><Button variant="secondary" onClick={() => download('excel')}><Download />Excel</Button><Button variant="secondary" onClick={() => download('csv')}><Download />CSV</Button></>}</div><ErrorMessage message={error} /><section className="metric-grid">{items.map((item) => <article className="panel metric indicator-card" key={item.id}><div><span>{item.category}</span><code>{item.code}</code></div><h3>{item.name}</h3><h2>{item.json_value ? `${item.json_value.length} organizações` : formatIndicatorValue(item.value ?? item.text_value, item.value_type, item.unit)}</h2><p>{item.description}</p>{Array.isArray(item.json_value) && <div className="indicator-details" aria-label={`Detalhamento de ${item.name}`}>{item.json_value.map((detail) => <div key={detail.organization}><strong>{detail.organization}</strong><span>Desafios: {detail.challenges} · Soluções: {detail.solutions} · Negócios: {detail.deals}</span></div>)}</div>}<footer><em>{item.period}</em><small>{item.source}</small></footer></article>)}</section>{!items.length && !error && <article className="panel empty-state">Nenhum indicador encontrado para os filtros.</article>}</div>;
 }
 
 function Residents() {
@@ -326,25 +330,6 @@ function Respond() {
   return <div className="content respond"><article className="respond-card"><ErrorMessage message={error} />{form && <div className="respond-head"><small>COLETA</small><h2>{form.title}</h2><p>{form.description}</p><p>Prazo: {form.period || 'não informado'}</p><div className="response-progress"><Progress value={questions.length ? (answeredCount / questions.length) * 100 : 0} /><span>{answeredCount} de {questions.length}</span></div></div>}<form onSubmit={(event) => { event.preventDefault(); persist(true); }}>{sent ? <div className="success"><Check /><h3>Resposta enviada com sucesso!</h3><p>Uma nova edição exige reabertura pela equipe responsável.</p></div> : <>{questions.map((question) => <label key={question.id}>{question.label}{question.required && ' *'}{question.type === 'OPTION' ? <div className="choices">{(options[question.id] || []).map((option) => <button type="button" className={answers[question.id] === option.value ? 'selected' : ''} onClick={() => update(question.id, option.value)} key={option.id}>{option.value}</button>)}</div> : <input type={question.type === 'TEXT' ? 'text' : 'number'} step={question.type === 'DECIMAL' ? '.01' : '1'} value={answers[question.id] || ''} onChange={(event) => update(question.id, event.target.value)} />}</label>)}<div className="toolbar"><Button type="button" variant="secondary" disabled={saving} onClick={() => persist(false)}>Salvar rascunho</Button><Button type="submit" disabled={saving}>Enviar respostas</Button></div></>}</form></article></div>;
 }
 
-function AdminUsers() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [processingId, setProcessingId] = useState('');
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const load = () => getUsers().then(setUsers).catch((reason) => setError(reason.message)).finally(() => setLoading(false));
-  useEffect(() => { void load(); }, []);
-  const change = async (id, operation) => {
-    setProcessingId(id); setError(''); setMessage('');
-    try { await operation(); await load(); setMessage('Usuário atualizado com sucesso.'); }
-    catch (reason) { setError(reason.message); }
-    finally { setProcessingId(''); }
-  };
-  const visible = users.filter((item) => `${item.name} ${item.email}`.toLowerCase().includes(search.toLowerCase()));
-  return <div className="content"><div className="toolbar"><label className="field-search"><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar usuário..." /></label></div><ErrorMessage message={error} />{message && <div className="success-message" role="status">{message}</div>}{loading ? <div className="panel">Carregando usuários...</div> : <section className="panel history">{visible.map((item) => <div className="history-row" key={item.id}><div><strong>{item.name}</strong><small>{item.email} · {item.status}</small></div><select aria-label={`Perfil de ${item.name}`} disabled={processingId === item.id} value={item.role || ''} onChange={(event) => change(item.id, () => changeUserRole(item.id, event.target.value))}><option value="" disabled>Sem perfil</option>{['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE'].map((role) => <option key={role}>{role}</option>)}</select>{item.status === 'ACTIVE' ? <Button disabled={processingId === item.id} variant="secondary" onClick={() => change(item.id, () => changeUserStatus(item.id, 'INACTIVE'))}>Inativar</Button> : item.status === 'INACTIVE' && <Button disabled={processingId === item.id} onClick={() => change(item.id, () => changeUserStatus(item.id, 'ACTIVE'))}>Ativar</Button>}</div>)}{!visible.length && <div className="empty-state">Nenhum usuário encontrado.</div>}</section>}</div>;
-}
-
 function ProfilePage() {
   const { user, logout, updateAvatar } = useAuth();
   const navigate = useNavigate();
@@ -399,9 +384,10 @@ export default function App() {
     <Route element={<ProtectedRoute />}><Route path="/unauthorized" element={<Unauthorized />} /><Route path="/unknown-profile" element={<UnknownProfile />} /><Route path="/" element={<HomeRedirect />} />
       <Route element={<AppShell />}>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/dashboard" element={<DashboardPage />} /></Route>
-        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/pesquisa" element={<Forms />} /><Route path="/forms" element={<Forms />} /><Route path="/forms/new" element={<Create />} /><Route path="/forms/:formId/edit" element={<Create />} /></Route>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/pesquisa" element={<Navigate to="/forms" replace />} /><Route path="/forms" element={<Forms />} /><Route path="/forms/new" element={<Create />} /><Route path="/forms/:formId/edit" element={<Create />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/indicators" element={<Indicators />} /></Route><Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR']} />}><Route path="/organizations" element={<Residents />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicators/catalog" element={<IndicatorCatalogPage />} /></Route>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicadores/importar-eventos" element={<IndicatorImportPage type="EVENTS" />} /><Route path="/indicadores/importar-residentes" element={<IndicatorImportPage type="RESIDENTS" />} /></Route>
         <Route path="/perfil" element={<ProfilePage />} />
         <Route element={<ProtectedRoute roles={['ADMIN']} />}><Route path="/admin" element={<AdminRequestsPage />} /><Route path="/admin/solicitacoes" element={<AdminRequestsPage />} /><Route path="/admin/usuarios" element={<AdminUsersPage />} /><Route path="/admin/auditoria" element={<Audit />} /><Route path="/admin/requests" element={<Navigate to="/admin/solicitacoes" replace />} /></Route>
         <Route element={<ProtectedRoute roles={['RESIDENTE']} />}><Route path="/residente" element={<Forms resident />} /><Route path="/resident/forms" element={<Forms resident />} /><Route path="/resident/forms/:formId/respond" element={<Respond />} /><Route path="/resident/history" element={<History />} /></Route>

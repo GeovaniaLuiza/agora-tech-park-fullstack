@@ -17,15 +17,9 @@ export default function IndicatorCatalogPage() {
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [sort, setSort] = useState({ key: 'name', direction: 'asc' });
-  const [filters, setFilters] = useState({ category: '', type: '', periodicity: '', aggregation: '', status: '' });
+  const [filters] = useState({ category: '', type: '', periodicity: '', aggregation: '', status: '' });
   const load = useCallback(() => getIndicatorDefinitions(includeInactive).then(setItems).catch((reason) => setError(reason.message)), [includeInactive]);
   useEffect(() => { void load(); }, [load]);
-  const options = useMemo(() => ({
-    category: [...new Set(items.map((item) => item.category).filter(Boolean))].sort(),
-    type: [...new Set(items.map((item) => item.value_type).filter(Boolean))].sort(),
-    periodicity: [...new Set(items.map((item) => item.periodicity).filter(Boolean))].sort(),
-    aggregation: [...new Set(items.map((item) => item.annual_aggregation || item.aggregation_type).filter(Boolean))].sort(),
-  }), [items]);
   const visible = useMemo(() => {
     const filtered = items.filter((item) => `${item.name} ${item.code} ${item.category}`.toLowerCase().includes(search.toLowerCase())
       && (!filters.category || item.category === filters.category)
@@ -37,7 +31,6 @@ export default function IndicatorCatalogPage() {
   }, [items, search, filters, sort]);
   const toggleSort = (key) => setSort((current) => current.key === key ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' });
   const sortLabel = (key) => sort.key === key ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : '';
-  const filterChange = (name) => (event) => setFilters((current) => ({ ...current, [name]: event.target.value }));
   const open = (item = null) => {
     setEditing(item); setError(''); setMessage('');
     setForm(item ? { code: item.code, name: item.name, description: item.description || '', category: item.category,

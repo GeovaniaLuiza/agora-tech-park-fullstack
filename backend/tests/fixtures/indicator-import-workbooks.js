@@ -1,3 +1,4 @@
+// Synthetic fixture: document numbers are deliberately invalid.
 import ExcelJS from 'exceljs';
 
 const asBuffer = async (workbook) => Buffer.from(await workbook.xlsx.writeBuffer());
@@ -21,10 +22,10 @@ export async function residentWorkbookFixture() {
   sheet.addRow(['Legenda ', 'Bloco', 'Bloco e Modúlo ', 'Cliente', 'Área ', 'CNPJ', 'Vigência ', 'Fim ', 'Locador ', 'Atividades', 'Nacionalidade', 'Nome ', 'Telefone', 'E-mail ']);
   const add = ({ legend = 'Locada', block, room, name, document, start, end, sector = 'Tecnologia' }) =>
     sheet.addRow([legend, block, room, name, 50, document, start, end, 'Locador anonimizado', sector, 'Brasileira', '', '', '']);
-  add({ block: 'HUB', room: 'HUB 201', name: 'Empresa Anônima A', document: '11.222.333/0001-81', start: '01/01/2026', end: '31/12/2026' });
-  add({ block: 'UNI', room: 'UNI 301', name: 'Empresa Anônima A', document: '11.222.333/0001-81', start: '01/03/2026', end: '' });
-  add({ block: 'MOB', room: 'MOB 101', name: 'Profissional Anônimo B', document: '529.982.247-25', start: '01/06/2026', end: '30/09/2026', sector: 'Consultoria' });
-  add({ block: 'Z', room: 'Z 10', name: 'Empresa Fora do Centro', document: '19.131.243/0001-97', start: '01/01/2026', end: '31/12/2026' });
+  add({ block: 'HUB', room: 'HUB 201', name: 'Empresa Anônima A', document: '00.000.000/0000-00', start: '01/01/2026', end: '31/12/2026' });
+  add({ block: 'UNI', room: 'UNI 301', name: 'Empresa Anônima A', document: '00.000.000/0000-00', start: '01/03/2026', end: '' });
+  add({ block: 'MOB', room: 'MOB 101', name: 'Profissional Anônimo B', document: '000.000.000-00', start: '01/06/2026', end: '30/09/2026', sector: 'Consultoria' });
+  add({ block: 'Z', room: 'Z 10', name: 'Empresa Fora do Centro', document: '00.000.000/0000-01', start: '01/01/2026', end: '31/12/2026' });
   add({ block: 'HUB', room: 'HUB 401', name: 'Empresa Sem Documento', document: '', start: '01/01/2026', end: '28/02/2026' });
   add({ block: 'HUB', room: 'HUB 402', name: 'Empresa Sem Documento', document: '', start: '01/07/2026', end: '31/08/2026' });
   sheet.addRow(['Novos contratos']);

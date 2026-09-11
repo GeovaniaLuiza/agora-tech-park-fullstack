@@ -13,46 +13,22 @@ services:
       retries: 20
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
-      - ./database/migrations/002_auth_access_control.sql:/docker-entrypoint-initdb.d/002_auth_access_control.sql
-      - ./database/migrations/003_email_identity.sql:/docker-entrypoint-initdb.d/003_email_identity.sql
-      - ./database/migrations/004_email_verification.sql:/docker-entrypoint-initdb.d/004_email_verification.sql
-      - ./database/migrations/005_access_governance.sql:/docker-entrypoint-initdb.d/005_access_governance.sql
-      - ./database/migrations/006_secure_user_defaults.sql:/docker-entrypoint-initdb.d/006_secure_user_defaults.sql
-      - ./database/migrations/007_email_token_delivery.sql:/docker-entrypoint-initdb.d/007_email_token_delivery.sql
-      - ./database/migrations/008_api_workflows.sql:/docker-entrypoint-initdb.d/008_api_workflows.sql
-      - ./database/migrations/009_password_reset.sql:/docker-entrypoint-initdb.d/009_password_reset.sql
-      - ./database/migrations/010_notifications_indicator_source.sql:/docker-entrypoint-initdb.d/010_notifications_indicator_source.sql
-      - ./database/migrations/011_dashboard_institutional_indicators.sql:/docker-entrypoint-initdb.d/011_dashboard_institutional_indicators.sql
-      - ./database/migrations/012_form_respondents.sql:/docker-entrypoint-initdb.d/012_form_respondents.sql
-      - ./database/migrations/013_indicator_management.sql:/docker-entrypoint-initdb.d/013_indicator_management.sql
-      - ./database/migrations/016_indicator_imports.sql:/docker-entrypoint-initdb.d/016_indicator_imports.sql
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/009_seed.sql
   migrate-auth-schema:
-    image: postgres:16-alpine
+    image: node:22-bookworm-slim
+    working_dir: /app/backend
     environment:
-      PGPASSWORD: agora_dev
+      NODE_ENV: development
+      DATABASE_URL: postgresql://agora:agora_dev@postgres:5432/agora_indicadores
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./database/runtime/ensure_auth_schema.sql:/migrations/ensure_auth_schema.sql:ro
-      - ./database/migrations/010_notifications_indicator_source.sql:/migrations/010_notifications_indicator_source.sql:ro
-      - ./database/migrations/011_dashboard_institutional_indicators.sql:/migrations/011_dashboard_institutional_indicators.sql:ro
-      - ./database/migrations/012_form_respondents.sql:/migrations/012_form_respondents.sql:ro
-      - ./database/migrations/013_indicator_management.sql:/migrations/013_indicator_management.sql:ro
-      - ./database/migrations/016_indicator_imports.sql:/migrations/016_indicator_imports.sql:ro
-    command:
-      - psql
-      - --host=postgres
-      - --username=agora
-      - --dbname=agora_indicadores
-      - --file=/migrations/ensure_auth_schema.sql
-      - --file=/migrations/010_notifications_indicator_source.sql
-      - --file=/migrations/011_dashboard_institutional_indicators.sql
-      - --file=/migrations/012_form_respondents.sql
-      - --file=/migrations/013_indicator_management.sql
-      - --file=/migrations/016_indicator_imports.sql
+      - ./backend:/app/backend:ro
+      - ./database/migrations:/app/database/migrations:ro
+      - migration_node_modules:/app/backend/node_modules
+    # One owner for ordering, checksums and schema_migrations; no automatic data seed.
+    # Legacy volumes without runner metadata require an explicit baseline first.
+    command: [sh, -c, 'npm ci --omit=dev && npm run migrate']
     restart: "no"
   mailpit:
     image: axllent/mailpit:v1.30.6
@@ -68,4 +44,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-volumes: { postgres_data: {} }
+volumes:
+  postgres_data:
+  migration_node_modules:

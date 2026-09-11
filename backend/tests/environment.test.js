@@ -14,6 +14,23 @@ const valid = {
 };
 
 describe('validateEnvironment', () => {
+  it('defaults production to IPv4 loopback', () => {
+    expect(validateEnvironment(valid).LISTEN_HOST).toBe('127.0.0.1');
+  });
+
+  it.each(['development', 'test'])('preserves container access in %s', (NODE_ENV) => {
+    expect(validateEnvironment({ ...valid, NODE_ENV }).LISTEN_HOST).toBe('0.0.0.0');
+    expect(validateEnvironment({ ...valid, NODE_ENV, LISTEN_HOST: '127.0.0.1' }).LISTEN_HOST).toBe('127.0.0.1');
+  });
+
+  it('accepts explicit production loopback', () => {
+    expect(validateEnvironment({ ...valid, LISTEN_HOST: '127.0.0.1' }).LISTEN_HOST).toBe('127.0.0.1');
+  });
+
+  it.each(['0.0.0.0', '::', 'localhost', '192.168.1.10', ''])('rejects unsafe production binding: %s', (LISTEN_HOST) => {
+    expect(() => validateEnvironment({ ...valid, LISTEN_HOST })).toThrow(/LISTEN_HOST/);
+  });
+
   it('accepts a complete production configuration', () => {
     expect(validateEnvironment(valid).PORT).toBe(3000);
   });

@@ -35,4 +35,4 @@ O scanner aguarda o Quality Gate. `scripts/check-sonar-quality.mjs` consulta tam
 
 ## Dependências
 
-`npm run audit` bloqueia vulnerabilidades High/Critical. O frontend conserva React Router 6; advisories Moderate remanescentes devem ser acompanhados até uma atualização compatível, sem forçar uma migração quebradora para v7. Dependabot abre PRs semanais agrupados.
+`npm run audit` bloqueia vulnerabilidades High/Critical. As versões vigentes ficam nos manifests/lockfiles (o frontend atual usa React Router 7); a medição acima é histórica. Dependabot abre PRs semanais agrupados. Resultados desta sincronização AWS ficam em [AWS_REPOSITORY_ALIGNMENT.md](AWS_REPOSITORY_ALIGNMENT.md).

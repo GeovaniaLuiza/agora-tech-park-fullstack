@@ -53,9 +53,25 @@ export default function DashboardPage() {
   const loadProjects = useCallback(() => loadSection('projects', getDashboardProjects), [loadSection]);
   const loadEngagement = useCallback(() => loadSection('engagement', getDashboardEngagement), [loadSection]);
 
-  useEffect(() => { loadOperational(); }, [loadOperational]);
-  useEffect(() => { getInnovationCenters().then((items) => { setCenters(items); setFilters((current) => ({ ...current, centerId: current.centerId || items[0]?.id || '' })); }).catch(() => {}); }, []);
-  useEffect(() => { if (!filters.centerId) return; loadInstitutional(); loadCompanies(); loadFinancial(); loadProjects(); loadEngagement(); }, [filters.centerId, loadInstitutional, loadCompanies, loadFinancial, loadProjects, loadEngagement]);
+  useEffect(() => {
+    void Promise.resolve().then(() => loadOperational());
+  }, [loadOperational]);
+  useEffect(() => {
+    void Promise.resolve().then(() => getInnovationCenters().then((items) => {
+      setCenters(items);
+      setFilters((current) => ({ ...current, centerId: current.centerId || items[0]?.id || '' }));
+    }).catch(() => {}));
+  }, []);
+  useEffect(() => {
+    if (!filters.centerId) return;
+    void Promise.resolve().then(() => {
+      loadInstitutional();
+      loadCompanies();
+      loadFinancial();
+      loadProjects();
+      loadEngagement();
+    });
+  }, [filters.centerId, loadInstitutional, loadCompanies, loadFinancial, loadProjects, loadEngagement]);
 
   const clearFilters = () => setFilters(initialFilters);
   const exportReport = async () => {

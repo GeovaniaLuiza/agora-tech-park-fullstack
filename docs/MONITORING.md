@@ -2,6 +2,8 @@
 
 ## Escolha
 
+A arquitetura vigente usa Grafana Alloy na EC2 → Grafana Cloud. CloudWatch não é o destino de observabilidade da aplicação nesta etapa; referências antigas representam alternativas históricas.
+
 Grafana Cloud Free com Grafana Alloy é a opção preferida para uma EC2 pequena: evita operar Grafana, Prometheus e Loki no mesmo host, reduz consumo de RAM, atualizações e persistência local. Limites e preço do plano precisam ser conferidos na conta antes da ativação. Self-hosted só é indicado com capacidade dedicada e responsabilidade por backup/upgrade.
 
 `pino`/`pino-http` foram escolhidos para JSON e redaction com baixo overhead; `prom-client` expõe o formato Prometheus e métricas padrão sem manter um servidor Prometheus dentro da aplicação. São três dependências runtime pequenas, sem licença SaaS própria, mas exigem atualizações de segurança. Alloy concentra coleta de host/PostgreSQL/journald em um único agente operacional.

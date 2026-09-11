@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventWorkbookFixture } from './fixtures/indicator-import-workbooks.js';
-import { parseEventWorkbook, summarizeEvents } from '../src/services/eventImportParser.js';
+import { parseEventWorkbook } from '../src/services/eventImportParser.js';
 
 const mocks = vi.hoisted(() => ({ findBatch: vi.fn(), saveDraft: vi.fn() }));
 vi.mock('../src/repositories/indicatorImportRepository.js', () => ({

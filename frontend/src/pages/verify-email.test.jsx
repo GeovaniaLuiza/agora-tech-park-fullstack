@@ -55,4 +55,14 @@ describe('confirmação de e-mail', () => {
     await screen.findByRole('heading', { name: /link expirado/i });
     expect(screen.getByRole('button', { name: /solicitar novo link/i })).toBeTruthy();
   });
+
+  it('trata a ausência de token na url', async () => {
+    renderPage('');
+    expect(await screen.findByRole('heading', { name: /link inválido/i })).toBeTruthy();
+  });
+
+  it('não chama a api de verificação se o token estiver ausente', async () => {
+    renderPage('');
+    expect(api.verifyEmail).not.toHaveBeenCalled();
+  });
 });

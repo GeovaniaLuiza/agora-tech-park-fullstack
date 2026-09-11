@@ -1,0 +1,1908 @@
+{
+  "total": 32,
+  "afetados": [
+    "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+    "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+    "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+    "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+    "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+    "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+    "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+    "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+    "55d5de436fc4b282fa811196fa37320f4d8c443b",
+    "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+    "159c401fa7bab558d4f04965be907d406d18e4b1",
+    "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+    "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+    "12a4fe833eeda8940f1ca62032e76035ff70da72",
+    "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+    "2864b45908cbba643417f53bbceaaead87f2746e",
+    "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3"
+  ],
+  "refs": [
+    "refs/heads/GLF-Frontend-Tela_importar_residentes",
+    "refs/heads/dependabot/github_actions/github-actions-4717a0affd",
+    "refs/heads/dependabot/npm_and_yarn/backend/backend-dependencies-56b52bfd91",
+    "refs/heads/dependabot/npm_and_yarn/frontend/frontend-dependencies-47b67a8480",
+    "refs/heads/dependabot/npm_and_yarn/root-dependencies-b599029903",
+    "refs/heads/main",
+    "refs/pull/10/head",
+    "refs/pull/11/head",
+    "refs/pull/12/head",
+    "refs/pull/12/merge",
+    "refs/pull/13/head",
+    "refs/pull/13/merge",
+    "refs/pull/14/head",
+    "refs/pull/14/merge",
+    "refs/pull/15/head",
+    "refs/pull/15/merge",
+    "refs/pull/8/head",
+    "refs/pull/9/head"
+  ],
+  "assinados": [
+    "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+    "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+    "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+    "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+    "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+    "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+    "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+    "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+    "55d5de436fc4b282fa811196fa37320f4d8c443b",
+    "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+    "159c401fa7bab558d4f04965be907d406d18e4b1",
+    "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+    "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+    "12a4fe833eeda8940f1ca62032e76035ff70da72",
+    "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+    "2864b45908cbba643417f53bbceaaead87f2746e",
+    "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+    "5242c6ece96b6ad4afc95bf961d76b162275e827",
+    "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+    "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+    "538900691b04165a94690b7803eb6c424b41aab7",
+    "a760aa51e72d7e52364288cbcf47a76e75394d45",
+    "44717d82a91b6faf277a50dfcb7f885c400967d0",
+    "e77bb373c778e40dedffa0e40eab7220c4d3ed7b"
+  ],
+  "lfs": [],
+  "datasets": [
+    {
+      "arquivo": ".logs/health-current.json",
+      "blob": "1d000929227181501f4ab61c48788f9e31911436",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package-lock.json",
+      "blob": "393b259a0915dc40c2c326cb68ad3ccb4cfca98d",
+      "commits": [
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f"
+      ],
+      "padroes": {
+        "email": 1,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package-lock.json",
+      "blob": "5cee4a08408db4d25a7b0b24b4f92746ed5f7c92",
+      "commits": [
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package-lock.json",
+      "blob": "8734005dda1f2f48769ac7a64c400d91e3da5073",
+      "commits": [
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 1,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package-lock.json",
+      "blob": "a9a8e8975d7d18a3b054a602c558d20a3ccc181d",
+      "commits": [
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39"
+      ],
+      "padroes": {
+        "email": 1,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package-lock.json",
+      "blob": "aad8b5f19f82bceb8f4ac95b9dd7d6fdb2b884ba",
+      "commits": [
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b"
+      ],
+      "padroes": {
+        "email": 1,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package-lock.json",
+      "blob": "e293cd37293188ecd120ab2e4bd883cd902b638e",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827"
+      ],
+      "padroes": {
+        "email": 1,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package-lock.json",
+      "blob": "fd9010e18a894c8ff0a33b755fba25ee64754357",
+      "commits": [
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7"
+      ],
+      "padroes": {
+        "email": 1,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package.json",
+      "blob": "08040487b3077daaa59f94598e10e82169d5deb3",
+      "commits": [
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package.json",
+      "blob": "23d2f32f9314a8ddaaf7f5b48cf16329fbe7704e",
+      "commits": [
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package.json",
+      "blob": "37e8b1e71bb283afa91bc34d9de9b3fb5c623b1c",
+      "commits": [
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package.json",
+      "blob": "680eb44045d56d782e5f98f8cdd1395068af535d",
+      "commits": [
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package.json",
+      "blob": "691d5637e731080186070700a9c98400d5db2f76",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package.json",
+      "blob": "7e26bd9b44b1f24d2753121810b996debcdf238a",
+      "commits": [
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "backend/package.json",
+      "blob": "a60d40c6a282eafffa7198c3d0a18d8e21c64fb1",
+      "commits": [
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/001_initial_schema.sql",
+      "blob": "b3b42cf958a7a9b9065ef8661ab33808b66e2701",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/002_auth_access_control.sql",
+      "blob": "9435578a4e429be7f82d08dde852152b4c0efd03",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/003_email_identity.sql",
+      "blob": "29ef1db32230d8e10dc97b1cb2e9fbc719f61c11",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/004_email_verification.sql",
+      "blob": "c86ea05afbe1c585dcfb8e90b8573fbe98c6b72e",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/005_access_governance.sql",
+      "blob": "0c9d94d4a199b2438182442e5835c6e3a38b4b99",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/006_secure_user_defaults.sql",
+      "blob": "21154fe6feb022cdbe154681552dbdbe716e9aa0",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/007_email_token_delivery.sql",
+      "blob": "d827915a9d6a40bbb7a18a8dcd50ec0118fbdea5",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/008_api_workflows.sql",
+      "blob": "495e6c89ce22c7fe1a10cfcb1d2dbca23b4096c5",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/009_password_reset.sql",
+      "blob": "7d6d225dda8c360a2ad93d93009af16b24b8275e",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/010_notifications_indicator_source.sql",
+      "blob": "71230c862dec4338f1c6e0335bb8e1c5a4451cab",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/011_dashboard_institutional_indicators.sql",
+      "blob": "6a1b2328834209451dc4f0bda03986248e6c906b",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 2
+      }
+    },
+    {
+      "arquivo": "database/migrations/012_form_respondents.sql",
+      "blob": "68dd1ed48c8d5a2ba6f4892281c8b45a6c61b318",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/013_indicator_management.sql",
+      "blob": "01c010520027d855b2713b4c410a6c61ba8635e6",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/014_form_indicator_collection.sql",
+      "blob": "7d3a6759e12b317cbeb5d63c5ce93883e7500812",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/015_user_profile_photo.sql",
+      "blob": "99440dc2569949613a6820390ec82e03044d667e",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/migrations/016_indicator_imports.sql",
+      "blob": "dec2e3f80ce5bf6f6007c5b8d4a7a23b870a5d3b",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/runtime/ensure_auth_schema.sql",
+      "blob": "a568e0e023b53807fb42130dd564de39cbc10afc",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/schema.sql",
+      "blob": "097ca5fd4856baeb25f1d7782725297955f50bae",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "database/seed.sql",
+      "blob": "db4db484f92c5c04137f495aed71c49af062922b",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17",
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 4,
+        "CPF": 0,
+        "CNPJ": 4,
+        "telefone": 115
+      }
+    },
+    {
+      "arquivo": "deploy/aws/github-deploy-policy.json",
+      "blob": "b9542b20540e412901700bf2def2610ab45eaec8",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "deploy/aws/github-oidc-trust-policy.json",
+      "blob": "28913e76032db7a82047b5ead763195955281627",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/imgs/Indicadores Rede de Centros de Inovação 2025_Joinville.xlsx",
+      "blob": "38f5745f1e432e8e05b4cae2ea3ff36745f420a8",
+      "commits": [
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 19,
+        "CNPJ": 0,
+        "telefone": 0
+      },
+      "celulas": {
+        "email": 0,
+        "CPF_formatado": 0,
+        "CNPJ_formatado": 0,
+        "nome_composto_heuristico": 225,
+        "endereco_heuristico": 2,
+        "numerico_11_digitos": 19
+      },
+      "categorias_cabecalho": []
+    },
+    {
+      "arquivo": "frontend/imgs/Indicadores Rede de Centros de Inovação 2026_Joinville.xlsx",
+      "blob": "471c7522bac726821580e9f6826f30433f4526af",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      },
+      "celulas": {
+        "email": 0,
+        "CPF_formatado": 0,
+        "CNPJ_formatado": 0,
+        "nome_composto_heuristico": 25,
+        "endereco_heuristico": 0,
+        "numerico_11_digitos": 0
+      },
+      "categorias_cabecalho": []
+    },
+    {
+      "arquivo": "frontend/imgs/Locatários Perini Business 2026.xlsx",
+      "blob": "54b236f1796d100c64259e54bfff3d43854005b5",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3"
+      ],
+      "padroes": {
+        "email": 251,
+        "CPF": 15,
+        "CNPJ": 477,
+        "telefone": 129
+      },
+      "celulas": {
+        "email": 397,
+        "CPF_formatado": 17,
+        "CNPJ_formatado": 603,
+        "nome_composto_heuristico": 153,
+        "endereco_heuristico": 0,
+        "numerico_11_digitos": 0
+      },
+      "categorias_cabecalho": [
+        "cnpj",
+        "e-mail",
+        "nome",
+        "telefone"
+      ]
+    },
+    {
+      "arquivo": "frontend/imgs/estatisticas.xlsx",
+      "blob": "261ff6c44c6ca2b52975133f0f63bf61933d6925",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      },
+      "celulas": {
+        "email": 0,
+        "CPF_formatado": 0,
+        "CNPJ_formatado": 0,
+        "nome_composto_heuristico": 18,
+        "endereco_heuristico": 0,
+        "numerico_11_digitos": 0
+      },
+      "categorias_cabecalho": []
+    },
+    {
+      "arquivo": "frontend/package-lock.json",
+      "blob": "02e3b15422e63d2ff33fc80788d75cd03f627949",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package-lock.json",
+      "blob": "5d7e38cb5f513e2e417273ccc84c44b5887528ac",
+      "commits": [
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package-lock.json",
+      "blob": "7ff6e759456e9a695f93b46873753cf49edcd72e",
+      "commits": [
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package-lock.json",
+      "blob": "cd2bb26af7302c14bf72eb7526b42203cdd5820e",
+      "commits": [
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package-lock.json",
+      "blob": "e657d545583ca2078fa9d375d32c21181b2f6d25",
+      "commits": [
+        "55d5de436fc4b282fa811196fa37320f4d8c443b"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package-lock.json",
+      "blob": "f1c81108cefcc804f10b5c0af3179cfa417ff189",
+      "commits": [
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package.json",
+      "blob": "17f054840bc7377840efff2ad157d0ab50ca3dd5",
+      "commits": [
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package.json",
+      "blob": "22f7ef1549f883c8dec0a0901831dd3502807ca2",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package.json",
+      "blob": "86adabdeea3c38faf48ff64f814fd6a68b464d6d",
+      "commits": [
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package.json",
+      "blob": "9860f1b50b2745a807e4c0bbe7ce0715d762d5de",
+      "commits": [
+        "55d5de436fc4b282fa811196fa37320f4d8c443b"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package.json",
+      "blob": "9b16e73aed99bc607d59e5b2b5f2f34695fde7c6",
+      "commits": [
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "frontend/package.json",
+      "blob": "d13a16f691722999f04a815efb541cefdb81d927",
+      "commits": [
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "monitoring/dashboards/api.json",
+      "blob": "5b1d9b650fd3db6ca308fe3c89849cc53ac945a7",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "monitoring/dashboards/application.json",
+      "blob": "ac3e149eb441f34ac000abd4088e7a01d012ef84",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "monitoring/dashboards/infrastructure.json",
+      "blob": "695511bd63a601b978e72da8c92cfba26baaaaf1",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "monitoring/dashboards/postgresql.json",
+      "blob": "d16f15ae517ad04049f8cebb93930cbcee6eb2b0",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "159c401fa7bab558d4f04965be907d406d18e4b1",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "538900691b04165a94690b7803eb6c424b41aab7",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package-lock.json",
+      "blob": "1d849ce72faca77d88399196c398d945c913744e",
+      "commits": [
+        "159c401fa7bab558d4f04965be907d406d18e4b1"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package-lock.json",
+      "blob": "239a79c0bb585d78e31862b03285ac27bc68beba",
+      "commits": [
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package-lock.json",
+      "blob": "64f8efbc7bad42247531875dd2736fe747c1f1be",
+      "commits": [
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package-lock.json",
+      "blob": "997866e58fdf7108746c17b097ad54582d246033",
+      "commits": [
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package-lock.json",
+      "blob": "c84f633b0e6c19e7b44c462426646885b76f54e4",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "538900691b04165a94690b7803eb6c424b41aab7"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package.json",
+      "blob": "2d2977cb4c9e2672feffe9fb112c9c3d948d6e4f",
+      "commits": [
+        "4aab03f80ab70dcac9722c0c4ffeabd506190336",
+        "e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+        "f719795b6afffeb2f367f8ddb9bbd60b67920663",
+        "198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+        "e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+        "323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+        "55d5de436fc4b282fa811196fa37320f4d8c443b",
+        "1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+        "aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+        "4f4ba111acaed9dea1cc899973ce3fe450cf210e",
+        "12a4fe833eeda8940f1ca62032e76035ff70da72",
+        "538900691b04165a94690b7803eb6c424b41aab7"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package.json",
+      "blob": "4dfbba9ad4146cbf94665e586f8d4f14ff0c6721",
+      "commits": [
+        "c5086ab177cb3d57b86165d4066ade20a109f69c",
+        "5b2bd52af8e692bd03db5da6ebdef4a36ca50a90",
+        "34ad99e0728c73a05d984937e8d9ba5fb1cb376e",
+        "98d3e766b28aeac9f24c34b663e9f4c6f1b2e7e7",
+        "d0e7d629f898e6d96fe30b92b66e50aec264f764",
+        "fc36c25a07b50b3b9a3d558576701d71fa98326e"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package.json",
+      "blob": "54e3bb928e76723fdcfff2fd9d7e8a84370efc86",
+      "commits": [
+        "159c401fa7bab558d4f04965be907d406d18e4b1"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package.json",
+      "blob": "66ac7fba1e3ff740d42cfaa7277ca18c5c8fb154",
+      "commits": [
+        "7a86a3a59b02e61837d77fe0eb0cbee965384781",
+        "2864b45908cbba643417f53bbceaaead87f2746e",
+        "55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+        "a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+        "5242c6ece96b6ad4afc95bf961d76b162275e827",
+        "ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+        "69ab4f29766cd48bdea46fc746b5099859ea2a39",
+        "a760aa51e72d7e52364288cbcf47a76e75394d45",
+        "44717d82a91b6faf277a50dfcb7f885c400967d0",
+        "cf94dc6015bc5a034080391bad98168402e2cc17"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    },
+    {
+      "arquivo": "package.json",
+      "blob": "c32f55a9982f34e0f743cef1a459617c4b68393a",
+      "commits": [
+        "adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+        "1a3b762b51d17332f4376dcab2680afdc2f473e8"
+      ],
+      "padroes": {
+        "email": 0,
+        "CPF": 0,
+        "CNPJ": 0,
+        "telefone": 0
+      }
+    }
+  ],
+  "historical_paths_target": [
+    "frontend/imgs/Locatários Perini Business 2026.xlsx"
+  ],
+  "lfs_all_small_blobs": [],
+  "all_refs": [
+    "refs/heads/Frontend-GLF1 cf94dc6015bc5a034080391bad98168402e2cc17",
+    "refs/heads/Frontend-GLF2 44717d82a91b6faf277a50dfcb7f885c400967d0",
+    "refs/heads/GLF-Frontend-Tela_importar_residentes 55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+    "refs/heads/dependabot/github_actions/github-actions-4717a0affd 323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+    "refs/heads/dependabot/npm_and_yarn/backend/backend-dependencies-56b52bfd91 198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+    "refs/heads/dependabot/npm_and_yarn/frontend/frontend-dependencies-47b67a8480 e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+    "refs/heads/dependabot/npm_and_yarn/root-dependencies-b599029903 1a3b762b51d17332f4376dcab2680afdc2f473e8",
+    "refs/heads/main aeace75a2139cc05a1bfa00d7a3ad23b4a5671be",
+    "refs/pull/1/head cf94dc6015bc5a034080391bad98168402e2cc17",
+    "refs/pull/10/head 1ffc45b205db1397a2cfa471b8a8e382d944e63f",
+    "refs/pull/11/head 55d5de436fc4b282fa811196fa37320f4d8c443b",
+    "refs/pull/12/head 323614efd31165d2fbc2e0f8bbe465d5521b1d8d",
+    "refs/pull/12/merge e086217d6ed085f362a5547a241c5c24ccd6f1bd",
+    "refs/pull/13/head 1a3b762b51d17332f4376dcab2680afdc2f473e8",
+    "refs/pull/13/merge adc29e47c1a38a4164b6fb5adf2dc5e4553372a2",
+    "refs/pull/14/head 198a80cbf29bb3d7d44e49968c82f9bad0baea9b",
+    "refs/pull/14/merge f719795b6afffeb2f367f8ddb9bbd60b67920663",
+    "refs/pull/15/head e8230037674fcdea5e7e7893f1564ea62ad9ac33",
+    "refs/pull/15/merge 4aab03f80ab70dcac9722c0c4ffeabd506190336",
+    "refs/pull/2/head a760aa51e72d7e52364288cbcf47a76e75394d45",
+    "refs/pull/3/head 538900691b04165a94690b7803eb6c424b41aab7",
+    "refs/pull/4/head 69ab4f29766cd48bdea46fc746b5099859ea2a39",
+    "refs/pull/5/head ab8dac3ae53b35ad090bb8f33672a9cacf9313f4",
+    "refs/pull/6/head 5242c6ece96b6ad4afc95bf961d76b162275e827",
+    "refs/pull/7/head a52d18c6950b6f263d3a337345d56ef1bbf8b58f",
+    "refs/pull/8/head 55faededae3cf1dd10dd3afc47ed3a1d2c8628c3",
+    "refs/pull/9/head 159c401fa7bab558d4f04965be907d406d18e4b1"
+  ],
+  "signature_inclusive_estimate": 32,
+  "first_changed_commit_estimate": "e77bb373c778e40dedffa0e40eab7220c4d3ed7b"
+}

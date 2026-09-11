@@ -9,10 +9,10 @@ try {
   const result = validateOnly
     ? await validateSource()
     : await importSource(null, { reprocess });
-  console.log(JSON.stringify(result, null, 2));
+  console.log(JSON.stringify({ event: validateOnly ? 'source_validated' : 'source_imported', valid: result.valid === true }));
   if (validateOnly && !result.valid) process.exitCode = 2;
-} catch (error) {
-  console.error(JSON.stringify({ message: error.message, code: error.code, details: error.details }, null, 2));
+} catch {
+  console.error(JSON.stringify({ event: 'source_import_failed' }));
   process.exitCode = 1;
 } finally {
   await pool.end();

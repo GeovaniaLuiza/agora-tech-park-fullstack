@@ -13,15 +13,12 @@ function safePath(url = '/') {
 export const requestLogger = pinoHttp({
   logger,
   genReqId(req, res) {
-    const incoming = req.headers['x-request-id'];
-    const requestId = typeof incoming === 'string' && /^[a-zA-Z0-9._-]{8,100}$/.test(incoming)
-      ? incoming
-      : randomUUID();
+    const requestId = randomUUID();
     res.setHeader('X-Request-Id', requestId);
     return requestId;
   },
   serializers: {
-    req: (req) => ({ id: req.id, method: req.method, path: safePath(req.url) }),
+    req: (req) => ({ id: req.id, method: req.method, path: '[omitted]' }),
     res: (res) => ({ statusCode: res.statusCode }),
   },
   customLogLevel(_req, res, error) {

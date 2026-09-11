@@ -2,6 +2,10 @@
 
 O fluxo oficial separa CI e CD. Consulte [CI/CD](docs/CI_CD.md) para checks e proteção de branch e [Produção AWS](docs/AWS_PRODUCTION.md) para arquitetura, custo, provisionamento, backup e rollback.
 
+Arquitetura vigente: Amplify `main/PRODUCTION` + EC2 Ubuntu 24.04 em `us-east-1`, Node.js 22/systemd, Caddy e PostgreSQL 16 local/EBS. Administração via SSM com SSH desativado, deploy via OIDC, observabilidade Alloy/Grafana Cloud. Bootstrap manual; IaC não é pré-requisito. Esta sincronização do repositório não executa deploy nem migrations remotas.
+
+O CI valida a URL pública incorporada ao `frontend-dist`; o CD repete a validação antes de acessar AWS. Amplify mantém AutoBuild desativado.
+
 ## Pré-condições
 
 - CI verde e SonarQube Cloud Quality Gate aprovado;

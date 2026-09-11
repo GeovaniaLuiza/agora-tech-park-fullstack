@@ -8,11 +8,13 @@ O fluxo de coleta por formulário e sua integração com Indicadores e Dashboard
 
 ## Arquitetura
 
-- Frontend: React 18, Vite, React Router e Context API.
+- Frontend: React, Vite, React Router e Context API (versões em `frontend/package.json`).
 - Backend: Node.js 22, Express, ES Modules, JWT, Zod e PostgreSQL 16.
 - Organização backend: `routes → controllers → services → repositories → PostgreSQL`.
 - Desenvolvimento: Docker Compose com PostgreSQL e Mailpit.
-- Produção proposta: Amplify para o frontend; EC2 com Caddy, Node, PostgreSQL e systemd para a API; Grafana Cloud e Alloy para observabilidade.
+- Produção adotada em `us-east-1`: Amplify para o frontend; EC2 Ubuntu 24.04 com Caddy, Node.js 22/systemd e PostgreSQL 16 local em EBS; Grafana Alloy → Grafana Cloud. Administração via SSM, SSH desativado e deploy via GitHub Actions/OIDC.
+- API pública planejada: `https://agora-techpark.duckdns.org`; variável pública de build `VITE_API_URL=https://agora-techpark.duckdns.org/api`.
+- Bootstrap AWS manual; deploy da aplicação automatizado. Terraform/CloudFormation/CDK não são requisito desta etapa.
 
 Detalhes: [arquitetura](docs/ARCHITECTURE.md), [qualidade](docs/QUALITY.md), [CI/CD](docs/CI_CD.md), [produção AWS](docs/AWS_PRODUCTION.md) e [monitoramento](docs/MONITORING.md).
 
@@ -40,7 +42,9 @@ npm run dev
 npm run lint
 npm test
 npm run test:coverage
+$env:VITE_API_URL='https://agora-techpark.duckdns.org/api'
 npm run build
+node scripts/validate-frontend-artifact.mjs frontend/dist
 npm run audit
 ```
 

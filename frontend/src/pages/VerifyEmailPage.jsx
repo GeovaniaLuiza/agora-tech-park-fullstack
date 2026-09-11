@@ -14,11 +14,13 @@ const errorStates = {
 export default function VerifyEmailPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [state, setState] = useState({ type: 'verifying' });
+  const [state, setState] = useState(() => (
+    params.get('token') ? { type: 'verifying' } : { type: 'error', code: 'INVALID_TOKEN' }
+  ));
 
   useEffect(() => {
     const token = params.get('token');
-    if (!token) { setState({ type: 'error', code: 'INVALID_TOKEN' }); return; }
+    if (!token) return;
     verifyEmail(token).then((data) => setState({ type: 'success', message: data.message }))
       .catch((error) => setState({ type: 'error', code: error.code || 'NETWORK_ERROR' }));
   }, [params]);

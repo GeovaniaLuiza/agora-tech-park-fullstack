@@ -1,6 +1,11 @@
 import pino from 'pino';
 
 export const REDACTED_PATHS = [
+  'msg', // Pino may derive this field from an unsanitized Error.message.
+  'cpf', 'cnpj', 'email', 'phone', 'telefone', 'jwt',
+  'body', 'file', 'files', 'buffer', 'rows', 'workbook',
+  '*.cpf', '*.cnpj', '*.email', '*.phone', '*.telefone',
+  'req.body', 'req.file', 'req.files',
   'password',
   'password_hash',
   'token',
@@ -25,6 +30,7 @@ export const logger = pino({
   level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'test' ? 'silent' : 'info'),
   base: { service: 'agora-api', environment: process.env.NODE_ENV || 'development' },
   redact: { paths: REDACTED_PATHS, censor: '[REDACTED]' },
-  serializers: { err: pino.stdSerializers.err },
+  // Driver errors can embed submitted values in messages, stacks and details.
+  serializers: { err: () => ({ type: 'Error', message: 'Operation failed' }) },
   timestamp: pino.stdTimeFunctions.isoTime,
 });

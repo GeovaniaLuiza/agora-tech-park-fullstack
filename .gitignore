@@ -15,5 +15,14 @@ coverage/
 *.sql.gz
 *.dump
 *.backup
+
+# Operational resident exports may contain personal data. Keep them local.
+frontend/imgs/Locatários Perini Business*.xlsx
 .DS_Store
 Thumbs.db
+
+# Private input, uploads and local recovery material (templates remain trackable).
+data/private/
+uploads/
+tmp/
+backups/

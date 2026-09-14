@@ -88,6 +88,20 @@ Depois da conferência, a aplicação operacional da mudança requer `systemctl 
 
 Para Alloy, copie `alloy.config` para o caminho de configuração da distribuição e `alloy.env.example` para o EnvironmentFile do serviço, com modo `0600`. Use usuário PostgreSQL somente leitura para o exporter quando viável.
 
+## Segurança e reexecução do deploy backend
+
+O script requer `flock` (util-linux) e `realpath` (coreutils), disponíveis no ambiente Linux adotado. O host precisa ter `/opt/agora` preparado. O descritor de `/opt/agora/deploy.lock` permanece aberto desde antes da leitura de `current` até o fim do deploy, incluindo rollback e retenção. Contenção ou falha ao adquirir o lock encerra a tentativa sem alterar releases/current. Não remover o arquivo de lock durante execuções; todos os deploys devem passar por esse script.
+
+O destino de `current` é normalizado e deve permanecer dentro de `/opt/agora/releases`. Rerun do SHA ativo verifica diretório, `backend/src/server.js`, `backend/package.json` e health local. Se saudável, retorna sucesso sem clone, instalação, backup, migrations, troca de symlink, restart ou retenção. Se inválido ou não saudável, retorna erro preservando os arquivos. Diretório de SHA existente e inativo nunca é destruído automaticamente: o operador deve investigar, confirmar que não está ativo nem necessário para rollback e tratar eventual release parcial somente de forma controlada.
+
+SHA novo mantém clone → checkout → ambiente → backup → dependências → dry-run → migrations → troca atômica de `current` → restart → health. Falha no restart ou health tenta restaurar uma anterior com estrutura válida, reiniciar e verificar sua saúde; informa recuperação bem-sucedida ou falha, mantendo erro do deploy original. Primeiro deploy sem anterior válida não tem rollback. Não há rollback automático do banco, e compatibilidade das migrations continua obrigatória. A verificação estrutural não comprova integridade completa da release ou compatibilidade de schema.
+
+A retenção mantém os cinco diretórios com maior mtime e preserva adicionalmente a release ativa, a anterior e a recém-ativada, comparando caminhos normalizados dentro da árvore de releases. Por isso pode manter mais de cinco diretórios. Preparações que falham podem deixar releases parciais e backups incompletos; não há limpeza automática dessas tentativas. Alterações manuais fora do lock não são serializadas.
+
+Validação local: `node --test scripts/deploy-backend.test.mjs scripts/deploy-backup.test.mjs` executa uma cópia do script com apenas a restrição de raiz adaptada para diretório temporário, filesystem/symlinks reais e comandos git, npm, pg_dump, curl e systemctl simulados. Não acessa AWS, banco ou serviços reais. No Windows, o teste substitui `flock` por exclusão via diretório temporário; em Linux usa `flock` real, incluindo duas execuções concorrentes. A semântica Linux do lock ainda deve ser validada localmente em Linux quando os testes forem executados somente em Windows.
+
+Esta etapa não declara produção pronta. O script instalado em `/opt/agora/bin` deverá ser atualizado em etapa operacional autorizada; o checkout do workflow não o instala. Permanecem os limites do health local (sem comprovação do SHA, HTTPS/Caddy ou prazo total explícito), ausência de rollback após falhas do Amplify/smoke e os gaps de backup abaixo. Nenhuma ativação de CD é autorizada por esta correção.
+
 ## Banco, migração e backup
 
 - Banco no volume EBS persistente; defina espaço livre mínimo de 15%.

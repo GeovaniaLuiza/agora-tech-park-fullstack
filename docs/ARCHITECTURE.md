@@ -8,7 +8,11 @@ React/Vite (Amplify) → HTTPS → Caddy → Express → PostgreSQL 16
                                       └→ /metrics → Grafana Alloy → Grafana Cloud
 ```
 
-O frontend permanece uma SPA React 18. O backend mantém o fluxo `routes → controllers → services → repositories`; regras de negócio ficam nos services e SQL parametrizado nos repositories. Controllers traduzem HTTP, e middlewares tratam autenticação, autorização, limites, logs, métricas e erros.
+O frontend permanece uma SPA React. O backend mantém o fluxo `routes → controllers → services → repositories`; regras de negócio ficam nos services e SQL parametrizado nos repositories. Controllers traduzem HTTP, e middlewares tratam autenticação, autorização, limites, logs, métricas e erros.
+
+Produção adotada: `us-east-1`, EC2 Ubuntu 24.04, Node.js 22/systemd, Caddy e PostgreSQL 16 na mesma EC2 com EBS. A API escuta `127.0.0.1:3000` e PostgreSQL `127.0.0.1:5432`. SSM administra a instância com SSH desativado; GitHub Actions usa OIDC para SSM e Amplify. Amplify `main/PRODUCTION` recebe apenas o artefato CI, com AutoBuild desativado. Bootstrap manual, sem requisito de IaC nesta etapa.
+
+`LISTEN_HOST` é centralizado em `backend/src/config/environment.js`: default `127.0.0.1` em produção, rejeitando qualquer outro valor; default `0.0.0.0` em development/test, com override permitido. O Compose local inicia banco, migrations e Mailpit, não a API. Containers locais de API devem usar development/test com `0.0.0.0`; produção segue o contrato EC2/Caddy, sem exposição direta da API.
 
 ## Ambientes
 

@@ -266,7 +266,7 @@ async function main() {
   await runMigrations();
 }
 
-main().catch(err => {
-  console.error('Migration process failed:', err.message || err);
+main().catch(() => {
+  console.error('Database maintenance failed; inspect configuration securely.');
   process.exit(1);
 });

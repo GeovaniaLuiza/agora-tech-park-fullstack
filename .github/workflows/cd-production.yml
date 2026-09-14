@@ -45,6 +45,10 @@ jobs:
           path: frontend-dist
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
       - name: Validate deployment configuration
         env:
           AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
@@ -56,6 +60,9 @@ jobs:
             echo "VITE_API_URL must equal PRODUCTION_API_URL + /api"
             exit 1
           }
+          test "$AMPLIFY_BRANCH" = "main" || { echo "Production IAM policy only allows branch main"; exit 1; }
+      - name: Validate downloaded frontend artifact before AWS access
+        run: node scripts/validate-frontend-artifact.mjs frontend-dist
       - name: Configure short-lived AWS credentials
         uses: aws-actions/configure-aws-credentials@v6.2.3
         with:

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiRequest, publishForm, tokenStore } from './api';
+
+const apiBaseUrl = import.meta.env.VITE_API_URL?.trim() || 'http://localhost:3002/api';
 describe('armazenamento da sessão', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
   it('usa sessionStorage quando lembrar-me está desmarcado', () => {
@@ -85,7 +87,7 @@ describe('publicação de formulário', () => {
 
     await publishForm('form-1', ['org-1'], ['11111111-1111-4111-8111-111111111111']);
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:3002/api/forms/form-1/publish', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith(`${apiBaseUrl}/forms/form-1/publish`, expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ organizationIds: ['org-1'], recipientIds: ['11111111-1111-4111-8111-111111111111'] }),
     }));

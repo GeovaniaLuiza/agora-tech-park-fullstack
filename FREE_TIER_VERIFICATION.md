@@ -1,3 +1,5 @@
+> **LEGADO — não utilizar como procedimento atual de produção.** Este documento preserva a análise de 2026-08-07, incluindo alternativas RDS/PM2/CloudWatch e estimativas históricas não validadas para a conta atual. A arquitetura vigente é Amplify + EC2 Ubuntu 24.04/Node.js 22/systemd/Caddy + PostgreSQL 16 local/EBS, SSM/OIDC e Alloy/Grafana Cloud, em us-east-1. Consulte [produção AWS](docs/AWS_PRODUCTION.md) e [inventário da sincronização](docs/AWS_REPOSITORY_ALIGNMENT.md). Nenhuma estimativa abaixo comprova gratuidade ou elegibilidade atual.
+
 # FREE TIER & CRÉDITOS AWS — Verificação Necessária
 ## Ágora Tech Park | 2026-08-07
 

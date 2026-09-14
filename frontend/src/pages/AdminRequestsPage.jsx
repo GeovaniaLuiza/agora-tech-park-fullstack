@@ -24,7 +24,7 @@ export default function AdminRequestsPage() {
     }
   }, []);
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(() => load());
   }, [load]);
   const approve = async (item) => {
     setProcessingId(item.id); setError('');

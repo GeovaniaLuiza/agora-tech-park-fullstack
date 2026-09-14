@@ -1,6 +1,6 @@
 # Sincronização do repositório com AWS — 2026-09-11
 
-## Diagnóstico e escopo
+## Diagnóstico e escopo original — 2026-09-11
 
 Arquitetura remota informada pelo responsável: us-east-1, Amplify main/PRODUCTION sem AutoBuild, EC2 Ubuntu 24.04 com Node.js 22/Express/systemd, Caddy, PostgreSQL 16 local em EBS, SSM com SSH desativado, OIDC e Grafana Alloy/Grafana Cloud. Nenhum recurso remoto foi consultado ou alterado nesta revisão; não houve deploy, migration em produção, commit ou push.
 
@@ -41,7 +41,7 @@ A busca incluiu README, documentos Markdown versionados e arquivos de deploy. N�
 
 ## Validações locais
 
-Ambiente: Windows, Node.js 24.16.0/npm 11.13.0 (dentro dos engines atuais); o CI e a produção continuam em Node.js 22. Validação Linux/Node 22 depende da próxima execução CI autorizada.
+Ambiente: Windows, Node.js 24.16.0/npm 11.13.0 (dentro dos engines atuais); o CI e a produção continuam em Node.js 22. A validação remota em Linux/Node.js 22 foi concluída com sucesso, conforme a revalidação de 2026-09-13 abaixo.
 
 | Verificação | Resultado |
 | --- | --- |
@@ -59,22 +59,40 @@ Ambiente: Windows, Node.js 24.16.0/npm 11.13.0 (dentro dos engines atuais); o CI
 | Shell de deploy | `bash -n` aprovado; script completo não executado |
 | systemd/Caddy | Inspeção estática; binários nativos indisponíveis neste Windows, WSL sem acesso. Comandos de validação no host documentados, não executados |
 | npm audit | 0 vulnerabilidades em raiz/backend/frontend; repetido com acesso de rede autorizado após bloqueio do sandbox |
-| Lint global | 6 erros existentes `react-hooks/set-state-in-effect` em arquivos não alterados nesta correção; bloqueia CI |
+| Lint global | Pendência da revisão local original superada; check remoto aprovado em 2026-09-13 |
 
 Cobertura (statements / branches / functions / lines): backend **47,64 / 40,39 / 39,12 / 53,59%**; frontend **59,12 / 54,88 / 46,38 / 70,34%**. Todos os thresholds atuais foram atendidos. A primeira execução frontend com paralelismo padrão teve timeout de 5 segundos no dashboard; execução com dois workers passou sem aumentar timeout nem alterar testes existentes.
 
-Arquivos com lint pendente: `frontend/src/contexts/AuthContext.jsx:43`, `frontend/src/hooks/useForms.js:13`, `frontend/src/pages/AdminRequestsPage.jsx:27`, `frontend/src/pages/DashboardPage.jsx:56` e `:58`, `frontend/src/pages/VerifyEmailPage.jsx:21`. Não foram desabilitadas regras nem refatorados esses fluxos fora do escopo da infraestrutura.
+Esses valores de cobertura são as medições locais registradas e permanecem preservados; a aprovação dos checks remotos não os substitui nem comprova conformidade acadêmica. O backend continua abaixo do requisito de **75% de cobertura definido pelo Playbook**.
+
+## Revalidação remota — 2026-09-13
+
+Conforme os resultados remotos confirmados pelo responsável, o CI do **PR #16** foi executado com sucesso em **Linux/GitHub Actions com Node.js 22**:
+
+| Verificação remota | Resultado |
+| --- | --- |
+| Lint and dependency audit | PASS |
+| Backend unit tests | PASS |
+| Frontend tests and build | PASS |
+| PostgreSQL integration tests | PASS |
+| SonarQube Cloud Quality Gate | PASS |
+
+`SONAR_TOKEN` está configurado como GitHub Repository Secret; seu valor não foi solicitado nem registrado. Nenhum deploy AWS foi executado e `DEPLOY_ENABLED` continua não habilitado. Os resultados acima validam o alinhamento do repositório/PR para merge, sem autorizar a ativação de produção/CD.
+
+Esta atualização é exclusivamente documental. Não executar deploy, migrations, comandos AWS ou history rewrite nesta tarefa; não restaurar a planilha operacional removida.
 
 ## Riscos e dependências remotas
 
-- O lint global precisa ser corrigido antes de obter CI verde e liberar CD. Sonar/integração PostgreSQL serão validados no CI; nenhuma migration foi executada nesta revisão.
-- Confirmar no GitHub variáveis de repositório `VITE_API_URL` e `DEPLOY_ENABLED=false` durante configuração; variáveis de production, SONAR_TOKEN, proteções e ausência de override divergente da URL.
+- Lint, SonarQube Cloud e integração PostgreSQL estão aprovados no CI remoto. Essa aprovação não elimina os riscos operacionais abaixo nem autoriza CD.
+- Manter `DEPLOY_ENABLED` não habilitado. Antes de uma futura ativação autorizada, revisar `VITE_API_URL`, variáveis de production, proteções e ausência de override divergente da URL. `SONAR_TOKEN` já está configurado como GitHub Repository Secret.
 - No host, aplicar futuramente o ambiente Caddy versionado, verificar serviços, permissões, DNS/HTTPS, PostgreSQL somente em loopback, EBS, SSM e acesso ao repositório. IDs de EC2/Amplify e ARNs reais permanecem fora dos templates.
 - AWS remoto: confirmar role/policy/trust conforme estado informado; app main/PRODUCTION, AutoBuild desativado e rewrite SPA. Não houve tentativa de redeploy ou alteração remota.
 - EC2 única permanece ponto de falha. Backup pré-deploy local não substitui backup diário/off-site nem teste real de restore. O teste com pg_dump simulado comprova interrupção do pipeline, não recuperabilidade do banco real.
-- Script atual não faz rollback de migrations. Reexecutar o mesmo SHA pode remover seu diretório de release antes do clone; não repetir deploy da release ativa sem corrigir esse comportamento. Revisar idempotência e recuperação antes da ativação do CD.
+- `deploy/aws/deploy-backend.sh` não faz rollback de migrations. Reexecutar o mesmo SHA pode remover seu diretório de release antes do clone; não repetir deploy da release ativa sem corrigir esse comportamento. Revisar a idempotência da reexecução do mesmo SHA e a recuperação antes da ativação do CD.
+- A planilha operacional `frontend/imgs/Locatários Perini Business 2026.xlsx` foi removida da árvore, mas permanece no histórico Git até sanitização controlada. Não restaurar o arquivo nem executar history rewrite nesta tarefa.
 - A transformação do literal auxiliar do Router depende do formato da dependência; o build e o validador devem continuar bloqueando regressões.
 
 ## Classificação
 
-**NÃO PRONTO PARA RETOMAR CONFIGURAÇÃO AWS** pelo critério de validações integralmente aprovadas: ajustes solicitados de arquitetura foram implementados, mas o lint global ainda bloqueia CI/CD. Não habilitar deploy com esse check reprovado. Recursos AWS e publicação continuam intocados.
+- **ALINHAMENTO DO REPOSITÓRIO/PR VALIDADO PARA MERGE:** os checks remotos do PR #16 passaram em Linux/GitHub Actions com Node.js 22. A cobertura do backend permanece abaixo dos 75% exigidos pelo Playbook; não se declara conformidade acadêmica de cobertura.
+- **PRODUÇÃO/CD NÃO DEVE SER ATIVADA:** `DEPLOY_ENABLED` continua não habilitado. Permanecem abertas a revisão da idempotência do deploy, a implantação de backup diário/off-site com restore testado, a sanitização controlada do histórico Git e as verificações operacionais remotas descritas acima. Nenhum deploy AWS foi executado.

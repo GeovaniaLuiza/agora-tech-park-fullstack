@@ -35,7 +35,13 @@ Essa configuração é administrativa e não pode ser garantida por arquivos ver
 
 `cd-production.yml` só é elegível após uma execução `push/main` do workflow `CI` concluir com sucesso e `DEPLOY_ENABLED=true`. PR nunca faz deploy. O environment `production` pode exigir aprovação manual adicional.
 
-O backend usa OIDC e Systems Manager, sem access keys ou SSH private key. A EC2 instala o SHA exato em `/opt/agora/releases`, faz backup, instala dependências, valida/aplica migrações, troca o symlink, reinicia o systemd e verifica health. Se o health falhar, o binário volta à release anterior; migrações não são revertidas automaticamente.
+O backend usa OIDC e Systems Manager, sem access keys ou SSH private key. Para um SHA novo, a EC2 instala o SHA exato em `/opt/agora/releases`, faz backup, instala dependências, valida/aplica migrações, troca o symlink, reinicia o systemd e verifica health. Um lock exclusivo `flock` no host cobre a leitura de `current`, preparação, ativação, recuperação e retenção; uma segunda execução falha sem modificar releases/current. A concorrência do GitHub permanece como proteção adicional.
+
+Reexecutar o SHA já ativo é no-op com sucesso somente se a estrutura esperada existir e o health local passar: não clona, instala dependências, migra, troca symlink ou reinicia. Se estiver inválido ou não saudável, falha preservando a release. Um diretório de SHA existente e inativo também causa erro e é preservado; o operador deve investigar uma release parcial e removê-la somente de forma controlada, verificando antes que não é ativa nem necessária para rollback.
+
+Falha no restart ou health da candidata aciona a mesma recuperação da aplicação: se houver uma release anterior válida, restaura o symlink atomicamente, tenta restart e verifica health, registrando sucesso ou falha. O deploy original sempre retorna erro. Sem anterior válida, informa que rollback está indisponível. Migrações não têm rollback automático e precisam permanecer compatíveis com a aplicação anterior. A retenção preserva explicitamente os caminhos normalizados da ativa, anterior e recém-ativada dentro de `/opt/agora/releases`.
+
+Esta correção local não declara produção pronta nem autoriza ativar CD. O workflow executa `/opt/agora/bin/deploy-backend.sh` já instalado na EC2; atualizar o repositório não atualiza esse arquivo no host. Falhas posteriores no Amplify/smoke não revertem o backend; health local não comprova o SHA respondente nem Caddy/HTTPS. Consulte os limites de backup e a validação isolada em `AWS_PRODUCTION.md`.
 
 O frontend usa o artefato Vite aprovado e o fluxo manual de deployment do Amplify, branch `main/PRODUCTION`, com AutoBuild desativado. Isso evita o risco de o Amplify construir um commit mais novo ainda não aprovado.
 

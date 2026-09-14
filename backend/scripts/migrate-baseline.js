@@ -128,7 +128,7 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error('Baseline process failed:', err.message || err);
+main().catch(() => {
+  console.error('Database maintenance failed; inspect configuration securely.');
   process.exit(1);
 });

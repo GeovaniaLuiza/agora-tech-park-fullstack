@@ -2,7 +2,7 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "SendDeploymentToTaggedInstance",
+      "Sid": "SendDeploymentToProjectInstance",
       "Effect": "Allow",
       "Action": "ssm:SendCommand",
       "Resource": [
@@ -13,7 +13,7 @@
     {
       "Sid": "ReadDeploymentCommand",
       "Effect": "Allow",
-      "Action": ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"],
+      "Action": "ssm:GetCommandInvocation",
       "Resource": "*"
     },
     {
@@ -21,9 +21,14 @@
       "Effect": "Allow",
       "Action": [
         "amplify:CreateDeployment",
-        "amplify:StartDeployment",
-        "amplify:GetJob"
+        "amplify:StartDeployment"
       ],
+      "Resource": "arn:aws:amplify:AWS_REGION:ACCOUNT_ID:apps/AMPLIFY_APP_ID/branches/main"
+    },
+    {
+      "Sid": "ReadAmplifyDeploymentJob",
+      "Effect": "Allow",
+      "Action": "amplify:GetJob",
       "Resource": "arn:aws:amplify:AWS_REGION:ACCOUNT_ID:apps/AMPLIFY_APP_ID/branches/main/jobs/*"
     }
   ]

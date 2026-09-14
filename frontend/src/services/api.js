@@ -1,4 +1,4 @@
-﻿const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
+﻿const BASE_URL = import.meta.env.VITE_API_URL?.trim() || (import.meta.env.DEV ? 'http://localhost:3002/api' : '');
 const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 30000;
 
 export const tokenStore = {

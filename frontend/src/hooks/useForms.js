@@ -10,6 +10,8 @@ export function useForms() {
     setError('');
     return getForms().then(setForms).catch((reason) => setError(reason.message)).finally(() => setLoading(false));
   };
-  useEffect(() => { reload(); }, []);
+  useEffect(() => {
+    void Promise.resolve().then(() => reload());
+  }, []);
   return { forms, loading, error, reload };
 }

@@ -15,7 +15,7 @@ async function start() {
     logger.warn({ event: 'smtp_unavailable', reason: classifyEmailError(error) }, 'SMTP service unavailable');
     if (process.env.NODE_ENV === 'production' && error instanceof EmailConfigurationError) throw error;
   }
-  const server = app.listen(config.PORT, () => logger.info({ event: 'api_started', port: config.PORT }, 'API started'));
+  const server = app.listen(config.PORT, config.LISTEN_HOST, () => logger.info({ event: 'api_started', port: config.PORT, host: config.LISTEN_HOST }, 'API started'));
 
   const stop = async (signal) => {
     logger.info({ event: 'api_stopping', signal }, 'Graceful shutdown started');

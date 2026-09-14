@@ -7,8 +7,8 @@ export default class AppErrorBoundary extends Component {
     return { hasError: true };
   }
 
-  componentDidCatch(error, info) {
-    console.error('Falha inesperada na interface', error, info);
+  componentDidCatch() {
+    console.error('Falha inesperada na interface');
   }
 
   render() {

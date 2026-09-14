@@ -40,7 +40,9 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => { restoreSession(); }, [restoreSession]);
+  useEffect(() => {
+    void Promise.resolve().then(() => restoreSession());
+  }, [restoreSession]);
   useEffect(() => {
     const onUnauthorized = () => { void logout(); };
     window.addEventListener('auth:unauthorized', onUnauthorized);

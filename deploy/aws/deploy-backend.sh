@@ -102,8 +102,17 @@ set +a
 
 BACKUP_FILE="$BACKUP_DIR/agora-$(date -u +%Y%m%dT%H%M%SZ)-$RELEASE_SHA.sql.gz"
 echo "Creating database backup: $BACKUP_FILE"
-PGDATABASE="$DATABASE_URL" pg_dump --format=plain --no-owner --no-privileges | gzip -9 > "$BACKUP_FILE"
-test -s "$BACKUP_FILE"
+BACKUP_TEMP="$(mktemp "$BACKUP_FILE.tmp.XXXXXX")"
+if pg_dump --dbname="$DATABASE_URL" --format=plain --no-owner --no-privileges | gzip -9 > "$BACKUP_TEMP" \
+  && test -s "$BACKUP_TEMP" \
+  && gzip -t "$BACKUP_TEMP" \
+  && mv -- "$BACKUP_TEMP" "$BACKUP_FILE"; then
+  echo "Database backup completed: $BACKUP_FILE"
+else
+  rm -f -- "$BACKUP_TEMP"
+  echo "Database backup failed; deploy aborted." >&2
+  exit 1
+fi
 
 ln -s "$ENV_FILE" "$RELEASE_DIR/backend/.env"
 npm ci --omit=dev --prefix "$RELEASE_DIR/backend"

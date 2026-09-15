@@ -96,7 +96,7 @@ O destino de `current` é normalizado e deve permanecer dentro de `/opt/agora/re
 
 SHA novo mantém clone → checkout → ambiente → backup → dependências → dry-run → migrations → troca atômica de `current` → restart → health. Falha no restart ou health tenta restaurar uma anterior com estrutura válida, reiniciar e verificar sua saúde; informa recuperação bem-sucedida ou falha, mantendo erro do deploy original. Primeiro deploy sem anterior válida não tem rollback. Não há rollback automático do banco, e compatibilidade das migrations continua obrigatória. A verificação estrutural não comprova integridade completa da release ou compatibilidade de schema.
 
-A retenção mantém os cinco diretórios com maior mtime e preserva adicionalmente a release ativa, a anterior e a recém-ativada, comparando caminhos normalizados dentro da árvore de releases. Por isso pode manter mais de cinco diretórios. Preparações que falham podem deixar releases parciais e backups incompletos; não há limpeza automática dessas tentativas. Alterações manuais fora do lock não são serializadas.
+A retenção mantém os cinco diretórios com maior mtime e preserva adicionalmente a release ativa, a anterior e a recém-ativada, comparando caminhos normalizados dentro da árvore de releases. Por isso pode manter mais de cinco diretórios. Preparações que falham podem deixar releases parciais; não há limpeza automática dessas releases. Falhas no pipeline ou na validação do backup removem o temporário. Alterações manuais fora do lock não são serializadas.
 
 Validação local: `node --test scripts/deploy-backend.test.mjs scripts/deploy-backup.test.mjs` executa uma cópia do script com apenas a restrição de raiz adaptada para diretório temporário, filesystem/symlinks reais e comandos git, npm, pg_dump, curl e systemctl simulados. Não acessa AWS, banco ou serviços reais. No Windows, o teste substitui `flock` por exclusão via diretório temporário; em Linux usa `flock` real, incluindo duas execuções concorrentes. A semântica Linux do lock ainda deve ser validada localmente em Linux quando os testes forem executados somente em Windows.
 
@@ -105,7 +105,7 @@ Esta etapa não declara produção pronta. O script instalado em `/opt/agora/bin
 ## Banco, migração e backup
 
 - Banco no volume EBS persistente; defina espaço livre mínimo de 15%.
-- O CD cria `pg_dump` comprimido antes de migrar, valida arquivo não vazio e mantém 14 dias por padrão (`BACKUP_RETENTION_DAYS`).
+- O CD cria `pg_dump` comprimido antes de migrar, valida arquivo não vazio e integridade com `gzip -t`, publica o arquivo final atomicamente e mantém 14 dias por padrão (`BACKUP_RETENTION_DAYS`).
 - Configure job diário separado, retenção local curta e cópia externa criptografada somente após aprovar custo do destino.
 - Teste restauração periodicamente; backup não testado não é garantia.
 - Nunca execute `migrate:baseline` automaticamente. Um operador deve comparar objetos e confirmar a linha de base.
@@ -113,9 +113,9 @@ Esta etapa não declara produção pronta. O script instalado em `/opt/agora/bin
 
 ### Gap de backup e recuperação
 
-Validação do script existente: `set -Eeuo pipefail` interrompe o deploy se `pg_dump` ou `gzip` falhar; o dump ocorre antes de `migrate:dry` e `migrate`. A URI é fornecida por `PGDATABASE`, sem imprimir a conexão. O arquivo `.sql.gz` usa SQL plain, sem owners/privileges. A retenção só é aplicada ao final de deploy bem-sucedido. `node --test scripts/deploy-backup.test.mjs` exercita o trecho real de backup com `pg_dump` simulado em diretório temporário, verificando sucesso e interrupção em falhas de dump/compressão, sem conectar a banco ou executar o restante do deploy.
+O script preserva `set -Eeuo pipefail` e passa a URI explicitamente por `pg_dump --dbname="$DATABASE_URL"`, sem imprimir a conexão. O pipeline grava em temporário no mesmo diretório; somente após sucesso, tamanho maior que zero e `gzip -t` o arquivo é renomeado atomicamente para `.sql.gz`. Falhas removem o temporário e abortam antes das dependências, `migrate:dry` e `migrate`, preservando backups anteriores. O arquivo usa SQL plain, sem owners/privileges. A retenção só é aplicada ao final de deploy bem-sucedido. `node --test scripts/deploy-backup.test.mjs` exercita o trecho real de backup com `pg_dump` simulado em diretório temporário, verificando conexão explícita, ausência da URI nos logs, sucesso, limpeza em falhas de dump/compressão/validação e preservação de backups anteriores, sem conectar a banco ou executar o restante do deploy.
 
-`test -s` confirma bytes no arquivo comprimido, mas não comprova conteúdo SQL útil, integridade do gzip nem restauração. Não foi feito dump ou restore de produção. Não existe job diário nem cópia off-site implementada; perda da EC2/EBS pode perder banco e backups. Registrar também permissões restritas dos dumps e espaço disponível.
+`test -s` e `gzip -t` confirmam bytes e integridade do arquivo comprimido, mas não comprovam conteúdo SQL útil nem restauração. Restore continua sendo procedimento manual. Não foi feito dump ou restore de produção. Não existe job diário nem cópia off-site implementada; perda da EC2/EBS pode perder banco e backups. Registrar também permissões restritas dos dumps e espaço disponível.
 
 Próxima etapa: um serviço/timer systemd separado do deploy deverá executar backup diário, validar gzip e conteúdo, aplicar retenção e reportar falhas ao Alloy/Grafana. A cópia off-site criptografada deverá ser adicionada após esse backup, com destino, custo e credenciais de privilégio mínimo aprovados. Um procedimento independente deve restaurar em PostgreSQL 16 isolado, validar schema/dados e registrar RPO/RTO e data do teste. Nenhum recurso externo pago, timer ou restore foi criado nesta etapa.
 

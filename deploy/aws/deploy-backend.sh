@@ -59,7 +59,7 @@ valid_release() {
 }
 
 health_check() {
-  curl --fail --silent --show-error --retry 5 --retry-delay 3 "$HEALTH_URL" >/dev/null
+  curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-connrefused "$HEALTH_URL" >/dev/null
 }
 
 if ! RELEASE_DIR="$(release_path "$RELEASE_DIR")"; then

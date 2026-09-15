@@ -52,6 +52,7 @@ git() {
 }
 node() { echo node >> "$TRACE"; return 99; }
 pg_dump() { echo backup >> "$TRACE"; [[ "$SCENARIO" != backup ]] || return 1; printf 'SELECT 1;\n'; }
+gzip() { [[ "$SCENARIO" != gzip ]] || { command cat >/dev/null; return 1; }; command gzip "$@"; }
 npm() {
   local step="$1"
   [[ "$1" != run ]] || step="$2"
@@ -76,7 +77,7 @@ curl() {
   esac
 }
 rm() { echo rm >> "$TRACE"; command rm "$@"; }
-export -f git node pg_dump npm systemctl curl rm make_release
+export -f git node pg_dump gzip npm systemctl curl rm make_release
 export previous
 # Windows has no flock. Model contention explicitly; Linux uses the real flock.
 if [[ "$SIMULATE_FLOCK" == 1 ]]; then
@@ -127,7 +128,7 @@ fi
 cat "$TRACE"
 `;
 
-for (const scenario of ['new', 'active', 'active_bad', 'existing', 'clone', 'backup', 'ci', 'migrate:dry', 'migrate', 'restart', 'health', 'rollback_restart', 'rollback_health', 'first_restart', 'first_health', 'lock', 'concurrent', 'retention']) {
+for (const scenario of ['new', 'active', 'active_bad', 'existing', 'clone', 'backup', 'gzip', 'ci', 'migrate:dry', 'migrate', 'restart', 'health', 'rollback_restart', 'rollback_health', 'first_restart', 'first_health', 'lock', 'concurrent', 'retention']) {
   test(`backend deploy: ${scenario}`, async (t) => {
     const directory = await mkdtemp(join(tmpdir(), 'agora-deploy-test-'));
     t.after(() => rm(directory, { recursive: true, force: true }));
@@ -160,12 +161,13 @@ for (const scenario of ['new', 'active', 'active_bad', 'existing', 'clone', 'bac
       assert.equal(trace.filter(line => line.startsWith('restart:')).length, 1);
       assert.match(output, /Cannot acquire backend deploy lock/);
     }
-    if (['clone', 'backup', 'ci', 'migrate:dry', 'migrate'].includes(scenario)) {
+    assert.doesNotMatch(output + result.stderr, /postgresql:\/\/|unused:unused/);
+    if (['clone', 'backup', 'gzip', 'ci', 'migrate:dry', 'migrate'].includes(scenario)) {
       assert.equal(value('CURRENT'), value('PREVIOUS'));
       assert.ok(!trace.some(line => /^(restart|health):/.test(line)));
       const stages = ['git', 'backup', 'ci', 'migrate:dry', 'migrate'];
-      const last = scenario === 'clone' ? 'git' : scenario;
-      assert.equal(trace.at(-1), last);
+      const last = scenario === 'clone' ? 'git' : scenario === 'gzip' ? 'backup' : scenario;
+      assert.equal(trace.filter(line => line !== 'rm').at(-1), last);
       for (const later of stages.slice(stages.indexOf(last) + 1)) assert.ok(!trace.includes(later));
     }
     if (['restart', 'health', 'rollback_restart', 'rollback_health'].includes(scenario)) {

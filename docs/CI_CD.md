@@ -17,6 +17,8 @@ lint + audit High/Critical
 
 O PostgreSQL do CI usa credenciais efêmeras do próprio service container e não acessa banco do desenvolvedor. O artefato `frontend-dist` vem do mesmo build aprovado.
 
+O job `quality`, em `ubuntu-latest`, executa os testes isolados `scripts/deploy-backend.test.mjs` e `scripts/deploy-backup.test.mjs`. O backup passa `DATABASE_URL` explicitamente ao `pg_dump` por `--dbname`, sem registrar a conexão. O arquivo final `.sql.gz` só aparece após sucesso do pipeline, verificação de tamanho e `gzip -t`, por renomeação de um temporário no mesmo diretório. Falhas removem o temporário e abortam antes das dependências e migrations. Restore permanece manual.
+
 PRs de forks não recebem `SONAR_TOKEN`; por segurança, nunca use `pull_request_target` para analisar código não confiável. Contribuições externas precisam de branch de mantenedor ou aprovação operacional compatível com a política do projeto.
 
 ## Proteção de `main`

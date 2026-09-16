@@ -352,6 +352,121 @@ describe('autenticação e solicitação de acesso', () => {
 });
 
 describe('RBAC administrativo e isolamento do residente', () => {
+  describe('proteção do último administrador ativo', () => {
+    const otherAdmin = { ...activeUser, id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' };
+    const client = { query: vi.fn() };
+    const mutate = (operation, target = activeUser) => {
+      const endpoint = `/api/admin/users/${target.id}`;
+      const authorization = { Authorization: `Bearer ${tokenFor(activeUser)}` };
+      if (operation === 'delete') return request(app).delete(endpoint).set(authorization);
+      return request(app).patch(`${endpoint}/${operation === 'INACTIVE' ? 'status' : 'role'}`)
+        .set(authorization).send(operation === 'INACTIVE' ? { status: operation } : { role: operation });
+    };
+
+    beforeEach(() => {
+      accessRepo.findRequest.mockResolvedValue(activeUser);
+      accessRepo.setStatus.mockReset().mockImplementation(async (id, status, _adminId, audit) => {
+        await audit(client);
+        return { ...activeUser, id, status };
+      });
+      accessRepo.setRole.mockReset().mockImplementation(async (id, role, audit) => {
+        await audit(client);
+        return { ...activeUser, id, role };
+      });
+      emailService.sendInactive.mockReset().mockResolvedValue({});
+    });
+
+    // Repository mocks exercise the HTTP contract; real locks are covered by integration tests.
+    it.each(['INACTIVE', 'delete', 'GESTOR', 'PESQUISADOR', 'RESIDENTE'])('retorna 409 e não audita nem notifica ao bloquear %s', async (operation) => {
+      const target = operation === 'delete' ? otherAdmin : activeUser;
+      accessRepo.findRequest.mockResolvedValue(target);
+      const repository = ['INACTIVE', 'delete'].includes(operation) ? accessRepo.setStatus : accessRepo.setRole;
+      repository.mockRejectedValueOnce(Object.assign(new Error('internal conflict'), { code: 'LAST_ACTIVE_ADMIN' }));
+
+      const response = await mutate(operation, target);
+
+      expect(response.status).toBe(409);
+      expect(response.body).toMatchObject({
+        code: 'LAST_ACTIVE_ADMIN',
+        message: 'O último administrador ativo não pode ser inativado, excluído ou ter seu perfil alterado.',
+      });
+      expect(auditRepo.record).not.toHaveBeenCalled();
+      expect(emailService.sendInactive).not.toHaveBeenCalled();
+      expect(userRepo.findActiveAdminIds).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['INACTIVE', 'USER_INACTIVATED', 200],
+      ['delete', 'USER_DELETED', 204],
+      ['GESTOR', 'ROLE_CHANGED', 200],
+      ['PESQUISADOR', 'ROLE_CHANGED', 200],
+      ['RESIDENTE', 'ROLE_CHANGED', 200],
+    ])('preserva auditoria transacional de %s quando existe outro ADMIN ACTIVE', async (operation, action, status) => {
+      accessRepo.findRequest.mockResolvedValue(otherAdmin);
+
+      const response = await mutate(operation, otherAdmin);
+
+      expect(response.status).toBe(status);
+      expect(auditRepo.record).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ action, entityId: otherAdmin.id }), client);
+      if (operation === 'INACTIVE') expect(emailService.sendInactive).toHaveBeenCalledOnce();
+      else expect(emailService.sendInactive).not.toHaveBeenCalled();
+    });
+
+    it('mantém a proibição de excluir a própria conta', async () => {
+      expect((await mutate('delete')).status).toBe(422);
+      expect(accessRepo.setStatus).not.toHaveBeenCalled();
+      expect(auditRepo.record).not.toHaveBeenCalled();
+    });
+
+    it('mantém a validação de organização para RESIDENTE', async () => {
+      accessRepo.userHasOrganization.mockResolvedValue(false);
+      expect((await mutate('RESIDENTE')).status).toBe(422);
+      expect(accessRepo.setRole).not.toHaveBeenCalled();
+    });
+
+    it('inativa usuário não ADMIN com auditoria e notificação', async () => {
+      accessRepo.findRequest.mockResolvedValue(resident);
+      accessRepo.setStatus.mockImplementationOnce(async (id, status, _adminId, audit) => {
+        await audit(client);
+        return { ...resident, id, status };
+      });
+      expect((await mutate('INACTIVE', resident)).status).toBe(200);
+      expect(auditRepo.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_INACTIVATED', entityId: resident.id }), client);
+      expect(emailService.sendInactive).toHaveBeenCalledWith(expect.objectContaining({ role: 'RESIDENTE', status: 'INACTIVE' }));
+    });
+
+    it('usa setStatus e auditoria transacional também para excluir conta já inativa', async () => {
+      accessRepo.findRequest.mockResolvedValue({ ...resident, status: 'INACTIVE' });
+      expect((await mutate('delete', resident)).status).toBe(204);
+      expect(accessRepo.setStatus).toHaveBeenCalledWith(resident.id, 'INACTIVE', activeUser.id, expect.any(Function));
+      expect(auditRepo.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_DELETED', details: { logical: true } }), client);
+    });
+
+    it('não envia e-mail quando a transação falha na auditoria', async () => {
+      auditRepo.record.mockRejectedValueOnce(new Error('audit failed'));
+      expect((await mutate('INACTIVE', otherAdmin)).status).toBe(500);
+      expect(emailService.sendInactive).not.toHaveBeenCalled();
+    });
+
+    it('notifica somente após o repository concluir e preserva a decisão se SMTP falhar', async () => {
+      let committed = false;
+      accessRepo.setStatus.mockImplementationOnce(async (id, status, _adminId, audit) => {
+        expect(emailService.sendInactive).not.toHaveBeenCalled();
+        await audit(client);
+        committed = true;
+        return { ...otherAdmin, id, status };
+      });
+      emailService.sendInactive.mockImplementationOnce(async () => {
+        expect(committed).toBe(true);
+        throw new Error('SMTP indisponível');
+      });
+      const response = await mutate('INACTIVE', otherAdmin);
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ status: 'INACTIVE', notificationSent: false });
+      expect(auditRepo.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_INACTIVATED' }), client);
+    });
+  });
+
   it('permite ADMIN cadastrar todos os perfis e exige organização para residente', async () => {
     accessRepo.createManagedUser.mockImplementation(async (payload, audit) => {
       const created = { id: '77777777-7777-7777-7777-777777777777', name: payload.name, email: payload.email, role: payload.role, status: 'ACTIVE' };

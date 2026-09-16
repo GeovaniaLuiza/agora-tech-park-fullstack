@@ -113,18 +113,60 @@ export async function reject(userId, adminId, reason, audit) {
   }
 }
 
-export async function setStatus(userId, status, approvedBy = null) {
-  const { rows } = await query(`UPDATE users SET status=$2::user_status,
-    approved_by=CASE WHEN $2::user_status='ACTIVE' THEN COALESCE(approved_by,$3) ELSE approved_by END,
-    approved_at=CASE WHEN $2::user_status='ACTIVE' THEN COALESCE(approved_at,NOW()) ELSE approved_at END,
-    inactivated_at=CASE WHEN $2::user_status='INACTIVE' THEN NOW() WHEN $2::user_status='ACTIVE' THEN NULL ELSE inactivated_at END
-    WHERE id=$1 RETURNING id,name,email,role,status`, [userId, status, approvedBy]);
-  return rows[0];
+async function protectLastActiveAdmin(client, userId) {
+  // Lock in a consistent order before updating the target to avoid deadlocks.
+  const { rows } = await client.query(`SELECT id, id=$1::uuid AS is_target FROM users
+    WHERE role='ADMIN' AND status='ACTIVE' ORDER BY id FOR UPDATE`, [userId]);
+  if (rows.length === 1 && rows[0].is_target) {
+    const error = new Error('LAST_ACTIVE_ADMIN');
+    error.code = 'LAST_ACTIVE_ADMIN';
+    throw error;
+  }
 }
 
-export async function setRole(userId, role) {
-  const { rows } = await query('UPDATE users SET role=$2 WHERE id=$1 RETURNING id,name,email,role,status', [userId, role]);
-  return rows[0];
+export async function setStatus(userId, status, approvedBy = null, audit) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (status === 'INACTIVE') await protectLastActiveAdmin(client, userId);
+    const { rows } = await client.query(`UPDATE users SET status=$2::user_status,
+    approved_by=CASE WHEN $2::user_status='ACTIVE' THEN COALESCE(approved_by,$3) ELSE approved_by END,
+    approved_at=CASE WHEN $2::user_status='ACTIVE' THEN COALESCE(approved_at,NOW()) ELSE approved_at END,
+    inactivated_at=CASE
+      WHEN $2::user_status='ACTIVE' THEN NULL
+      WHEN $2::user_status='INACTIVE' AND status<>'INACTIVE' THEN NOW()
+      ELSE inactivated_at END
+    WHERE id=$1 RETURNING id,name,email,role,status`, [userId, status, approvedBy]);
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    await audit(client);
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
+}
+
+export async function setRole(userId, role, audit) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (role !== 'ADMIN') await protectLastActiveAdmin(client, userId);
+    const { rows } = await client.query('UPDATE users SET role=$2 WHERE id=$1 RETURNING id,name,email,role,status', [userId, role]);
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    await audit(client);
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
 }
 
 export async function linkOrganization(userId, organizationId) {

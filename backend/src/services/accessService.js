@@ -116,6 +116,13 @@ export async function rejectWithReason(userId, body, admin) {
   return { ...user, notificationSent: await notify(user, 'ACCESS_REJECTED', emailService.sendRejected) };
 }
 
+function handleAdminMutationError(error) {
+  if (error.code === 'LAST_ACTIVE_ADMIN') {
+    throw serviceError(409, 'O último administrador ativo não pode ser inativado, excluído ou ter seu perfil alterado.', 'LAST_ACTIVE_ADMIN');
+  }
+  throw error;
+}
+
 export async function changeStatus(userId, status, admin) {
   if (!statuses.includes(status)) throw serviceError(422, 'Status inválido');
   const current = await access.findRequest(userId);
@@ -124,9 +131,10 @@ export async function changeStatus(userId, status, admin) {
     if (!current.email_verified_at || !ROLE_VALUES.includes(current.role)) throw serviceError(422, 'Usuário sem confirmação ou perfil válido');
     if (current.role === ROLES.RESIDENT && !await access.userHasOrganization(userId)) throw serviceError(422, 'Residente sem organização vinculada');
   }
-  const user = await access.setStatus(userId, status, admin.sub);
+  const user = await access.setStatus(userId, status, admin.sub, (client) =>
+    auditRepository.record({ userId: admin.sub, action: status === USER_STATUS.ACTIVE ? 'USER_ACTIVATED' : 'USER_INACTIVATED', entityId: userId }, client))
+    .catch(handleAdminMutationError);
   if (!user) throw serviceError(404, 'Usuário não encontrado');
-  await auditRepository.record({ userId: admin.sub, action: status === USER_STATUS.ACTIVE ? 'USER_ACTIVATED' : 'USER_INACTIVATED', entityId: userId });
   if (status === USER_STATUS.INACTIVE) return { ...user, notificationSent: await notify(user, 'USER_INACTIVATED', emailService.sendInactive) };
   return user;
 }
@@ -135,12 +143,10 @@ export async function deleteUser(userId, admin) {
   const current = await access.findRequest(userId);
   if (!current) throw serviceError(404, 'Usuário não encontrado');
   if (String(userId) === String(admin.sub)) throw serviceError(422, 'O administrador atual não pode excluir a própria conta');
-  if (current.status === USER_STATUS.INACTIVE) {
-    await auditRepository.record({ userId: admin.sub, action: 'USER_DELETED', entity: 'user', entityId: userId, details: { logical: true } });
-    return;
-  }
-  await access.setStatus(userId, USER_STATUS.INACTIVE, admin.sub);
-  await auditRepository.record({ userId: admin.sub, action: 'USER_DELETED', entity: 'user', entityId: userId, details: { logical: true } });
+  const user = await access.setStatus(userId, USER_STATUS.INACTIVE, admin.sub, (client) =>
+    auditRepository.record({ userId: admin.sub, action: 'USER_DELETED', entity: 'user', entityId: userId, details: { logical: true } }, client))
+    .catch(handleAdminMutationError);
+  if (!user) throw serviceError(404, 'Usuário não encontrado');
 }
 
 export async function changeRole(userId, role, admin) {
@@ -148,8 +154,10 @@ export async function changeRole(userId, role, admin) {
   const current = await access.findRequest(userId);
   if (!current) throw serviceError(404, 'Usuário não encontrado');
   if (role === ROLES.RESIDENT && !await access.userHasOrganization(userId)) throw serviceError(422, 'Residente sem organização vinculada');
-  const user = await access.setRole(userId, role);
-  await auditRepository.record({ userId: admin.sub, action: 'ROLE_CHANGED', entityId: userId, details: { from: current.role, to: role } });
+  const user = await access.setRole(userId, role, (client) =>
+    auditRepository.record({ userId: admin.sub, action: 'ROLE_CHANGED', entityId: userId, details: { from: current.role, to: role } }, client))
+    .catch(handleAdminMutationError);
+  if (!user) throw serviceError(404, 'Usuário não encontrado');
   return user;
 }
 

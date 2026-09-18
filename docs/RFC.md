@@ -102,7 +102,7 @@ Desenvolver uma plataforma web para automatizar a coleta e visualização de ind
 ### Objetivos Específicos
 - automatizar formulários  
 - centralizar dados  
-- gerar dashboards em tempo real  
+- gerar dashboards em tempo real (meta proposta; não comprovada por medição ou mecanismo versionado)
 
 ---
 
@@ -127,26 +127,31 @@ Desenvolver uma plataforma web para automatizar a coleta e visualização de ind
 
 ## 2.2 Casos de Uso
 
-- Login  
-- Criar formulários  
-- Responder formulários  
-- Visualizar dashboards  
-- Exportar relatórios  
+Os casos de uso comprovados pela implementação atual estão detalhados em [docs/REQUIREMENTS.md](REQUIREMENTS.md):
+
+- solicitar, confirmar e aprovar acesso;
+- autenticar e encerrar sessão;
+- administrar usuários e organizações;
+- configurar e publicar formulários;
+- responder formulários e consolidar indicadores;
+- manter indicadores;
+- consultar/exportar dashboards;
+- importar eventos e residentes com revisão humana.
 
 ---
 
 ## 2.3 Requisitos Funcionais
 
-- RF01 a RF12 (autenticação, formulários, dashboards, exportação)
+Os requisitos funcionais rastreáveis, seus critérios de aceite, evidências de implementação, testes e estados estão em [docs/REQUIREMENTS.md](REQUIREMENTS.md). As áreas atualmente confirmadas são autenticação e recuperação de acesso, governança de usuários/organizações, formulários e respostas, indicadores, dashboards/exportação e importação revisável de eventos e residentes.
 
 ---
 
 ## 2.4 Requisitos Não Funcionais
 
-- desempenho < 300ms  
-- 99% disponibilidade  
-- segurança com JWT  
-- responsividade  
+- segurança com JWT (implementada; ver evidências em [docs/REQUIREMENTS.md](REQUIREMENTS.md));
+- controle de acesso, persistência PostgreSQL, validação, testes, health e observabilidade (documentados com evidências no mesmo documento);
+- desempenho inferior a 300 ms e disponibilidade de 99% são metas originalmente propostas, ainda sem medição versionada que as comprove;
+- responsividade é objetivo de interface, sem critério de medição ou teste específico localizado nesta auditoria.
 
 ---
 
@@ -171,9 +176,7 @@ Desenvolver uma plataforma web para automatizar a coleta e visualização de ind
 
 ## 3.1 C4 Model
 
-- Contexto: usuários + sistema  
-- Containers: frontend, backend, banco  
-- Componentes: services, controllers, repositories  
+A documentação arquitetural vigente, incluindo as visões equivalentes a C4 de contexto, containers e deployment, está em [docs/ARCHITECTURE.md](ARCHITECTURE.md). Os diagramas não são duplicados neste RFC.
 
 ---
 
@@ -191,11 +194,11 @@ Tabelas:
 
 ## 3.3 Stack
 
-- React / Next.js  
-- Node.js / NestJS  
+- React + Vite + React Router
+- Node.js + Express
 - PostgreSQL  
 - JWT  
-- Chart.js  
+- Componentes próprios de gráficos no frontend; não há Chart.js declarado em `frontend/package.json`.
 
 ---
 
@@ -216,4 +219,4 @@ Login → Dashboard → Formulários → Respostas → Relatórios
 - POWER BI  
 - GOOGLE Forms  
 - TYPEFORM  
-- AIRTABLE  
+- AIRTABLE

@@ -2,35 +2,124 @@
 
 ## Visão geral
 
-```text
-React/Vite (Amplify) → HTTPS → Caddy → Express → PostgreSQL 16
-                                      ├→ SMTP
-                                      └→ /metrics → Grafana Alloy → Grafana Cloud
+Em 18/09/2026, a arquitetura validada separa o frontend React/Vite no AWS Amplify do backend Node.js/Express em uma EC2 Ubuntu 24.04. A URL pública do frontend vem da variável GitHub `PRODUCTION_FRONTEND_URL` e não está versionada. A API pública é `https://agora-techpark.duckdns.org/api`, com health em `https://agora-techpark.duckdns.org/api/health`.
+
+Na EC2, Caddy termina HTTPS e encaminha requisições para a API em `127.0.0.1:3000`. A API é gerenciada por `agora-api.service`; Caddy por `caddy.service`; PostgreSQL 16 por `postgresql.service`; e Grafana Alloy 1.19.2 por `alloy.service`. Os quatro serviços foram comprovados como `active` e `enabled`.
+
+PostgreSQL escuta somente em `127.0.0.1:5432`, na mesma EC2. Produção usa o serviço externo Gmail SMTP via Nodemailer, e o Grafana Cloud também é externo; Grafana não é operado na EC2. RDS e SES não fazem parte da arquitetura vigente; Mailpit é exclusivo do desenvolvimento.
+
+O backend mantém o fluxo `routes → controllers → services → repositories`: regras de negócio ficam nos services, SQL parametrizado nos repositories, controllers traduzem HTTP e middlewares tratam autenticação, autorização, limites, logs, métricas e erros.
+
+## Visão de contexto — equivalente ao C4 Context
+
+```mermaid
+flowchart LR
+    U([Usuário]) -->|utiliza via HTTPS| PLATAFORMA[Plataforma Agora Tech Park]
+    PLATAFORMA -->|usa para envio de e-mails| GMAIL[Gmail SMTP]
+    PLATAFORMA -->|envia telemetria| GRAFANA[Grafana Cloud]
+    GH[GitHub] -->|CI/CD| AWS[AWS]
+    AWS -->|hospeda e entrega| PLATAFORMA
 ```
 
-O frontend permanece uma SPA React. O backend mantém o fluxo `routes → controllers → services → repositories`; regras de negócio ficam nos services e SQL parametrizado nos repositories. Controllers traduzem HTTP, e middlewares tratam autenticação, autorização, limites, logs, métricas e erros.
+O limite lógico “Plataforma Agora Tech Park” reúne a SPA e a API sem atribuir responsabilidades internas. Na implantação, esses componentes ficam em destinos distintos: frontend no Amplify e backend na EC2.
 
-Produção adotada: `us-east-1`, EC2 Ubuntu 24.04, Node.js 22/systemd, Caddy e PostgreSQL 16 na mesma EC2 com EBS. A API escuta `127.0.0.1:3000` e PostgreSQL `127.0.0.1:5432`. SSM administra a instância com SSH desativado; GitHub Actions usa OIDC para SSM e Amplify. Amplify `main/PRODUCTION` recebe apenas o artefato CI, com AutoBuild desativado. Bootstrap manual, sem requisito de IaC nesta etapa.
+## Visão de containers — equivalente ao C4 Container
 
-`LISTEN_HOST` é centralizado em `backend/src/config/environment.js`: default `127.0.0.1` em produção, rejeitando qualquer outro valor; default `0.0.0.0` em development/test, com override permitido. O Compose local inicia banco, migrations e Mailpit, não a API. Containers locais de API devem usar development/test com `0.0.0.0`; produção segue o contrato EC2/Caddy, sem exposição direta da API.
+```mermaid
+flowchart LR
+    U([Usuário]) -->|HTTPS| FE[React/Vite<br/>AWS Amplify]
+    FE -->|API HTTPS| CADDY[Caddy<br/>EC2]
+    CADDY -->|127.0.0.1:3000| API[Node.js/Express API]
+    API -->|127.0.0.1:5432| DB[(PostgreSQL 16)]
+    API -->|SMTP| GMAIL[Gmail SMTP]
+    ALLOY[Grafana Alloy<br/>inclui exporter PostgreSQL] -->|scrape GET /metrics| API
+    API -->|Pino / stdout| JOURNAL[journald]
+    ALLOY -->|lê agora-api.service| JOURNAL
+    ALLOY -->|prometheus.exporter.postgres<br/>queries de monitoramento| DB
+    ALLOY -->|Prometheus remote_write / Loki| GRAFANA[Grafana Cloud]
+```
+
+O Alloy faz o scrape local de `/metrics` com bearer token. O Caddyfile versionado responde 404 para qualquer acesso público a esse caminho antes do proxy.
+
+## Visão de deployment
+
+```mermaid
+flowchart TB
+    GH[GitHub] --> CI[CI]
+    CI -->|sucesso em main| CD[CD Production]
+    CI -->|artefato frontend testado| ART[frontend-dist]
+    ART --> CD
+    CD -->|publicação| AMP[AWS Amplify]
+    CD -->|OIDC / credenciais temporárias| SSM[AWS Systems Manager]
+
+    subgraph EC2[AWS EC2 — Ubuntu 24.04]
+        DEPLOY["/opt/agora/bin/deploy-backend.sh"]
+        RELEASES["/opt/agora/releases/SHA"]
+        CURRENT["/opt/agora/current"]
+        CADDY[Caddy]
+        API[Node.js/Express]
+        DB[(PostgreSQL 16)]
+        JOURNAL[journald]
+        ALLOY[Grafana Alloy 1.19.2<br/>inclui prometheus.exporter.postgres]
+
+        DEPLOY --> RELEASES --> CURRENT --> API
+        CADDY -->|127.0.0.1:3000| API
+        API -->|127.0.0.1:5432| DB
+        ALLOY -->|scrape /metrics| API
+        API -->|Pino / stdout| JOURNAL
+        ALLOY -->|lê journald| JOURNAL
+        ALLOY -->|exporter PostgreSQL| DB
+    end
+
+    SSM --> DEPLOY
+    API -->|SMTP| GMAIL[Gmail SMTP]
+    ALLOY -->|remote_write| PROM[Grafana Cloud Prometheus]
+    ALLOY -->|logs| LOKI[Grafana Cloud Loki]
+```
+
+O GitHub Actions usa OIDC para assumir uma role e obter credenciais AWS temporárias; access keys fixas não fazem parte do fluxo. O CI executa antes do CD. O CI #43 aprovou lint/auditoria de dependências, testes unitários do backend, testes e build do frontend, integração PostgreSQL e SonarQube Cloud Quality Gate.
+
+O CD Production #48 implantou o backend via Systems Manager, publicou no Amplify o artefato já testado pelo CI e concluiu os smoke tests. O backend usa releases imutáveis em `/opt/agora/releases/<sha>`, symlink ativo `/opt/agora/current` e script persistente `/opt/agora/bin/deploy-backend.sh`.
 
 ## Ambientes
 
 | Ambiente | Aplicação | Banco | E-mail | Observabilidade |
 | --- | --- | --- | --- | --- |
-| development | Node/Vite local | PostgreSQL Docker | Mailpit | JSON no console; métricas locais |
-| test | GitHub runner | PostgreSQL 16 isolado | mock | logs silenciosos |
-| production | Amplify + EC2/systemd | PostgreSQL persistente na EC2 | SMTP real/degradável | journald + Alloy + Grafana Cloud |
+| development | React/Vite e Node locais; Compose quando aplicável | PostgreSQL local/Compose | Mailpit | Pino no console; métricas locais |
+| test/CI | GitHub runner | PostgreSQL 16 isolado | mock | logs de teste |
+| production | React/Vite no Amplify; Node/Express na EC2/systemd | PostgreSQL 16 local à EC2 | Gmail SMTP | journald + Alloy + Grafana Cloud |
+
+Não há ambiente STAGING comprovado; ele não integra a arquitetura atual.
 
 ## Endpoints operacionais
 
 - `GET /api/health/live`: liveness da API, sem dependências.
 - `GET /api/health/ready`: readiness com PostgreSQL e SMTP.
 - `GET /api/health`: contrato agregado; banco indisponível retorna 503, SMTP indisponível retorna `degraded` com HTTP 200.
-- `GET /metrics`: Prometheus; em produção exige `Authorization: Bearer <METRICS_TOKEN>` e responde 404 quando não autorizado.
+- `GET /metrics`: endpoint Prometheus da API.
+  - acesso direto ao backend local em produção, sem bearer token ou com token incorreto: HTTP 404;
+  - acesso direto ao backend local em produção, com bearer token correto: HTTP 200 e métricas no formato Prometheus em operação normal;
+  - acesso direto em ambiente diferente de produção: o código não exige bearer token;
+  - acesso público via Caddy: HTTP 404 antes do proxy, independentemente do bearer token.
 
-Nenhum label de métrica contém nome, e-mail, identificador de usuário, conteúdo de formulário ou token.
+O Alloy usa o bearer token no scrape local de `127.0.0.1:3000/metrics`.
 
-## Migrações
+Nenhum label de métrica deve conter nome, e-mail, identificador de usuário, conteúdo de formulário ou token.
+
+## Observabilidade
+
+Os fluxos validados em produção são:
+
+```text
+Node/Express /metrics → Grafana Alloy → Grafana Cloud Prometheus
+Pino → stdout/journald → Grafana Alloy → Grafana Cloud Loki
+PostgreSQL → Grafana Alloy (prometheus.exporter.postgres) → Grafana Cloud Prometheus
+```
+
+`prometheus.exporter.postgres` é um componente configurado e executado pelo Alloy, não um serviço systemd independente. O Grafana Cloud recebeu dados reais de Prometheus e Loki. Dashboards finais, disparo e recebimento de alertas, SLO e retenção ainda não foram validados.
+
+## Migrações e backup
+
+O deploy cria um `pg_dump` local antes das migrations, valida migrations com `migrate:dry` e aplica as pendentes antes de trocar o symlink da release e reiniciar a API. O backup permanece na mesma EC2; destino off-site e teste de restauração continuam pendentes.
 
 Migrações antigas são imutáveis e verificadas por SHA-256 em `schema_migrations`. `migrate:dry` não altera dados e falha ao detectar banco legado, metadados legados ou checksum divergente. Bancos anteriores ao mecanismo precisam de `migrate:baseline`, com confirmação explícita. Cada migração pendente é transacional e existe um advisory lock contra concorrência.

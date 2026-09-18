@@ -27,7 +27,7 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 | DocumentaÃ§Ã£o essencial | ðŸŸ  PARCIAL | `README.md`, `docs/ARCHITECTURE.md`, `docs/RFC.md`, `docs/CI_CD.md`, `docs/MONITORING.md`, `docs/QUALITY.md` | VersÃµes do stack e resultados de testes estÃ£o desatualizados; RFC e requisitos estÃ£o incompletos | Atualizar apÃ³s estabilizar implementaÃ§Ã£o e infraestrutura |
 | Wiki ou equivalente navegÃ¡vel | ðŸ”´ AUSENTE / FALHANDO | GitHub informa `has_wiki=false`; existe uma pasta `docs/`, mas ela nÃ£o estÃ¡ estruturada nem declarada como Wiki equivalente | O nÃºcleo comum da orientaÃ§Ã£o Web App torna a Wiki/equivalente obrigatÃ³ria | Estruturar e publicar uma Wiki junto ao repositÃ³rio |
 | Requisitos e casos de uso completos | ðŸŸ  PARCIAL | Requisitos resumidos em `docs/RFC.md` e rotas/fluxos na aplicaÃ§Ã£o | RFs nÃ£o estÃ£o especificados com critÃ©rios de aceite e rastreabilidade | Criar documento de requisitos e matriz requisito â†’ fluxo â†’ teste |
-| Arquitetura C4 ou equivalente | ðŸŸ  PARCIAL | DescriÃ§Ã£o textual em `docs/ARCHITECTURE.md`; produÃ§Ã£o AWS EC2/Amplify e observabilidade Alloy/Grafana validadas | NÃ£o hÃ¡ diagrama C4/equivalente verificÃ¡vel nem comprovaÃ§Ã£o de que o documento reflita todos os componentes validados | Documentar contexto, contÃªineres e implantaÃ§Ã£o efetiva |
+| Arquitetura C4 ou equivalente | âœ… IMPLEMENTADO E VALIDADO | `docs/ARCHITECTURE.md` contÃ©m trÃªs diagramas Mermaid verificÃ¡veis: visÃ£o de contexto e visÃ£o de containers equivalentes ao C4, alÃ©m da visÃ£o de deployment; componentes, ambientes e fluxos correspondem Ã  produÃ§Ã£o validada | Nenhuma lacuna observada neste requisito | Manter os diagramas alinhados Ã  arquitetura efetivamente implantada |
 | ADRs / decisÃµes arquiteturais | ðŸ”´ AUSENTE / FALHANDO | Nenhum diretÃ³rio ou registro ADR localizado | DecisÃµes relevantes nÃ£o sÃ£o rastreÃ¡veis | Criar ADRs somente para decisÃµes reais e atuais |
 | ReferÃªncia acadÃªmica fornecida | âšª DOCUMENTADO / PLANEJADO | Tese de Nancy V. PÃ©rez, 2022, fornecida pelo usuÃ¡rio nesta auditoria | Ainda nÃ£o foi incorporada; nÃ£o constitui evidÃªncia tÃ©cnica | Usar apenas como fundamentaÃ§Ã£o, com autoria e referÃªncia bibliogrÃ¡fica completas |
 | Link funcional pÃºblico e estÃ¡vel | ðŸŸ  PARCIAL | API pÃºblica `https://agora-techpark.duckdns.org/api` e health pÃºblico validados; frontend implantado no AWS Amplify e smoke test concluÃ­do | O CD usa a variÃ¡vel GitHub `PRODUCTION_FRONTEND_URL`, mas seu valor nÃ£o estÃ¡ versionado nem documentado no repositÃ³rio | Registrar a URL real do Amplify e manter smoke checks periÃ³dicos |
@@ -203,7 +203,7 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | HistÃ³rico de commits | 19 commits em 6 dias de desenvolvimento | PARCIAL |
 | Link funcional | API e health pÃºblicos via HTTPS; frontend no Amplify, com valor de `PRODUCTION_FRONTEND_URL` nÃ£o versionado | PARCIAL |
 | ProduÃ§Ã£o pÃºblica | Backend EC2 e frontend Amplify implantados; CD #48 e smoke tests passaram | âœ… ATENDIDO |
-| Arquitetura documentada | `docs/ARCHITECTURE.md`, desatualizado em relaÃ§Ã£o ao destino de produÃ§Ã£o | PARCIAL |
+| Arquitetura documentada | `docs/ARCHITECTURE.md` com diagramas Mermaid de contexto, containers e deployment equivalentes ao C4 e coerentes com a produÃ§Ã£o validada | âœ… ATENDIDO |
 | Wiki junto ao repositÃ³rio | Wiki desabilitada; pasta `docs/` nÃ£o constitui equivalente completo | NÃƒO ATENDIDO |
 | Requisitos, casos de uso e decisÃµes | DocumentaÃ§Ã£o existente, porÃ©m incompleta/desatualizada | PARCIAL |
 | TrÃªs fluxos de negÃ³cio completos | ImplementaÃ§Ã£o parcial sem validaÃ§Ã£o ponta a ponta em produÃ§Ã£o | PARCIAL |
@@ -285,7 +285,7 @@ Observabilidade: parcial
 - Registrar a URL pÃºblica do frontend e manter as evidÃªncias de CI #43, CD #48, Sonar e Quality Gate.
 - Validar backup/restauraÃ§Ã£o e destino off-site; PostgreSQL persistente, e-mail real e smoke tests jÃ¡ foram comprovados.
 - Validar dashboards finais, sÃ©ries operacionais ainda nÃ£o observadas, alertas, SLO e retenÃ§Ã£o; a ingestÃ£o de mÃ©tricas e logs de produÃ§Ã£o jÃ¡ foi comprovada.
-- Atualizar Wiki, requisitos, C4/equivalente, ADRs, URLs, deploy e trade-offs conforme o sistema real.
+- Atualizar Wiki, requisitos, ADRs, URLs e trade-offs conforme o sistema real.
 - Cumprir orientaÃ§Ãµes, prova de autoria, pÃ´ster/QR e participaÃ§Ã£o no Demo Day.
 
 ## Gates executados na baseline e validaÃ§Ãµes posteriores

@@ -51,7 +51,7 @@
         │                                                    │
         │  Validação: Zod                                   │
         │  Segurança: Helmet, CORS, bcryptjs, rate-limit    │
-        │  Email: Nodemailer (SMTP Mailpit local)           │
+        │  Email: provider mock em DEV/test; SMTP em PROD   │
         │  Express 4.21.2                                   │
         │  Node.js (ES Modules)                             │
         │                                                    │
@@ -123,12 +123,12 @@
 ### 1.4 Email
 
 **Atual (Desenvolvimento):**
-- SMTP: localhost:1025 (Mailpit)
-- UI: localhost:8025
-- Sem autenticação necessária
+- `EMAIL_PROVIDER=mock` por padrão
+- Sem conexão SMTP externa ou entrega real
+- Sem credenciais de e-mail necessárias
 
 **Produção:**
-- Precisa de configuração de SMTP válida OU Amazon SES
+- Exige `EMAIL_PROVIDER=smtp` e configuração válida do Gmail SMTP via Nodemailer
 - Variáveis: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`
 - Rate limiting aplicado
 - Email de teste: `nao-responda@agoratechpark.com.br`
@@ -295,13 +295,13 @@ DB_CONNECTION_TIMEOUT_MS=5000
 JWT_SECRET=<GERAR_CHAVE_FORTE_64_CARACTERES>
 JWT_EXPIRES_IN=8h
 
-# Email (SES ou SMTP)
+# Email (Gmail SMTP via Nodemailer)
 EMAIL_PROVIDER=smtp
-SMTP_HOST=<smtp.region.amazonaws.com OU email-smtp.region.amazonaws.com>
+SMTP_HOST=<GMAIL_SMTP_HOST>
 SMTP_PORT=587
-SMTP_SECURE=true
-SMTP_USER=<AWS_SES_USERNAME>
-SMTP_PASSWORD=<AWS_SES_PASSWORD>
+SMTP_SECURE=false
+SMTP_USER=<GMAIL_SMTP_USER>
+SMTP_PASSWORD=<GMAIL_SMTP_PASSWORD>
 SMTP_CONNECTION_TIMEOUT_MS=10000
 EMAIL_FROM="Ágora Tech Park <nao-responda@agoratechpark.com.br>"
 EMAIL_FROM_NAME="Ágora Tech Park"

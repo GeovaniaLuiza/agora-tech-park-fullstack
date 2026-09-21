@@ -21,9 +21,6 @@ async function withTimeout(check) {
 }
 
 async function emailHealthCheck() {
-  if ((process.env.EMAIL_PROVIDER || 'smtp').toLowerCase() !== 'smtp' || !process.env.SMTP_HOST) {
-    return 'down';
-  }
   try {
     await withTimeout(verifyConnection);
     return 'up';

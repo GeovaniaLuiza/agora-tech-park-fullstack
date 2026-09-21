@@ -33,6 +33,7 @@ describe('validateEnvironment', () => {
 
   it('accepts a complete production configuration', () => {
     expect(validateEnvironment(valid).PORT).toBe(3000);
+    expect(validateEnvironment(valid).EMAIL_PROVIDER).toBe('smtp');
   });
 
   it('rejects placeholder production secrets without exposing them', () => {
@@ -42,5 +43,37 @@ describe('validateEnvironment', () => {
 
   it('requires SMTP configuration in production', () => {
     expect(() => validateEnvironment({ ...valid, SMTP_HOST: undefined })).toThrow(/SMTP_HOST/);
+  });
+
+  it('rejects the mock provider in production', () => {
+    expect(() => validateEnvironment({ ...valid, EMAIL_PROVIDER: 'mock', SMTP_HOST: undefined }))
+      .toThrow(/EMAIL_PROVIDER=smtp/);
+  });
+
+  it('accepts the mock provider in development without SMTP variables', () => {
+    const config = validateEnvironment({
+      ...valid,
+      NODE_ENV: 'development',
+      EMAIL_PROVIDER: 'mock',
+      SMTP_HOST: undefined,
+    });
+
+    expect(config.EMAIL_PROVIDER).toBe('mock');
+  });
+
+  it('uses the mock provider by default in development', () => {
+    const config = validateEnvironment({
+      ...valid,
+      NODE_ENV: 'development',
+      EMAIL_PROVIDER: undefined,
+      SMTP_HOST: undefined,
+    });
+
+    expect(config.EMAIL_PROVIDER).toBe('mock');
+  });
+
+  it('forces the mock provider in tests even when SMTP is inherited', () => {
+    const config = validateEnvironment({ ...valid, NODE_ENV: 'test', EMAIL_PROVIDER: 'smtp' });
+    expect(config.EMAIL_PROVIDER).toBe('mock');
   });
 });

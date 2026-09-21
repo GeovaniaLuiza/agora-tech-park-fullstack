@@ -36,6 +36,9 @@ jobs:
   backend-unit:
     name: Backend unit tests
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      EMAIL_PROVIDER: mock
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
@@ -101,6 +104,7 @@ jobs:
           --health-retries 5
     env:
       NODE_ENV: test
+      EMAIL_PROVIDER: mock
       DATABASE_URL: postgresql://agora_test:agora_test_password@localhost:5432/agora_test
       JWT_SECRET: integration-test-secret-with-at-least-32-characters
       FRONTEND_URL: http://localhost:5174

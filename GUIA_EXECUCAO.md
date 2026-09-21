@@ -4,7 +4,7 @@
 
 - Node.js 22 e npm compatível;
 - Docker Desktop ou Docker Engine com Compose;
-- portas locais 3002, 5174, 5435 e 8025 disponíveis.
+- portas locais 3002, 5174 e 5435 disponíveis.
 
 ## Development
 
@@ -22,7 +22,7 @@ Serviços:
 - frontend: `http://localhost:5174`;
 - backend: `http://localhost:3002`;
 - health: `http://localhost:3002/api/health`;
-- Mailpit: `http://localhost:8025`;
+- e-mail: provider mock controlado, sem conexão SMTP externa;
 - PostgreSQL: `localhost:5435`, conforme `.env.example`/Compose.
 
 O Docker inicializa as migrations em banco novo. Para banco existente, use o runner versionado:
@@ -61,4 +61,4 @@ npm run test --prefix backend
 npm run test --prefix frontend
 ```
 
-Falhas de e-mail no ambiente local devem aparecer no Mailpit. Em produção, SMTP indisponível deixa health `degraded`; PostgreSQL indisponível deixa health `unavailable` e HTTP 503.
+Em DEV e testes, `EMAIL_PROVIDER=mock` valida o fluxo sem enviar mensagens nem abrir conexão externa. Em produção, SMTP indisponível deixa health `degraded`; PostgreSQL indisponível deixa health `unavailable` e HTTP 503.

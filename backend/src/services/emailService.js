@@ -1,9 +1,9 @@
-import { createSmtpProvider } from '../email/smtpProvider.js';
+import { createEmailProvider } from '../email/providerFactory.js';
 import { approvedTemplate, formInvitationTemplate, inactiveTemplate, passwordResetTemplate, rejectedTemplate, verificationTemplate, verifiedTemplate } from '../email/templates.js';
 
 let provider;
 const getProvider = () => {
-  if (!provider) provider = createSmtpProvider();
+  if (!provider) provider = createEmailProvider();
   return provider;
 };
 export const setEmailProviderForTests = (value) => { provider = value; };

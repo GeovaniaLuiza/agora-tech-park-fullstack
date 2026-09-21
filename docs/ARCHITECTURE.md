@@ -6,7 +6,7 @@ Em 18/09/2026, a arquitetura validada separa o frontend React/Vite no AWS Amplif
 
 Na EC2, Caddy termina HTTPS e encaminha requisições para a API em `127.0.0.1:3000`. A API é gerenciada por `agora-api.service`; Caddy por `caddy.service`; PostgreSQL 16 por `postgresql.service`; e Grafana Alloy 1.19.2 por `alloy.service`. Os quatro serviços foram comprovados como `active` e `enabled`.
 
-PostgreSQL escuta somente em `127.0.0.1:5432`, na mesma EC2. Produção usa o serviço externo Gmail SMTP via Nodemailer, e o Grafana Cloud também é externo; Grafana não é operado na EC2. RDS e SES não fazem parte da arquitetura vigente; Mailpit é exclusivo do desenvolvimento.
+PostgreSQL escuta somente em `127.0.0.1:5432`, na mesma EC2. Produção usa o serviço externo Gmail SMTP via Nodemailer, enquanto DEV/test usam um provider mock controlado sem SMTP externo. O Grafana Cloud também é externo; Grafana não é operado na EC2. RDS e SES não fazem parte da arquitetura vigente.
 
 O backend mantém o fluxo `routes → controllers → services → repositories`: regras de negócio ficam nos services, SQL parametrizado nos repositories, controllers traduzem HTTP e middlewares tratam autenticação, autorização, limites, logs, métricas e erros.
 
@@ -85,8 +85,8 @@ O CD Production #48 implantou o backend via Systems Manager, publicou no Amplify
 
 | Ambiente | Aplicação | Banco | E-mail | Observabilidade |
 | --- | --- | --- | --- | --- |
-| development | React/Vite e Node locais; Compose quando aplicável | PostgreSQL local/Compose | Mailpit | Pino no console; métricas locais |
-| test/CI | GitHub runner | PostgreSQL 16 isolado | mock | logs de teste |
+| development | React/Vite e Node locais; Compose quando aplicável | PostgreSQL local/Compose | provider mock por padrão, sem SMTP externo | Pino no console; métricas locais |
+| test/CI | GitHub runner | PostgreSQL 16 isolado | provider mock obrigatório, sem SMTP externo | logs de teste |
 | production | React/Vite no Amplify; Node/Express na EC2/systemd | PostgreSQL 16 local à EC2 | Gmail SMTP | journald + Alloy + Grafana Cloud |
 
 Não há ambiente STAGING comprovado; ele não integra a arquitetura atual.
@@ -94,8 +94,8 @@ Não há ambiente STAGING comprovado; ele não integra a arquitetura atual.
 ## Endpoints operacionais
 
 - `GET /api/health/live`: liveness da API, sem dependências.
-- `GET /api/health/ready`: readiness com PostgreSQL e SMTP.
-- `GET /api/health`: contrato agregado; banco indisponível retorna 503, SMTP indisponível retorna `degraded` com HTTP 200.
+- `GET /api/health/ready`: readiness com PostgreSQL e o provider de e-mail ativo.
+- `GET /api/health`: contrato agregado; banco indisponível retorna 503; em produção, SMTP indisponível retorna `degraded` com HTTP 200; em DEV/test, o mock saudável é reportado como `up`.
 - `GET /metrics`: endpoint Prometheus da API.
   - acesso direto ao backend local em produção, sem bearer token ou com token incorreto: HTTP 404;
   - acesso direto ao backend local em produção, com bearer token correto: HTTP 200 e métricas no formato Prometheus em operação normal;

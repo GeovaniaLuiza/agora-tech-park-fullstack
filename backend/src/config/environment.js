@@ -9,7 +9,7 @@ const baseSchema = z.object({
   CLIENT_URL: z.string().url(),
   FRONTEND_URL: z.string().url(),
   METRICS_TOKEN: z.string().optional(),
-  EMAIL_PROVIDER: z.enum(['smtp', 'mock']).default('smtp'),
+  EMAIL_PROVIDER: z.enum(['smtp', 'mock']).optional(),
   SMTP_HOST: z.string().optional(),
 });
 
@@ -26,6 +26,8 @@ export function validateEnvironment(environment = process.env) {
 
   const config = result.data;
   config.LISTEN_HOST ??= config.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0';
+  if (config.NODE_ENV === 'test') config.EMAIL_PROVIDER = 'mock';
+  if (config.NODE_ENV === 'development') config.EMAIL_PROVIDER ??= 'mock';
   if (!/^postgres(?:ql)?:\/\//.test(config.DATABASE_URL)) {
     throw new Error('DATABASE_URL must use the PostgreSQL protocol.');
   }
@@ -38,9 +40,13 @@ export function validateEnvironment(environment = process.env) {
     if (invalidSecrets || config.METRICS_TOKEN.length < 32) {
       throw new Error('Production secrets are missing, placeholders, or shorter than 32 characters.');
     }
-    if (config.EMAIL_PROVIDER === 'smtp' && !config.SMTP_HOST) {
-      throw new Error('SMTP_HOST is required when EMAIL_PROVIDER=smtp in production.');
+    if (config.EMAIL_PROVIDER !== 'smtp') {
+      throw new Error('EMAIL_PROVIDER=smtp is required in production.');
     }
+  }
+
+  if (config.EMAIL_PROVIDER === 'smtp' && !config.SMTP_HOST) {
+    throw new Error('SMTP_HOST is required when EMAIL_PROVIDER=smtp.');
   }
 
   return config;

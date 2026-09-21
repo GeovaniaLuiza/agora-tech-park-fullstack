@@ -34,6 +34,20 @@ describe('health service', () => {
     expect((await getHealth({ fresh: true })).status).toBe('degraded');
   });
 
+  it.each(['development', 'test'])('considera o provider mock saudável em %s', async (NODE_ENV) => {
+    process.env.NODE_ENV = NODE_ENV;
+    process.env.EMAIL_PROVIDER = 'mock';
+    delete process.env.SMTP_HOST;
+    dependencies.databaseHealthCheck.mockResolvedValue('up');
+    dependencies.verifyConnection.mockResolvedValue(true);
+
+    expect(await getHealth({ fresh: true })).toEqual({
+      status: 'ok',
+      services: { api: 'up', database: 'up', email: 'up' },
+    });
+    expect(dependencies.verifyConnection).toHaveBeenCalledOnce();
+  });
+
   it('retorna unavailable quando o banco está indisponível', async () => {
     dependencies.databaseHealthCheck.mockResolvedValue('down');
     dependencies.verifyConnection.mockResolvedValue(true);

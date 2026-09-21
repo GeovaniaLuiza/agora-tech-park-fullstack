@@ -48,9 +48,9 @@ A migration `004_email_verification.sql` adiciona o status `EMAIL_PENDING`, `ema
 
 ## Configuração de e-mail
 
-O backend envia mensagens por SMTP por meio de um serviço desacoplado. Configure as variáveis documentadas em `backend/.env.example`: `EMAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM`, `FRONTEND_URL`, `EMAIL_VERIFICATION_TTL_HOURS` e `EMAIL_RESEND_MINUTES`.
+O backend usa um serviço desacoplado com providers selecionados por ambiente. DEV usa `EMAIL_PROVIDER=mock` por padrão, testes forçam o mock mesmo quando existem variáveis SMTP herdadas, e produção exige `EMAIL_PROVIDER=smtp` com Nodemailer e Gmail SMTP. As variáveis estão documentadas em `backend/.env.example`.
 
-Não existe fallback por console ou provedor simulado. Sem SMTP válido, o cadastro permanece em `EMAIL_PENDING`, a falha é auditada e o usuário pode tentar o reenvio posteriormente.
+O mock de DEV/test não abre conexões nem entrega mensagens. Em produção não há fallback para mock: sem SMTP válido, a aplicação rejeita a configuração ou reporta a indisponibilidade conforme o tipo da falha.
 
 ## Validação
 

@@ -11,7 +11,7 @@ O fluxo de coleta por formulário e sua integração com Indicadores e Dashboard
 - Frontend: React, Vite, React Router e Context API (versões em `frontend/package.json`).
 - Backend: Node.js 22, Express, ES Modules, JWT, Zod e PostgreSQL 16.
 - Organização backend: `routes → controllers → services → repositories → PostgreSQL`.
-- Desenvolvimento: Docker Compose com PostgreSQL e Mailpit.
+- Desenvolvimento: Docker Compose com PostgreSQL; e-mail usa provider mock local, sem SMTP externo.
 - Produção adotada em `us-east-1`: Amplify para o frontend; EC2 Ubuntu 24.04 com Caddy, Node.js 22/systemd e PostgreSQL 16 local em EBS; Grafana Alloy → Grafana Cloud. Administração via SSM, SSH desativado e deploy via GitHub Actions/OIDC.
 - API pública planejada: `https://agora-techpark.duckdns.org`; variável pública de build `VITE_API_URL=https://agora-techpark.duckdns.org/api`.
 - Bootstrap AWS manual; deploy da aplicação automatizado. Terraform/CloudFormation/CDK não são requisito desta etapa.
@@ -38,7 +38,7 @@ npm run dev
 - Frontend: `http://localhost:5174`
 - API: `http://localhost:3002`
 - Health: `http://localhost:3002/api/health`
-- Mailpit: `http://localhost:8025`
+- E-mail em DEV: provider mock controlado (`EMAIL_PROVIDER=mock`), sem entrega externa.
 
 ## Qualidade e testes
 

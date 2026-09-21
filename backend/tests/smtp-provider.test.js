@@ -8,22 +8,22 @@ import {
 
 const validEnvironment = {
   EMAIL_PROVIDER: 'smtp',
-  SMTP_HOST: 'localhost',
-  SMTP_PORT: '1025',
+  SMTP_HOST: 'smtp.example.test',
+  SMTP_PORT: '2525',
   SMTP_SECURE: 'false',
   EMAIL_FROM: 'Ágora Tech Park <nao-responda@agora.test>',
 };
 
 describe('configuração e diagnóstico SMTP', () => {
-  it('aceita Mailpit local sem autenticação e executa transport.verify()', async () => {
+  it('aceita um servidor SMTP genérico sem autenticação e executa transport.verify()', async () => {
     const transport = { verify: vi.fn().mockResolvedValue(true), sendMail: vi.fn(), close: vi.fn() };
     const createTransport = vi.fn(() => transport);
     const provider = createSmtpProvider(validEnvironment, createTransport);
 
     await expect(provider.verify()).resolves.toBe(true);
     expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({
-      host: 'localhost',
-      port: 1025,
+      host: 'smtp.example.test',
+      port: 2525,
       secure: false,
     }));
     expect(createTransport.mock.calls[0][0]).not.toHaveProperty('auth');
@@ -43,7 +43,7 @@ describe('configuração e diagnóstico SMTP', () => {
       validateSmtpConfiguration(environment);
     } catch (error) {
       expect(error.reason).toBe(reason);
-      expect(error.message).not.toMatch(/user|secret|localhost/i);
+      expect(error.message).not.toMatch(/user|secret|example/i);
     }
   });
 

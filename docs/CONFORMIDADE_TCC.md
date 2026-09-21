@@ -68,7 +68,7 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 | SeguranÃ§a de aplicaÃ§Ã£o | ðŸŸ  PARCIAL | Helmet, CORS, JWT, rate limit, Zod, queries parametrizadas e auditoria de dependÃªncias High/Critical aprovada no CI #43 | NÃ£o hÃ¡ evidÃªncia de varredura completa de supply chain, dados e produÃ§Ã£o | Ampliar testes de abuso e configuraÃ§Ã£o |
 | Dados pessoais/LGPD no repositÃ³rio | ðŸ”´ AUSENTE / FALHANDO | O arquivo `frontend/imgs/LocatÃ¡rios Perini Business 2026.xlsx` foi removido da Ã¡rvore atual, mas continua no commit `55faede`; a inspeÃ§Ã£o OOXML contou 251 padrÃµes de e-mail e 467 de CPF/CNPJ | Potencial incidente permanece no histÃ³rico pÃºblico | Seguir `docs/SECURITY_DATA_REMOVAL.md`; reescrever e publicar o histÃ³rico somente em checkpoints autorizados |
 | Metadados pessoais em artefatos | ðŸŸ  PARCIAL | Duas planilhas tÃªm propriedades `creator`/`lastModifiedBy`; DOCX sem esses campos detectados | Metadados podem identificar autores/mÃ¡quinas | Sanitizar cÃ³pias destinadas Ã  publicaÃ§Ã£o e verificar novamente |
-| E-mail transacional | âœ… IMPLEMENTADO E VALIDADO | Gmail SMTP via Nodemailer validado em produÃ§Ã£o; `nodemailer.verify()` e envio real passaram; health reporta `email="up"`; Mailpit permanece exclusivo do DEV | Nenhuma lacuna funcional observada na validaÃ§Ã£o informada | Monitorar entrega e manter secrets fora dos logs |
+| E-mail transacional | âœ… IMPLEMENTADO E VALIDADO | Gmail SMTP via Nodemailer validado em produÃ§Ã£o; `nodemailer.verify()` e envio real passaram; health reporta `email="up"`; DEV/test usam provider mock sem SMTP externo | Nenhuma lacuna funcional observada na validaÃ§Ã£o informada | Monitorar entrega e manter secrets fora dos logs |
 | Secrets fora do cÃ³digo | ðŸŸ¡ IMPLEMENTADO, PENDENTE DE VALIDAÃ‡ÃƒO | `.gitignore`, `.env.example`, validaÃ§Ã£o de ambiente; nenhum `.env` real rastreado na Ã¡rvore atual | Secrets remotos nÃ£o sÃ£o consultÃ¡veis; arquivos binÃ¡rios exigem tratamento de dados | Configurar apenas via secrets do ambiente e executar scanner apropriado |
 | Autoria individual | ðŸ‘¤ PENDÃŠNCIA HUMANA | Playbook exige prova individual atÃ© 30/11/2026 | NÃ£o Ã© automatizÃ¡vel | Cada integrante deve preparar explicaÃ§Ã£o e demonstraÃ§Ã£o das prÃ³prias contribuiÃ§Ãµes |
 | OrientaÃ§Ãµes obrigatÃ³rias | ðŸ‘¤ PENDÃŠNCIA HUMANA | Playbook exige 5 orientaÃ§Ãµes, com marcos em 30/09 e 30/11/2026 | NÃ£o hÃ¡ registro acadÃªmico verificÃ¡vel no repositÃ³rio | Grupo deve manter comprovantes e pauta por orientaÃ§Ã£o |
@@ -106,7 +106,7 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 | Frontend | Vite em `http://localhost:5174`; executado fora do Compose |
 | Backend | Express com fallback local em `http://localhost:3002`; executado fora do Compose |
 | Database | PostgreSQL 16 no Compose, porta local 5435, volume `postgres_data`; engine local indisponÃ­vel durante a auditoria |
-| Email | Mailpit somente no Compose DEV, SMTP em `127.0.0.1:1025`, interface em `127.0.0.1:8025` |
+| Email | Provider mock controlado por padrÃ£o, sem SMTP externo; o Compose nÃ£o provisiona serviÃ§o de e-mail |
 | Observability | Logs Pino e endpoint Prometheus implementados; o ambiente DEV nÃ£o foi revalidado em 18/09/2026 |
 
 ### PROD
@@ -120,7 +120,7 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 | Email | Gmail SMTP via Nodemailer validado com `verify()`, envio real e health `email="up"` |
 | Observability | Alloy 1.19.2; `alloy.service` ativo e habilitado na EC2; remote write Prometheus e envio Loki ao Grafana Cloud validados em 18/09/2026; dashboards e alertas permanecem pendentes |
 
-SeparaÃ§Ã£o DEV/PROD: **IMPLEMENTADA E VALIDADA para os ambientes comprovados**. O DEV mantÃ©m Mailpit, enquanto a produÃ§Ã£o usa AWS EC2/Amplify, PostgreSQL 16 e Gmail SMTP. O ambiente STAGING e a validaÃ§Ã£o integrada atual do DEV nÃ£o foram comprovados; por isso, o requisito agregado de ambientes permanece parcial.
+SeparaÃ§Ã£o DEV/PROD: **IMPLEMENTADA E VALIDADA para os ambientes comprovados**. DEV/test usam provider mock controlado sem SMTP externo, enquanto a produÃ§Ã£o usa AWS EC2/Amplify, PostgreSQL 16 e Gmail SMTP. O ambiente STAGING e a validaÃ§Ã£o integrada atual do DEV nÃ£o foram comprovados; por isso, o requisito agregado de ambientes permanece parcial.
 
 ## URLs funcionais
 

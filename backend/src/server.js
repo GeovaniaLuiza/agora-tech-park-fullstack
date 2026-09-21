@@ -10,9 +10,9 @@ async function start() {
   const config = validateEnvironment();
   try {
     await verifyConnection();
-    logger.info({ event: 'smtp_connection_verified' }, 'SMTP connection verified');
+    logger.info({ event: 'email_provider_verified', provider: config.EMAIL_PROVIDER }, 'Email provider verified');
   } catch (error) {
-    logger.warn({ event: 'smtp_unavailable', reason: classifyEmailError(error) }, 'SMTP service unavailable');
+    logger.warn({ event: 'email_provider_unavailable', reason: classifyEmailError(error) }, 'Email provider unavailable');
     if (process.env.NODE_ENV === 'production' && error instanceof EmailConfigurationError) throw error;
   }
   const server = app.listen(config.PORT, config.LISTEN_HOST, () => logger.info({ event: 'api_started', port: config.PORT, host: config.LISTEN_HOST }, 'API started'));

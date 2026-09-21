@@ -25,7 +25,7 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 | HistÃ³rico contÃ­nuo de commits | ðŸŸ  PARCIAL | `git log`: 19 commits, de 03/08/2026 a 01/09/2026, distribuÃ­dos em 6 dias; 3 autores, incluindo Dependabot | HistÃ³rico curto e concentrado; merges automÃ¡ticos nÃ£o comprovam evoluÃ§Ã£o contÃ­nua do grupo | Manter commits pequenos, autorais e vinculados a decisÃµes/testes |
 | RevisÃ£o por PR | ðŸŸ  PARCIAL | HistÃ³rico contÃ©m merges de PRs | NÃ£o hÃ¡ evidÃªncia consolidada de revisÃ£o humana/aprovaÃ§Ã£o | Documentar o fluxo e usar revisÃ£o entre integrantes |
 | DocumentaÃ§Ã£o essencial | ðŸŸ  PARCIAL | `README.md`, `docs/ARCHITECTURE.md`, `docs/RFC.md`, `docs/REQUIREMENTS.md`, `docs/adr/`, `docs/CI_CD.md`, `docs/MONITORING.md`, `docs/QUALITY.md` | URLs e trade-offs ainda nÃ£o estÃ£o integralmente consolidados; Wiki Ã© avaliada separadamente | Atualizar conforme a evoluÃ§Ã£o da implementaÃ§Ã£o e infraestrutura |
-| Wiki ou equivalente navegÃ¡vel | ðŸ”´ AUSENTE / FALHANDO | GitHub informa `has_wiki=false`; existe uma pasta `docs/`, mas ela nÃ£o estÃ¡ estruturada nem declarada como Wiki equivalente | O nÃºcleo comum da orientaÃ§Ã£o Web App torna a Wiki/equivalente obrigatÃ³ria | Estruturar e publicar uma Wiki junto ao repositÃ³rio |
+| Wiki ou equivalente navegável | ✅ IMPLEMENTADO E VALIDADO | `docs/README.md` funciona como índice navegável da documentação versionada no repositório, com 24 links locais verificados e nenhum link quebrado; o `README.md` principal referencia esse ponto de entrada | A GitHub Wiki permanece desabilitada, mas o requisito é atendido pelo equivalente navegável mantido junto ao código | Manter o índice e os links atualizados quando documentos forem criados, movidos ou removidos |
 | Requisitos e casos de uso completos | âœ… IMPLEMENTADO E VALIDADO | `docs/REQUIREMENTS.md` documenta 9 RFs, 8 RNFs e 8 casos de uso, com critÃ©rios de aceite e matriz de rastreabilidade | RF-004, RF-005 e RF-007 possuem cobertura automatizada insuficiente, explicitada no documento | Manter a matriz de rastreabilidade alinhada Ã  evoluÃ§Ã£o do sistema |
 | Arquitetura C4 ou equivalente | âœ… IMPLEMENTADO E VALIDADO | `docs/ARCHITECTURE.md` contÃ©m trÃªs diagramas Mermaid verificÃ¡veis: visÃ£o de contexto e visÃ£o de containers equivalentes ao C4, alÃ©m da visÃ£o de deployment; componentes, ambientes e fluxos correspondem Ã  produÃ§Ã£o validada | Nenhuma lacuna observada neste requisito | Manter os diagramas alinhados Ã  arquitetura efetivamente implantada |
 | ADRs / decisões arquiteturais | ✅ IMPLEMENTADO E VALIDADO | `docs/adr/` contém seis Architecture Decision Records aceitos e um índice, documentando decisões arquiteturais reais sobre separação frontend/backend, PostgreSQL, Caddy, CI/CD, e-mail e observabilidade | Nenhuma lacuna observada neste requisito | Manter os ADRs atualizados quando decisões arquiteturais relevantes forem alteradas |
@@ -204,7 +204,7 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | Link funcional | API e health pÃºblicos via HTTPS; frontend no Amplify, com valor de `PRODUCTION_FRONTEND_URL` nÃ£o versionado | PARCIAL |
 | ProduÃ§Ã£o pÃºblica | Backend EC2 e frontend Amplify implantados; CD #48 e smoke tests passaram | âœ… ATENDIDO |
 | Arquitetura documentada | `docs/ARCHITECTURE.md` com diagramas Mermaid de contexto, containers e deployment equivalentes ao C4 e coerentes com a produÃ§Ã£o validada | âœ… ATENDIDO |
-| Wiki junto ao repositÃ³rio | Wiki desabilitada; pasta `docs/` nÃ£o constitui equivalente completo | NÃƒO ATENDIDO |
+| Wiki junto ao repositório | `docs/README.md` fornece índice navegável da documentação versionada, referenciado pelo `README.md` principal; 24 links locais foram validados sem destinos quebrados | ✅ ATENDIDO |
 | Requisitos, casos de uso e decisÃµes | `docs/REQUIREMENTS.md`, `docs/adr/` e `docs/RFC.md` | âœ… ATENDIDO |
 | TrÃªs fluxos de negÃ³cio completos | ImplementaÃ§Ã£o parcial sem validaÃ§Ã£o ponta a ponta em produÃ§Ã£o | PARCIAL |
 | TDD | Testes presentes; histÃ³rico nÃ£o comprova integralmente teste-primeiro | PARCIAL |
@@ -285,7 +285,7 @@ Observabilidade: parcial
 - Registrar a URL pÃºblica do frontend e manter as evidÃªncias de CI #43, CD #48, Sonar e Quality Gate.
 - Validar backup/restauraÃ§Ã£o e destino off-site; PostgreSQL persistente, e-mail real e smoke tests jÃ¡ foram comprovados.
 - Validar dashboards finais, sÃ©ries operacionais ainda nÃ£o observadas, alertas, SLO e retenÃ§Ã£o; a ingestÃ£o de mÃ©tricas e logs de produÃ§Ã£o jÃ¡ foi comprovada.
-- Atualizar Wiki, URLs e trade-offs conforme o sistema real.
+- Atualizar URLs e trade-offs conforme o sistema real.
 - Cumprir orientaÃ§Ãµes, prova de autoria, pÃ´ster/QR e participaÃ§Ã£o no Demo Day.
 
 ## Gates executados na baseline e validaÃ§Ãµes posteriores

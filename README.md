@@ -18,6 +18,10 @@ O fluxo de coleta por formulário e sua integração com Indicadores e Dashboard
 
 Detalhes: [arquitetura](docs/ARCHITECTURE.md), [qualidade](docs/QUALITY.md), [CI/CD](docs/CI_CD.md), [produção AWS](docs/AWS_PRODUCTION.md) e [monitoramento](docs/MONITORING.md).
 
+## Documentação
+
+O ponto de entrada da documentação técnica é a [documentação navegável do projeto](docs/README.md), com acesso à [arquitetura](docs/ARCHITECTURE.md), aos [requisitos](docs/REQUIREMENTS.md) e aos [ADRs](docs/adr/README.md).
+
 ## Desenvolvimento local
 
 Pré-requisitos: Node.js 22, npm e Docker Compose.

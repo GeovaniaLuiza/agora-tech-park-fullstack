@@ -40,7 +40,7 @@ npm run migrate --prefix backend
 npm run lint
 npm test
 npm run test:coverage
-$env:VITE_API_URL='https://agora-techpark.duckdns.org/api'
+$env:VITE_API_URL='/api'
 npm run build
 node scripts/validate-frontend-artifact.mjs frontend/dist
 npm run audit

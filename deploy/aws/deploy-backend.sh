@@ -54,8 +54,12 @@ release_path() {
   printf '%s\n' "$resolved"
 }
 
-valid_release() {
+valid_backend_release() {
   [[ -d "$1/backend" && -f "$1/backend/src/server.js" && -f "$1/backend/package.json" ]]
+}
+
+valid_joint_release() {
+  valid_backend_release "$1" && [[ -d "$1/frontend/dist" && -f "$1/frontend/dist/index.html" ]]
 }
 
 health_check() {
@@ -77,7 +81,7 @@ elif [[ -e "$CURRENT_LINK" ]]; then
 fi
 
 if [[ "$PREVIOUS_RELEASE" == "$RELEASE_DIR" ]]; then
-  if valid_release "$RELEASE_DIR" && health_check; then
+  if valid_backend_release "$RELEASE_DIR" && health_check; then
     echo "Backend SHA $RELEASE_SHA is already active and healthy; no changes made."
     exit 0
   fi
@@ -92,6 +96,26 @@ fi
 mkdir -p "$APP_ROOT/releases" "$BACKUP_DIR"
 git clone --quiet --no-checkout "$REPOSITORY_URL" "$RELEASE_DIR"
 git -C "$RELEASE_DIR" checkout --quiet --detach "$RELEASE_SHA"
+
+ln -s "$ENV_FILE" "$RELEASE_DIR/backend/.env"
+echo "Installing backend dependencies"
+npm ci --omit=dev --prefix "$RELEASE_DIR/backend"
+
+echo "Installing frontend dependencies"
+npm ci --prefix "$RELEASE_DIR/frontend"
+
+echo "Building frontend with VITE_API_URL=/api"
+VITE_API_URL=/api npm run build --prefix "$RELEASE_DIR/frontend"
+
+echo "Validating frontend artifact"
+VITE_API_URL=/api node "$RELEASE_DIR/scripts/validate-frontend-artifact.mjs" "$RELEASE_DIR/frontend/dist"
+
+if ! valid_joint_release "$RELEASE_DIR"; then
+  echo "Candidate release is invalid: backend and frontend artifacts are required." >&2
+  exit 4
+fi
+
+rm -rf -- "$RELEASE_DIR/frontend/node_modules"
 
 set -a
 # shellcheck disable=SC1090
@@ -114,9 +138,6 @@ else
   exit 1
 fi
 
-ln -s "$ENV_FILE" "$RELEASE_DIR/backend/.env"
-npm ci --omit=dev --prefix "$RELEASE_DIR/backend"
-
 echo "Validating migrations"
 npm run migrate:dry --prefix "$RELEASE_DIR/backend"
 
@@ -128,7 +149,7 @@ mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"
 
 if ! systemctl restart "$SERVICE_NAME" || ! health_check; then
   echo "Application restart or health failed; attempting application recovery." >&2
-  if [[ -n "$PREVIOUS_RELEASE" ]] && valid_release "$PREVIOUS_RELEASE"; then
+  if [[ -n "$PREVIOUS_RELEASE" ]] && valid_backend_release "$PREVIOUS_RELEASE"; then
     if ln -sfn "$PREVIOUS_RELEASE" "$APP_ROOT/current.next" \
       && mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"; then
       recovery_restart=0

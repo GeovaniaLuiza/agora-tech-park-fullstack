@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { gzipSync, gunzipSync } from 'node:zlib';
 
 const script = await readFile(new URL('../deploy/aws/deploy-backend.sh', import.meta.url), 'utf8');
-const backup = script.match(/^echo "Creating database backup:.*\r?\n[\s\S]*?(?=\r?\nln -s "\$ENV_FILE")/m)?.[0];
+const backup = script.match(/^echo "Creating database backup:.*\r?\n[\s\S]*?(?=\r?\necho "Validating migrations")/m)?.[0];
 assert.ok(backup, 'Backup pipeline must be present in the deployment script');
 const shell = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash';
 

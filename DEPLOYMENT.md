@@ -20,10 +20,12 @@ O CI valida a URL pública incorporada ao `frontend-dist`; o CD repete a valida�
 
 ```text
 push main → CI → testes/build/Sonar → CD Production
-                                      ├─ backend: SSM → backup → dry-run → migrate → systemd → health
-                                      ├─ frontend: artefato aprovado → Amplify
+                                      ├─ EC2: SSM → clone → deps backend/frontend → build frontend (/api) → validate dist → backup → dry-run → migrate → current → restart → health
+                                      ├─ frontend: artefato aprovado → Amplify (contingência/rollback)
                                       └─ smoke: health → HTML → login opcional
 ```
+
+Na Etapa 2 da migração frontend, novas releases na EC2 passam a conter backend + `frontend/dist` construído com `VITE_API_URL=/api`. A compilação e validação do frontend ocorrem antes do backup do banco (`pg_dump`) e das migrações. O Caddy ainda NÃO serve o frontend nesta etapa (permanece proxy reverso para a API). O Amplify continua ativo como contingência operacional e frontend de produção.
 
 O workflow não aceita pull request como origem de deploy e usa credenciais AWS temporárias via OIDC. O backend faz checkout do SHA aprovado em uma release imutável; não usa `git pull` no diretório em execução.
 

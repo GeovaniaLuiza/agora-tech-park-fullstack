@@ -36,9 +36,26 @@ jobs:
   backend-unit:
     name: Backend unit tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: agora_test
+          POSTGRES_USER: agora_test
+          POSTGRES_PASSWORD: agora_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agora_test -d agora_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       NODE_ENV: test
       EMAIL_PROVIDER: mock
+      DATABASE_URL: postgresql://agora_test:agora_test_password@localhost:5432/agora_test
+      JWT_SECRET: integration-test-secret-with-at-least-32-characters
+      FRONTEND_URL: http://localhost:5174
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
@@ -47,6 +64,7 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci --prefix backend
+      - run: npm run migrate --prefix backend
       - run: npm run test:coverage --prefix backend
       - uses: actions/upload-artifact@v7
         with:

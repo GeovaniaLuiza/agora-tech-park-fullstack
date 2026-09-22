@@ -6,7 +6,7 @@
 
 Estado remoto informado pelo responsável em 2026-09-11, sem inspeção ou alteração da conta nesta revisão: região `us-east-1`; EC2 Ubuntu 24.04; Node.js 22; PostgreSQL 16 na mesma instância; systemd/Caddy; administração SSM com SSH desativado; GitHub OIDC e role de deploy com privilégio mínimo já criada. Amplify já criado com branch `main/PRODUCTION` e AutoBuild desativado. Grafana Alloy → Grafana Cloud permanece a arquitetura de observabilidade.
 
-API pública planejada: `https://agora-techpark.duckdns.org`. Variável pública de build: `VITE_API_URL=https://agora-techpark.duckdns.org/api`. Não colocar `/api` em `PRODUCTION_API_URL`.
+API pública planejada: `https://agora-techpark.duckdns.org`. O artefato preparado para a futura hospedagem EC2/Caddy usa `VITE_API_URL=/api`; o Amplify preserva o último artefato aprovado com URL absoluta durante a coexistência. Não colocar `/api` em `PRODUCTION_API_URL`.
 
 O bootstrap da infraestrutura foi manual. O deploy da aplicação será automatizado por GitHub Actions + OIDC + SSM/Amplify. Terraform, CloudFormation e CDK não são requisito desta etapa.
 
@@ -121,7 +121,7 @@ Próxima etapa: um serviço/timer systemd separado do deploy deverá executar ba
 
 ## Amplify
 
-O app já existe; manter branch `main/PRODUCTION` e AutoBuild desativado. Confirmar rewrite SPA para `/index.html` com HTTP 200 para rotas da aplicação, preservando assets existentes. Configurar `VITE_API_URL=https://agora-techpark.duckdns.org/api` como variável pública do repositório GitHub, pois o build acontece no CI. Defini-la somente no Amplify não altera o artefato já construído. O workflow envia exatamente o `frontend-dist` aprovado, validado após o build e novamente no CD antes do acesso AWS. Ver [CI_CD.md](CI_CD.md).
+O app já existe; manter branch `main/PRODUCTION` e AutoBuild desativado. Confirmar rewrite SPA para `/index.html` com HTTP 200 para rotas da aplicação, preservando assets existentes. O CI agora prepara `frontend-dist` com `VITE_API_URL=/api` para a futura hospedagem na EC2; o workflow não publica esse artefato same-origin no Amplify. O código de deployment Amplify e o último artefato absoluto aprovado permanecem disponíveis para rollback. Ver [CI_CD.md](CI_CD.md).
 
 ## Ativação e validação
 

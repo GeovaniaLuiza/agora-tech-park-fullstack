@@ -76,8 +76,8 @@ jobs:
     name: Frontend tests and build
     runs-on: ubuntu-latest
     env:
-      # Public repository variable: the same URL is verified in the emitted artifact by CI and CD.
-      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      # Future EC2/Caddy deployment serves the API from the same origin.
+      VITE_API_URL: /api
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0

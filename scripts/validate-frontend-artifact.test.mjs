@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { validateFrontendArtifact } from './validate-frontend-artifact.mjs';
 
 const expected = 'https://production.example.org/api';
+const productionUrl = 'https://agora-techpark.duckdns.org/api';
 async function artifact(t, javascript) {
   const directory = await mkdtemp(join(tmpdir(), 'agora-artifact-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
@@ -19,6 +20,14 @@ test('accepts production URL in emitted JavaScript', async (t) => {
   for (const quote of ['"', "'", '`']) {
     await validateFrontendArtifact(await artifact(t, `fetch(${quote}${expected}${quote})`), expected);
   }
+});
+
+test('accepts the exact same-origin API path', async (t) => {
+  await validateFrontendArtifact(await artifact(t, 'fetch("/api")'), '/api');
+});
+
+test('accepts the production absolute HTTPS API URL', async (t) => {
+  await validateFrontendArtifact(await artifact(t, `fetch("${productionUrl}")`), productionUrl);
 });
 
 for (const address of ['http://localhost:3002/api', 'http://127.0.0.1:3000/api', 'http://0.0.0.0:3000/api', 'http://[::1]:3000/api', 'http://192.168.1.10:3002/api', 'http://10.0.0.1/api', 'http://172.16.0.1/api']) {
@@ -42,7 +51,12 @@ test('HTML metadata cannot substitute for the URL in JavaScript', async (t) => {
 
 test('rejects absent, local, insecure or credential-bearing expected URL', async (t) => {
   const directory = await artifact(t, `fetch("${expected}")`);
-  for (const value of [undefined, '', '/api', 'http://production.example.org/api', 'https://localhost/api', 'https://2130706433/api', 'https://user:secret@production.example.org/api', `${expected}?token=secret`]) {
+  for (const value of [undefined, '', '/', 'api', '/api/', '//agora-techpark.duckdns.org/api',
+    'http://agora-techpark.duckdns.org/api', 'http://localhost:3000/api', 'http://localhost:3002/api',
+    'http://localhost:5174/api', 'https://localhost/api',
+    'https://example.com/', 'https://example.com/api/v2', 'https://2130706433/api',
+    'https://user:secret@production.example.org/api', `${expected}?token=secret`, 'javascript:alert(1)',
+    'data:text/plain,/api']) {
     await assert.rejects(validateFrontendArtifact(directory, value), /VITE_API_URL/);
   }
 });

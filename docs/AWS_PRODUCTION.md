@@ -6,7 +6,7 @@
 
 Estado remoto informado pelo responsável em 2026-09-11, sem inspeção ou alteração da conta nesta revisão: região `us-east-1`; EC2 Ubuntu 24.04; Node.js 22; PostgreSQL 16 na mesma instância; systemd/Caddy; administração SSM com SSH desativado; GitHub OIDC e role de deploy com privilégio mínimo já criada. Amplify já criado com branch `main/PRODUCTION` e AutoBuild desativado. Grafana Alloy → Grafana Cloud permanece a arquitetura de observabilidade.
 
-API pública planejada: `https://agora-techpark.duckdns.org`. Variável pública de build: `VITE_API_URL=https://agora-techpark.duckdns.org/api`. Não colocar `/api` em `PRODUCTION_API_URL`.
+API pública planejada: `https://agora-techpark.duckdns.org`. O artefato preparado para a futura hospedagem EC2/Caddy usa `VITE_API_URL=/api`; o Amplify preserva o último artefato aprovado com URL absoluta durante a coexistência. Não colocar `/api` em `PRODUCTION_API_URL`.
 
 O bootstrap da infraestrutura foi manual. O deploy da aplicação será automatizado por GitHub Actions + OIDC + SSM/Amplify. Terraform, CloudFormation e CDK não são requisito desta etapa.
 
@@ -94,7 +94,9 @@ O script requer `flock` (util-linux) e `realpath` (coreutils), disponíveis no a
 
 O destino de `current` é normalizado e deve permanecer dentro de `/opt/agora/releases`. Rerun do SHA ativo verifica diretório, `backend/src/server.js`, `backend/package.json` e health local. Se saudável, retorna sucesso sem clone, instalação, backup, migrations, troca de symlink, restart ou retenção. Se inválido ou não saudável, retorna erro preservando os arquivos. Diretório de SHA existente e inativo nunca é destruído automaticamente: o operador deve investigar, confirmar que não está ativo nem necessário para rollback e tratar eventual release parcial somente de forma controlada.
 
-SHA novo mantém clone → checkout → ambiente → backup → dependências → dry-run → migrations → troca atômica de `current` → restart → health. Falha no restart ou health tenta restaurar uma anterior com estrutura válida, reiniciar e verificar sua saúde; informa recuperação bem-sucedida ou falha, mantendo erro do deploy original. Primeiro deploy sem anterior válida não tem rollback. Não há rollback automático do banco, e compatibilidade das migrations continua obrigatória. A verificação estrutural não comprova integridade completa da release ou compatibilidade de schema.
+SHA novo executa: clone → checkout → ambiente backend → dependências backend (npm ci) → dependências frontend (npm ci) → build frontend (VITE_API_URL=/api) → validação do artefato frontend/dist (scripts/validate-frontend-artifact.mjs) → validação de release conjunta (backend + dist/index.html) → remoção de frontend/node_modules → backup (pg_dump) → validação de migrations (dry-run) → migrations → troca atômica de `current` → restart `agora-api` → health local. Falha em qualquer etapa de dependências, build ou validação do frontend aborta imediatamente antes do backup ou das migrações, sem tocar em `current`. Falha no restart ou health tenta restaurar uma anterior com estrutura válida, reiniciar e verificar sua saúde; informa recuperação bem-sucedida ou falha, mantendo erro do deploy original. Releases legadas backend-only continuam reconhecidas e aceitas para rollback transitório da API. Primeiro deploy sem anterior válida não tem rollback. Não há rollback automático do banco, e compatibilidade das migrations continua obrigatória.
+
+Na Etapa 2 da migração frontend, novas releases passam a conter estrutura conjunta (backend + `frontend/dist`), mas o Caddy ainda NÃO serve o frontend (permanece proxy da API até a Etapa 3). O Amplify continua ativo como contingência operacional e frontend de produção, e as variáveis reais `CLIENT_URL` e `FRONTEND_URL` não foram alteradas.
 
 A retenção mantém os cinco diretórios com maior mtime e preserva adicionalmente a release ativa, a anterior e a recém-ativada, comparando caminhos normalizados dentro da árvore de releases. Por isso pode manter mais de cinco diretórios. Preparações que falham podem deixar releases parciais; não há limpeza automática dessas releases. Falhas no pipeline ou na validação do backup removem o temporário. Alterações manuais fora do lock não são serializadas.
 
@@ -121,7 +123,7 @@ Próxima etapa: um serviço/timer systemd separado do deploy deverá executar ba
 
 ## Amplify
 
-O app já existe; manter branch `main/PRODUCTION` e AutoBuild desativado. Confirmar rewrite SPA para `/index.html` com HTTP 200 para rotas da aplicação, preservando assets existentes. Configurar `VITE_API_URL=https://agora-techpark.duckdns.org/api` como variável pública do repositório GitHub, pois o build acontece no CI. Defini-la somente no Amplify não altera o artefato já construído. O workflow envia exatamente o `frontend-dist` aprovado, validado após o build e novamente no CD antes do acesso AWS. Ver [CI_CD.md](CI_CD.md).
+O app já existe; manter branch `main/PRODUCTION` e AutoBuild desativado. Confirmar rewrite SPA para `/index.html` com HTTP 200 para rotas da aplicação, preservando assets existentes. O CI agora prepara `frontend-dist` com `VITE_API_URL=/api` para a futura hospedagem na EC2; o workflow não publica esse artefato same-origin no Amplify. O código de deployment Amplify e o último artefato absoluto aprovado permanecem disponíveis para rollback. Ver [CI_CD.md](CI_CD.md).
 
 ## Ativação e validação
 

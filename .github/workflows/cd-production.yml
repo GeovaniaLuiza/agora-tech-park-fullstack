@@ -32,7 +32,7 @@ jobs:
       AMPLIFY_BRANCH: ${{ vars.AMPLIFY_BRANCH || 'main' }}
       API_URL: ${{ vars.PRODUCTION_API_URL }}
       FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
-      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      VITE_API_URL: /api
       SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
       SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
     steps:
@@ -56,10 +56,10 @@ jobs:
           for value in AWS_ROLE_ARN AWS_REGION EC2_INSTANCE_ID AMPLIFY_APP_ID API_URL FRONTEND_URL VITE_API_URL; do
             test -n "${!value}" || { echo "Missing production variable: $value"; exit 1; }
           done
-          test "$VITE_API_URL" = "${API_URL%/}/api" || {
-            echo "VITE_API_URL must equal PRODUCTION_API_URL + /api"
-            exit 1
-          }
+          case "$VITE_API_URL" in
+            /api|"${API_URL%/}/api") ;;
+            *) echo "VITE_API_URL must be /api or PRODUCTION_API_URL + /api"; exit 1 ;;
+          esac
           test "$AMPLIFY_BRANCH" = "main" || { echo "Production IAM policy only allows branch main"; exit 1; }
       - name: Validate downloaded frontend artifact before AWS access
         run: node scripts/validate-frontend-artifact.mjs frontend-dist
@@ -92,6 +92,7 @@ jobs:
             --output text)"
           test "$status" = "Success"
       - name: Deploy tested frontend artifact to Amplify
+        if: env.VITE_API_URL != '/api'
         run: |
           (cd frontend-dist && zip -qr ../frontend-dist.zip .)
           deployment="$(aws amplify create-deployment \

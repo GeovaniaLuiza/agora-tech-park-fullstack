@@ -1,18 +1,40 @@
 {$API_DOMAIN} {
   encode zstd gzip
 
-  @metrics path /metrics
-  respond @metrics 404
+  @metrics path /metrics /metrics/*
+  handle @metrics {
+    respond 404
+  }
 
-  reverse_proxy 127.0.0.1:3000
+  @api path /api /api/*
+  handle @api {
+    reverse_proxy 127.0.0.1:3000
+  }
+
+  handle {
+    root * /opt/agora/current/frontend/dist
+    try_files {path} /index.html
+    file_server
+  }
 
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains"
     -Server
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
   }
 
   log {
     output stdout
-    format json
+    format filter {
+      request>uri query {
+        replace token REDACTED
+      }
+
+      request>headers>Referer delete
+
+      wrap json
+    }
   }
 }

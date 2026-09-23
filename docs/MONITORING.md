@@ -30,7 +30,7 @@ Grafana Cloud Prometheus
 
 A API expõe `http://127.0.0.1:3000/metrics`; em produção, o scrape do Alloy usa bearer token. A consulta `agora_process_process_cpu_seconds_total` retornou dados reais no Grafana Explore com `instance="127.0.0.1:3000"`, `job="prometheus.scrape.agora_api"` e `service="agora-api"`. Isso comprova o `remote_write` para a métrica de CPU do processo, não todas as séries operacionais.
 
-O código também oferece métricas padrão de processo, requisições e latência HTTP, disponibilidade/conexões/tamanho do banco e contadores da aplicação. O exporter Unix do Alloy oferece métricas de host, como CPU, memória e disco. A presença dessas séries no Grafana ainda precisa ser validada.
+O código também oferece métricas padrão de processo, requisições e latência HTTP, disponibilidade/conexões/tamanho do banco e contadores da aplicação. Em 23/09/2026, o dashboard consolidado exibiu séries reais de requisições, latência média e p95, CPU e memória RSS do processo Node, disponibilidade e conexões PostgreSQL. O exporter Unix do Alloy oferece métricas de host, como CPU, memória e disco; as demais séries de host, tamanho do banco e aplicação ainda precisam de validação específica.
 
 O PostgreSQL segue o fluxo `PostgreSQL → prometheus.exporter.postgres → Grafana Alloy → Grafana Cloud Prometheus`. O journal do Alloy registrou `Established new database connection` e PostgreSQL 16.15.0. O usuário `grafana_reader` tem `LOGIN`, pertence a `pg_monitor` e possui `CONNECT` no database `agora`; não é superuser e não possui `CREATEDB` nem `CREATEROLE`. A senha e a URL completa de conexão não devem ser documentadas.
 
@@ -60,7 +60,7 @@ O `deploy/aws/Caddyfile` bloqueia `/metrics` com resposta 404 antes do proxy. As
 
 ## Dashboards e alertas
 
-Existem cinco dashboards versionados em `monitoring/dashboards`: API, aplicação, infraestrutura, PostgreSQL e `monitoring/dashboards/production-overview.json`. Os quatro dashboards anteriores referenciam métricas HTTP/latência, de negócio, host e banco. O novo **Agora Tech Park - Production Overview** reúne sinais essenciais de disponibilidade, tráfego, desempenho, processo Node, PostgreSQL e logs da API em uma única visão. A importação e a validação final no Grafana ainda não foram comprovadas.
+Existem cinco dashboards versionados em `monitoring/dashboards`: API, aplicação, infraestrutura, PostgreSQL e `monitoring/dashboards/production-overview.json`. Os quatro primeiros referenciam métricas HTTP/latência, de negócio, host e banco; sua validação final permanece pendente. O dashboard consolidado **Agora Tech Park - Production Overview**, UID `agora-production-overview`, reúne disponibilidade, tráfego, desempenho, processo Node, PostgreSQL e logs da API em uma única visão. Ele foi importado e homologado no Grafana Cloud em 23/09/2026.
 
 O dashboard unificado contém exatamente estes dez painéis:
 
@@ -75,9 +75,20 @@ O dashboard unificado contém exatamente estes dez painéis:
 9. Logs recentes da API;
 10. Quantidade de erros nos logs Pino (`level >= 50`) em janelas de 5 minutos.
 
-Para importar manualmente no Grafana Cloud, abra **Dashboards > New > Import**, envie o arquivo `monitoring/dashboards/production-overview.json` e selecione os datasources Prometheus e Loki para as variáveis `DS_PROMETHEUS` e `DS_LOKI` durante a importação. Confira os painéis e salve o dashboard após selecionar as fontes corretas. Essa etapa operacional ainda está pendente.
+Na homologação de 23/09/2026, o dashboard importado usou `grafanacloud-bluegerbil2886-prom` em `DS_PROMETHEUS` e `grafanacloud-bluegerbil2886-logs` em `DS_LOKI`, ambos validados com dados reais. O filtro regex `.*-logs$` da variável `DS_LOKI` manteve a fonte Loki correta e excluiu `grafanacloud-bluegerbil2886-alert-state-history` da seleção.
 
-As regras em `monitoring/alerts/agora-alerts.yml` cobrem API down, banco down, falhas no health externo, HTTP 5xx acima de 5%, CPU acima de 90% e disco acima de 85%. O disparo e o recebimento ainda não foram comprovados. Synthetic Monitoring não está validado como ativo; o alerta de health externo depende dele. SLO e retenção também permanecem pendentes.
+### Evidências operacionais de 23/09/2026
+
+- **Disponibilidade:** API up/down e PostgreSQL up/down exibiram `UP`.
+- **Métricas da API:** Requests por minuto mostrou dados reais; Latência da API exibiu séries de média e p95. Os painéis de CPU e memória RSS do processo Node e sua telemetria correspondente foram validados.
+- **Erros HTTP 5xx:** o painel exibiu `0 req/s` quando não havia erros, em vez de `No data`. Isso valida a apresentação de zero, não um teste real de resposta 5xx.
+- **PostgreSQL:** Conexões PostgreSQL exibiu séries `active`, `idle` e `unknown`.
+- **Logs centralizados:** Logs recentes da API mostrou logs Pino estruturados reais no Grafana Cloud Loki, incluindo registros com `level` 30; nenhum conteúdo específico dos logs é reproduzido aqui.
+- **Erros nos logs (5 min):** na ausência de logs Pino com `level >= 50`, o painel exibiu linha em zero; o fallback `vector(0)` foi validado operacionalmente. Isso não representa teste de geração de erro.
+
+Foram realizadas capturas de tela manuais do Grafana Cloud em 23/09/2026 mostrando API e PostgreSQL `UP`, requests, latência, conexões PostgreSQL, logs Pino no Loki, 5xx e erros nos logs em zero, e Prometheus e Loki selecionados corretamente. As capturas não estão versionadas neste repositório.
+
+As regras em `monitoring/alerts/agora-alerts.yml` cobrem API down, banco down, falhas no health externo, HTTP 5xx acima de 5%, CPU do host acima de 90% e disco acima de 85%; não há regra versionada para memória do processo Node. O disparo e o recebimento ainda não foram comprovados. Synthetic Monitoring não está validado como ativo; o alerta de health externo depende dele. SLO e retenção também permanecem pendentes.
 
 ## Validação operacional
 
@@ -117,9 +128,9 @@ A causa foi o uso inicial do UUID/ID administrativo do token em vez da credencia
 
 ## Pendências
 
-- importar e validar os dashboards finais;
+- importar e validar os quatro dashboards específicos de API, aplicação, infraestrutura e PostgreSQL; o dashboard consolidado de produção já foi homologado em 23/09/2026;
 - provocar alertas de forma controlada e confirmar o recebimento;
 - configurar e validar Synthetic Monitoring, se exigido;
 - definir SLO;
 - confirmar retenção, plano, limites e política definitiva de custos do Grafana Cloud;
-- validar no Grafana as demais séries HTTP, latência, memória, disco, host, PostgreSQL e aplicação.
+- validar no Grafana as demais séries operacionais ainda não observadas, incluindo disco, host, tamanho do banco e métricas de aplicação; não foram executados testes reais de indisponibilidade da API, falha do PostgreSQL ou resposta HTTP 5xx.

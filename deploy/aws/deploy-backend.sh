@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 RELEASE_SHA="${1:-}"
+ACTION="${2:-deploy}"
 APP_ROOT="${APP_ROOT:-/opt/agora}"
 REPOSITORY_URL="${REPOSITORY_URL:-https://github.com/GeovaniaLuiza/agora-tech-park-fullstack.git}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
@@ -9,6 +10,7 @@ SERVICE_NAME="${SERVICE_NAME:-agora-api}"
 ENV_FILE="${ENV_FILE:-$APP_ROOT/shared/backend.env}"
 RELEASE_DIR="$APP_ROOT/releases/$RELEASE_SHA"
 CURRENT_LINK="$APP_ROOT/current"
+PREVIOUS_LINK="$APP_ROOT/previous"
 BACKUP_DIR="$APP_ROOT/backups"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 PREVIOUS_RELEASE=""
@@ -17,13 +19,17 @@ if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "A full 40-character Git commit SHA is required." >&2
   exit 2
 fi
+if [[ "$ACTION" != deploy && "$ACTION" != rollback ]]; then
+  echo "Action must be deploy or rollback." >&2
+  exit 2
+fi
 
 if [[ ! "$APP_ROOT" =~ ^/opt/[a-zA-Z0-9._-]+$ ]] || [[ ! "$BACKUP_RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
   echo "APP_ROOT must be a direct child of /opt and retention must be numeric." >&2
   exit 2
 fi
 
-for command_name in git npm node pg_dump gzip curl systemctl flock realpath; do
+for command_name in git npm node pg_dump gzip curl systemctl flock realpath grep; do
   command -v "$command_name" >/dev/null || {
     echo "Missing required command: $command_name" >&2
     exit 3
@@ -59,7 +65,13 @@ valid_backend_release() {
 }
 
 valid_joint_release() {
-  valid_backend_release "$1" && [[ -d "$1/frontend/dist" && -f "$1/frontend/dist/index.html" ]]
+  valid_backend_release "$1" \
+    && [[ -f "$1/frontend/dist/index.html" && -f "$1/frontend/dist/release.json" ]] \
+    && grep -Fxq "  \"sha\": \"$(basename "$1")\"" "$1/frontend/dist/release.json"
+}
+
+write_release_marker() {
+  printf '{\n  "sha": "%s"\n}\n' "$(basename "$1")" > "$1/frontend/dist/release.json"
 }
 
 health_check() {
@@ -80,13 +92,51 @@ elif [[ -e "$CURRENT_LINK" ]]; then
   exit 4
 fi
 
+if [[ "$ACTION" == rollback ]]; then
+  if [[ "$PREVIOUS_RELEASE" != "$RELEASE_DIR" || ! -L "$PREVIOUS_LINK" ]]; then
+    echo "Rollback refused: requested SHA is not the active release or previous is absent." >&2
+    exit 4
+  fi
+  if ! rollback_release="$(release_path "$PREVIOUS_LINK")" \
+    || [[ "$rollback_release" == "$RELEASE_DIR" ]] \
+    || ! valid_joint_release "$rollback_release"; then
+    echo "Rollback refused: previous joint release is invalid." >&2
+    exit 4
+  fi
+  ln -sfn "$rollback_release" "$APP_ROOT/current.next"
+  mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"
+  if ! systemctl restart "$SERVICE_NAME" || ! health_check; then
+    echo "Rollback failed: previous release restart or health check failed." >&2
+    exit 5
+  fi
+  echo "Joint release restored: $(basename "$rollback_release"). Database migrations were not reversed."
+  echo "ROLLBACK_SHA=$(basename "$rollback_release")"
+  exit 0
+fi
+
 if [[ "$PREVIOUS_RELEASE" == "$RELEASE_DIR" ]]; then
-  if valid_backend_release "$RELEASE_DIR" && health_check; then
-    echo "Backend SHA $RELEASE_SHA is already active and healthy; no changes made."
+  if valid_joint_release "$RELEASE_DIR" && health_check; then
+    echo "Joint SHA $RELEASE_SHA is already active and healthy; no changes made."
     exit 0
   fi
   echo "Active release is missing, invalid or unhealthy; preserved for investigation." >&2
   exit 5
+fi
+
+if [[ -n "$PREVIOUS_RELEASE" ]]; then
+  if ! valid_backend_release "$PREVIOUS_RELEASE" \
+    || [[ ! -f "$PREVIOUS_RELEASE/frontend/dist/index.html" ]] \
+    || [[ "$(git -C "$PREVIOUS_RELEASE" rev-parse HEAD)" != "$(basename "$PREVIOUS_RELEASE")" ]]; then
+    echo "Previous release cannot provide a verified joint rollback; deploy aborted." >&2
+    exit 4
+  fi
+  if [[ ! -f "$PREVIOUS_RELEASE/frontend/dist/release.json" ]]; then
+    write_release_marker "$PREVIOUS_RELEASE"
+  fi
+  if ! valid_joint_release "$PREVIOUS_RELEASE"; then
+    echo "Previous release marker is invalid; deploy aborted." >&2
+    exit 4
+  fi
 fi
 if [[ -e "$RELEASE_DIR" || -L "$APP_ROOT/releases/$RELEASE_SHA" ]]; then
   echo "Release directory already exists and is not active; preserved for operator investigation." >&2
@@ -96,6 +146,10 @@ fi
 mkdir -p "$APP_ROOT/releases" "$BACKUP_DIR"
 git clone --quiet --no-checkout "$REPOSITORY_URL" "$RELEASE_DIR"
 git -C "$RELEASE_DIR" checkout --quiet --detach "$RELEASE_SHA"
+if [[ "$(git -C "$RELEASE_DIR" rev-parse HEAD)" != "$RELEASE_SHA" ]]; then
+  echo "Checked out release does not match the approved SHA." >&2
+  exit 4
+fi
 
 ln -s "$ENV_FILE" "$RELEASE_DIR/backend/.env"
 echo "Installing backend dependencies"
@@ -106,6 +160,7 @@ npm ci --prefix "$RELEASE_DIR/frontend"
 
 echo "Building frontend with VITE_API_URL=/api"
 VITE_API_URL=/api npm run build --prefix "$RELEASE_DIR/frontend"
+write_release_marker "$RELEASE_DIR"
 
 echo "Validating frontend artifact"
 VITE_API_URL=/api node "$RELEASE_DIR/scripts/validate-frontend-artifact.mjs" "$RELEASE_DIR/frontend/dist"
@@ -144,12 +199,18 @@ npm run migrate:dry --prefix "$RELEASE_DIR/backend"
 echo "Applying pending migrations"
 npm run migrate --prefix "$RELEASE_DIR/backend"
 
+if [[ -n "$PREVIOUS_RELEASE" ]]; then
+  ln -sfn "$PREVIOUS_RELEASE" "$APP_ROOT/previous.next"
+  mv -Tf "$APP_ROOT/previous.next" "$PREVIOUS_LINK"
+else
+  rm -f -- "$PREVIOUS_LINK"
+fi
 ln -sfn "$RELEASE_DIR" "$APP_ROOT/current.next"
 mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"
 
 if ! systemctl restart "$SERVICE_NAME" || ! health_check; then
   echo "Application restart or health failed; attempting application recovery." >&2
-  if [[ -n "$PREVIOUS_RELEASE" ]] && valid_backend_release "$PREVIOUS_RELEASE"; then
+  if [[ -n "$PREVIOUS_RELEASE" ]] && valid_joint_release "$PREVIOUS_RELEASE"; then
     if ln -sfn "$PREVIOUS_RELEASE" "$APP_ROOT/current.next" \
       && mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"; then
       recovery_restart=0
@@ -189,4 +250,4 @@ find "$APP_ROOT/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
 find "$BACKUP_DIR" -maxdepth 1 -type f -name 'agora-*.sql.gz' \
   -mtime "+$BACKUP_RETENTION_DAYS" -delete
 
-echo "Backend release $RELEASE_SHA deployed successfully."
+echo "Joint release $RELEASE_SHA deployed successfully."

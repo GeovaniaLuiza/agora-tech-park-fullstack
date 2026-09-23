@@ -11,6 +11,19 @@
     reverse_proxy 127.0.0.1:3000
   }
 
+  @release path /release.json
+  handle @release {
+    root * /opt/agora/current/frontend/dist
+    header Cache-Control "no-store"
+    file_server
+  }
+
+  @assets path /assets/*
+  handle @assets {
+    root * /opt/agora/current/frontend/dist
+    file_server
+  }
+
   handle {
     root * /opt/agora/current/frontend/dist
     try_files {path} /index.html

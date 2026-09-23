@@ -30,7 +30,7 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: node --test scripts/deploy-backend.test.mjs scripts/deploy-backup.test.mjs
+      - run: node --test scripts/deploy-backend.test.mjs scripts/deploy-backup.test.mjs scripts/smoke-test.test.mjs
       - run: npm run audit
 
   backend-unit:
@@ -76,7 +76,7 @@ jobs:
     name: Frontend tests and build
     runs-on: ubuntu-latest
     env:
-      # Future EC2/Caddy deployment serves the API from the same origin.
+      # EC2/Caddy serves the API from the same origin.
       VITE_API_URL: /api
     steps:
       - uses: actions/checkout@v7.0.1

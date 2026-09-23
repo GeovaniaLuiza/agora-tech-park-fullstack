@@ -35,24 +35,41 @@ make_joint_release() {
   mkdir -p "$1/frontend/dist"
   printf '<html><body>Agora</body></html>\n' > "$1/frontend/dist/index.html"
   printf 'const api = "/api";\n' > "$1/frontend/dist/app.js"
+  printf '{\n  "sha": "%s"\n}\n' "$(basename "$1")" > "$1/frontend/dist/release.json"
 }
-make_release "$previous"
+make_joint_release "$previous"
 ln -s "$previous" "$APP_ROOT/current"
 [[ -L "$APP_ROOT/current" ]] || { echo 'Native symlinks required for these tests'; exit 90; }
 case "$SCENARIO" in
-  active*) make_release "$candidate"; ln -sfn "releases/$sha" "$APP_ROOT/current" ;;
-  existing) make_release "$candidate" ;;
+  active*) make_joint_release "$candidate"; ln -sfn "releases/$sha" "$APP_ROOT/current" ;;
+  existing) make_joint_release "$candidate" ;;
   first*) rm "$APP_ROOT/current" ;;
   rollback_joint)
     rm -rf "$previous"
     make_joint_release "$previous"
     ln -sfn "$previous" "$APP_ROOT/current"
     ;;
+  rollback_command)
+    make_joint_release "$candidate"
+    ln -sfn "$candidate" "$APP_ROOT/current"
+    ln -s "$previous" "$APP_ROOT/previous"
+    ;;
+  rollback_invalid)
+    make_joint_release "$candidate"
+    ln -sfn "$candidate" "$APP_ROOT/current"
+    ln -s "$previous" "$APP_ROOT/previous"
+    rm "$previous/frontend/dist/release.json"
+    ;;
+  legacy_marker) rm "$previous/frontend/dist/release.json" ;;
   retention)
     touch -t 200001010000 "$previous"
     for n in {1..7}; do mkdir "$APP_ROOT/releases/old$n"; touch -t 203001010000 "$APP_ROOT/releases/old$n"; done ;;
 esac
 git() {
+  if [[ "$1" == -C && "$3" == rev-parse ]]; then
+    if [[ "$SCENARIO" == wrong_sha && "$2" == "$candidate" ]]; then printf 'b%.0s' {1..40}; echo; else basename "$2"; fi
+    return 0
+  fi
   echo git >> "$TRACE"
   [[ "$SCENARIO" != clone ]] || return 1
   if [[ "$SCENARIO" == concurrent && "$1" == clone ]]; then
@@ -175,7 +192,11 @@ if [[ "$SCENARIO" == concurrent ]]; then
   status=$?
   cat first.log
 else
-  bash ./deploy.sh "$sha"
+  if [[ "$SCENARIO" == rollback_command || "$SCENARIO" == rollback_invalid ]]; then
+    bash ./deploy.sh "$sha" rollback
+  else
+    bash ./deploy.sh "$sha"
+  fi
   status=$?
 fi
 set -e
@@ -183,6 +204,9 @@ echo "STATUS:$status"
 echo "CURRENT:$(realpath -m "$APP_ROOT/current")"
 echo "PREVIOUS:$previous"
 echo "CANDIDATE:$candidate"
+if [[ -f "$APP_ROOT/current/frontend/dist/release.json" ]]; then
+  echo "CURRENT_MARKER:$(grep '"sha"' "$APP_ROOT/current/frontend/dist/release.json")"
+fi
 [[ ! -f "$previous/backend/src/server.js" ]] || echo PREVIOUS_PRESERVED
 [[ ! -f "$candidate/backend/src/server.js" ]] || echo CANDIDATE_PRESERVED
 if [[ "$SCENARIO" == retention ]]; then
@@ -191,12 +215,12 @@ fi
 cat "$TRACE"
 `;
 
-const failureStages = ['clone', 'ci', 'ci:frontend', 'build', 'validator', 'missing_dist', 'missing_index', 'backup', 'gzip', 'migrate:dry', 'migrate'];
+const failureStages = ['clone', 'wrong_sha', 'ci', 'ci:frontend', 'build', 'validator', 'missing_dist', 'missing_index', 'backup', 'gzip', 'migrate:dry', 'migrate'];
 for (const scenario of [
-  'new', 'active', 'active_bad', 'existing', 'clone', 'ci', 'ci:frontend', 'build', 'validator',
+  'new', 'active', 'active_bad', 'existing', 'clone', 'wrong_sha', 'ci', 'ci:frontend', 'build', 'validator',
   'missing_dist', 'missing_index', 'backup', 'gzip', 'migrate:dry', 'migrate',
   'restart', 'health', 'rollback_restart', 'rollback_health', 'rollback_joint',
-  'first_restart', 'first_health', 'lock', 'concurrent', 'retention',
+  'rollback_command', 'rollback_invalid', 'legacy_marker', 'first_restart', 'first_health', 'lock', 'concurrent', 'retention',
 ]) {
   test(`backend deploy: ${scenario}`, async (t) => {
     const directory = await mkdtemp(join(tmpdir(), 'agora-deploy-test-'));
@@ -211,7 +235,7 @@ for (const scenario of [
     const output = result.stdout;
     const trace = output.split('\n').filter(line => /^(git|backup|ci(:.*)?|build(:.*)?|node:.*|migrate(:dry)?|rm|restart:.*|health:.*)$/.test(line));
     const value = name => output.match(new RegExp(`^${name}:(.*)$`, 'm'))?.[1];
-    const success = ['new', 'active', 'retention', 'concurrent'].includes(scenario);
+    const success = ['new', 'active', 'retention', 'concurrent', 'rollback_command', 'legacy_marker'].includes(scenario);
     assert.equal(value('STATUS') === '0', success, output + result.stderr);
     if (!scenario.startsWith('first')) assert.match(output, /PREVIOUS_PRESERVED/);
     if (['active', 'active_bad', 'existing'].includes(scenario)) {
@@ -219,6 +243,22 @@ for (const scenario of [
       assert.ok(trace.every(line => line.startsWith('health:')), trace.join('\n'));
     }
     if (scenario === 'active') assert.match(output, /already active and healthy/);
+    if (scenario === 'rollback_command') {
+      assert.equal(value('CURRENT'), value('PREVIOUS'));
+      assert.match(output, /Joint release restored/);
+      assert.match(output, new RegExp(`^ROLLBACK_SHA=${'b'.repeat(40)}$`, 'm'));
+      assert.equal(trace.filter(line => line.startsWith('restart:')).length, 1);
+      assert.equal(trace.at(-1), `health:${value('PREVIOUS')}`);
+      assert.match(value('CURRENT_MARKER'), new RegExp(`"sha": "${'b'.repeat(40)}"`));
+    }
+    if (scenario === 'rollback_invalid') {
+      assert.equal(value('CURRENT'), value('CANDIDATE'));
+      assert.ok(!trace.some(line => line.startsWith('restart:')));
+    }
+    if (scenario === 'legacy_marker') {
+      assert.match(output, /PREVIOUS_PRESERVED/);
+      assert.match(await readFile(join(directory, 'app/releases', 'b'.repeat(40), 'frontend/dist/release.json'), 'utf8'), new RegExp('"sha": "' + 'b'.repeat(40) + '"'));
+    }
     if (scenario === 'existing') assert.match(result.stderr, /already exists and is not active/);
     if (scenario === 'lock') {
       assert.deepEqual(trace, []);
@@ -236,11 +276,11 @@ for (const scenario of [
       assert.ok(!trace.some(line => /^(restart|health):/.test(line)));
       const stages = ['git', 'ci:backend', 'ci:frontend', 'build:frontend', 'node:validate-frontend-artifact.mjs', 'backup', 'migrate:dry', 'migrate'];
       let last = scenario;
-      if (scenario === 'clone') last = 'git';
+      if (['clone', 'wrong_sha'].includes(scenario)) last = 'git';
       else if (scenario === 'ci') last = 'ci:backend';
       else if (scenario === 'ci:frontend') last = 'ci:frontend';
-      else if (scenario === 'build') last = 'build:frontend';
-      else if (['validator', 'missing_dist', 'missing_index'].includes(scenario)) last = 'node:validate-frontend-artifact.mjs';
+      else if (['build', 'missing_dist'].includes(scenario)) last = 'build:frontend';
+      else if (['validator', 'missing_index'].includes(scenario)) last = 'node:validate-frontend-artifact.mjs';
       else if (scenario === 'gzip') last = 'backup';
       assert.equal(trace.filter(line => line !== 'rm').at(-1), last);
       for (const later of stages.slice(stages.indexOf(last) + 1)) assert.ok(!trace.includes(later));

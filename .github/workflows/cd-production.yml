@@ -49,7 +49,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
           test "${API_URL%/}" = "${FRONTEND_URL%/}" || { echo "Production API and frontend must share the Caddy origin"; exit 1; }
       - name: Configure short-lived AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6.2.3
+        uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}

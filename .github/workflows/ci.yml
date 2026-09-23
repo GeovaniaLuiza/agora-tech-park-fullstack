@@ -166,7 +166,7 @@ jobs:
           name: frontend-coverage
           path: frontend/coverage
       - name: Sonar analysis and Quality Gate
-        uses: SonarSource/sonarqube-scan-action@v8.2.1
+        uses: SonarSource/sonarqube-scan-action@v8.2.2
         with:
           args: >-
             -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}

@@ -11,7 +11,6 @@ concurrency:
 
 permissions:
   contents: read
-  actions: read
   id-token: write
 
 jobs:
@@ -28,23 +27,14 @@ jobs:
       RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
       AWS_REGION: ${{ vars.AWS_REGION }}
       EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
-      AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
-      AMPLIFY_BRANCH: ${{ vars.AMPLIFY_BRANCH || 'main' }}
       API_URL: ${{ vars.PRODUCTION_API_URL }}
       FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
-      VITE_API_URL: /api
       SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
       SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ env.RELEASE_SHA }}
-      - uses: actions/download-artifact@v8.0.1
-        with:
-          name: frontend-dist
-          path: frontend-dist
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
       - uses: actions/setup-node@v7.0.0
         with:
           node-version: '22'
@@ -53,23 +43,18 @@ jobs:
         env:
           AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
         run: |
-          for value in AWS_ROLE_ARN AWS_REGION EC2_INSTANCE_ID AMPLIFY_APP_ID API_URL FRONTEND_URL VITE_API_URL; do
+          for value in AWS_ROLE_ARN AWS_REGION EC2_INSTANCE_ID API_URL FRONTEND_URL RELEASE_SHA; do
             test -n "${!value}" || { echo "Missing production variable: $value"; exit 1; }
           done
-          case "$VITE_API_URL" in
-            /api|"${API_URL%/}/api") ;;
-            *) echo "VITE_API_URL must be /api or PRODUCTION_API_URL + /api"; exit 1 ;;
-          esac
-          test "$AMPLIFY_BRANCH" = "main" || { echo "Production IAM policy only allows branch main"; exit 1; }
-      - name: Validate downloaded frontend artifact before AWS access
-        run: node scripts/validate-frontend-artifact.mjs frontend-dist
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "${API_URL%/}" = "${FRONTEND_URL%/}" || { echo "Production API and frontend must share the Caddy origin"; exit 1; }
       - name: Configure short-lived AWS credentials
         uses: aws-actions/configure-aws-credentials@v6.2.3
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: agora-${{ github.run_id }}
-      - name: Deploy backend through Systems Manager
+      - name: Deploy joint release through Systems Manager
         run: |
           parameters="$(jq -cn --arg command "sudo /opt/agora/bin/deploy-backend.sh $RELEASE_SHA" '{commands:[$command]}')"
           command_id="$(aws ssm send-command \
@@ -91,34 +76,25 @@ jobs:
             --query Status \
             --output text)"
           test "$status" = "Success"
-      - name: Deploy tested frontend artifact to Amplify
-        if: env.VITE_API_URL != '/api'
-        run: |
-          (cd frontend-dist && zip -qr ../frontend-dist.zip .)
-          deployment="$(aws amplify create-deployment \
-            --app-id "$AMPLIFY_APP_ID" \
-            --branch-name "$AMPLIFY_BRANCH")"
-          upload_url="$(jq -r '.zipUploadUrl' <<<"$deployment")"
-          job_id="$(jq -r '.jobId' <<<"$deployment")"
-          curl --fail --silent --show-error -T frontend-dist.zip "$upload_url"
-          aws amplify start-deployment \
-            --app-id "$AMPLIFY_APP_ID" \
-            --branch-name "$AMPLIFY_BRANCH" \
-            --job-id "$job_id" >/dev/null
-
-          for attempt in {1..60}; do
-            status="$(aws amplify get-job \
-              --app-id "$AMPLIFY_APP_ID" \
-              --branch-name "$AMPLIFY_BRANCH" \
-              --job-id "$job_id" \
-              --query 'job.summary.status' \
-              --output text)"
-            case "$status" in
-              SUCCEED) break ;;
-              FAILED|CANCELLED) echo "Amplify deployment failed: $status"; exit 1 ;;
-            esac
-            sleep 10
-          done
-          test "$status" = "SUCCEED"
       - name: Production smoke tests
-        run: node scripts/smoke-test.mjs
+        run: |
+          if node scripts/smoke-test.mjs; then exit 0; fi
+          echo "Public smoke failed; requesting joint release rollback" >&2
+          parameters="$(jq -cn --arg command "sudo /opt/agora/bin/deploy-backend.sh $RELEASE_SHA rollback" '{commands:[$command]}')"
+          command_id="$(aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "Rollback Agora $RELEASE_SHA" \
+            --parameters "$parameters" \
+            --timeout-seconds 900 \
+            --query 'Command.CommandId' \
+            --output text)"
+          aws ssm wait command-executed --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID"
+          aws ssm get-command-invocation --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID"
+          test "$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID" --query Status --output text)" = "Success"
+          rollback_output="$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID" --query StandardOutputContent --output text)"
+          previous_sha="$(printf '%s\n' "$rollback_output" | sed -n 's/^ROLLBACK_SHA=//p')"
+          [[ "$previous_sha" =~ ^[0-9a-f]{40}$ ]]
+          RELEASE_SHA="$previous_sha" node scripts/smoke-test.mjs
+          echo "Smoke failed; previous joint release $previous_sha restored and verified" >&2
+          exit 1

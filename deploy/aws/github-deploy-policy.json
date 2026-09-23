@@ -15,21 +15,6 @@
       "Effect": "Allow",
       "Action": "ssm:GetCommandInvocation",
       "Resource": "*"
-    },
-    {
-      "Sid": "DeployAmplifyArtifact",
-      "Effect": "Allow",
-      "Action": [
-        "amplify:CreateDeployment",
-        "amplify:StartDeployment"
-      ],
-      "Resource": "arn:aws:amplify:AWS_REGION:ACCOUNT_ID:apps/AMPLIFY_APP_ID/branches/main"
-    },
-    {
-      "Sid": "ReadAmplifyDeploymentJob",
-      "Effect": "Allow",
-      "Action": "amplify:GetJob",
-      "Resource": "arn:aws:amplify:AWS_REGION:ACCOUNT_ID:apps/AMPLIFY_APP_ID/branches/main/jobs/*"
     }
   ]
 }

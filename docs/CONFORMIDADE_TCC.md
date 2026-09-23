@@ -1,6 +1,6 @@
 ﻿# Matriz de conformidade do TCC â€” Ãgora Tech Park
 
-Baseline tÃ©cnica de 04/09/2026, com evidÃªncias de CI/CD, produÃ§Ã£o e observabilidade atualizadas em 18/09/2026. Esta matriz registra o estado observado antes das correÃ§Ãµes e as validaÃ§Ãµes posteriores explicitamente identificadas. Ela nÃ£o Ã© evidÃªncia de aprovaÃ§Ã£o acadÃªmica nem substitui resultados do GitHub Actions, SonarCloud, provedor de nuvem ou Grafana.
+Baseline tÃ©cnica de 04/09/2026, com evidÃªncias de CI/CD e produÃ§Ã£o atualizadas em 18/09/2026 e homologação do dashboard consolidado de observabilidade em 23/09/2026. Esta matriz registra o estado observado antes das correÃ§Ãµes e as validaÃ§Ãµes posteriores explicitamente identificadas. Ela nÃ£o Ã© evidÃªncia de aprovaÃ§Ã£o acadÃªmica nem substitui resultados do GitHub Actions, SonarCloud, provedor de nuvem ou Grafana.
 
 ## Legenda
 
@@ -13,7 +13,7 @@ Baseline tÃ©cnica de 04/09/2026, com evidÃªncias de CI/CD, produÃ§Ã£o e 
 
 ## Resumo executivo
 
-**DecisÃ£o atual: PARCIAL â€” produÃ§Ã£o funcional e tecnicamente validada, com pendÃªncias de seguranÃ§a/LGPD e de entrega acadÃªmica/documental.** CI #43 e CD Production #48 passaram; deploy, backend e frontend estÃ£o funcionando, a API e o health sÃ£o pÃºblicos via HTTPS, PostgreSQL e e-mail foram validados, e o Quality Gate passou. Isso nÃ£o representa aprovaÃ§Ã£o final: o arquivo com possÃ­veis dados pessoais permanece recuperÃ¡vel no histÃ³rico pÃºblico e constitui bloqueador real de seguranÃ§a/LGPD enquanto o histÃ³rico nÃ£o for sanitizado. A meta acadÃªmica de coverage backend, a documentaÃ§Ã£o obrigatÃ³ria e obrigaÃ§Ãµes acadÃªmicas/humanas tambÃ©m permanecem pendentes. Dashboards finais, alertas, SLO, retenÃ§Ã£o e backup/restauraÃ§Ã£o continuam parciais, sem invalidar a produÃ§Ã£o e a ingestÃ£o remota jÃ¡ comprovadas.
+**DecisÃ£o atual: PARCIAL â€” produÃ§Ã£o funcional e tecnicamente validada, com pendÃªncias de seguranÃ§a/LGPD e de entrega acadÃªmica/documental.** CI #43 e CD Production #48 passaram; deploy, backend e frontend estÃ£o funcionando, a API e o health sÃ£o pÃºblicos via HTTPS, PostgreSQL e e-mail foram validados, e o Quality Gate passou. Isso nÃ£o representa aprovaÃ§Ã£o final: o arquivo com possÃ­veis dados pessoais permanece recuperÃ¡vel no histÃ³rico pÃºblico e constitui bloqueador real de seguranÃ§a/LGPD enquanto o histÃ³rico nÃ£o for sanitizado. A meta acadÃªmica de coverage backend, a documentaÃ§Ã£o obrigatÃ³ria e obrigaÃ§Ãµes acadÃªmicas/humanas tambÃ©m permanecem pendentes. O dashboard consolidado foi homologado em 23/09/2026; os quatro dashboards específicos, alertas, SLO, retenÃ§Ã£o e backup/restauraÃ§Ã£o continuam parciais ou pendentes.
 
 O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nenhuma mudanÃ§a arquitetural foi aplicada nesta baseline.
 
@@ -56,13 +56,13 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 | PROD/STAGING separado | ðŸŸ  PARCIAL | ProduÃ§Ã£o validada em AWS EC2/Amplify com configuraÃ§Ã£o distinta do DEV | Ambiente STAGING nÃ£o foi comprovado | Documentar produÃ§Ã£o e decidir/validar staging conforme o critÃ©rio acadÃªmico |
 | Deploy pÃºblico em nuvem | âœ… IMPLEMENTADO E VALIDADO | CD Production #48 implantou backend na AWS EC2 via Systems Manager e frontend no AWS Amplify; smoke tests passaram | URL do frontend nÃ£o registrada nesta matriz | Registrar URL do Amplify e manter validaÃ§Ã£o pÃ³s-deploy |
 | HTTPS pÃºblico | âœ… IMPLEMENTADO E VALIDADO | `caddy.service` ativo e habilitado; Caddy serve `https://agora-techpark.duckdns.org/api` e `/api/health` por HTTPS; endpoint respondeu HTTP 200 | Nenhuma lacuna observada na validaÃ§Ã£o informada | Monitorar certificado e disponibilidade |
-| Observabilidade | ðŸŸ  PARCIAL | Em 18/09/2026, Alloy 1.19.2 ativo e habilitado no systemd da EC2 Ubuntu 24.04; configuraÃ§Ã£o validada; mÃ©tricas, logs e conexÃ£o do exporter PostgreSQL comprovados em produÃ§Ã£o | Dashboards finais, alertas, SLO e retenÃ§Ã£o nÃ£o foram validados | Validar dashboards, alertas e requisitos operacionais restantes |
-| Grafana Cloud recebendo dados | âœ… IMPLEMENTADO E VALIDADO | Grafana Explore exibiu a mÃ©trica `agora_process_process_cpu_seconds_total` via Prometheus e logs `{service="agora-api"}` via Loki em 18/09/2026 | Nenhuma lacuna de ingestÃ£o observada nesta validaÃ§Ã£o; dashboards e alertas sÃ£o avaliados separadamente | Preservar evidÃªncias sem expor credenciais e monitorar continuidade da ingestÃ£o |
+| Observabilidade | ðŸŸ  PARCIAL | Em 18/09/2026, Alloy 1.19.2 ativo e habilitado na EC2, com ingestão Prometheus/Loki comprovada; em 23/09/2026, dashboard consolidado homologado com mÃ©tricas reais da API e PostgreSQL e logs centralizados | Quatro dashboards específicos, disparo/recebimento de alertas, SLO e retenÃ§Ã£o nÃ£o foram validados | Validar os itens operacionais restantes sem presumir testes de falha |
+| Grafana Cloud recebendo dados | âœ… IMPLEMENTADO E VALIDADO | Em 18/09/2026, Explore exibiu CPU do processo via Prometheus e logs da API via Loki; em 23/09/2026, os datasources `grafanacloud-bluegerbil2886-prom` e `grafanacloud-bluegerbil2886-logs` exibiram dados reais no dashboard consolidado | Nenhuma lacuna de ingestÃ£o observada nessas validações; alertas sÃ£o avaliados separadamente | Preservar evidÃªncias sem expor credenciais e monitorar continuidade da ingestÃ£o |
 | Logs estruturados e redaction | âœ… IMPLEMENTADO E VALIDADO | Pino em journald; Alloy filtra somente `agora-api.service`; Loki recebeu JSON com `application="agora-tech-park"`, `environment="production"`, `service="agora-api"` e redaction `[REDACTED]` | A validaÃ§Ã£o comprova o fluxo e uma ocorrÃªncia de redaction, nÃ£o todas as variaÃ§Ãµes possÃ­veis de dados sensÃ­veis | Manter testes de regressÃ£o da redaction e o filtro da unit |
-| MÃ©tricas HTTP/latÃªncia/erros | ðŸŸ  PARCIAL | API expÃµe `/metrics`; Alloy coleta `127.0.0.1:3000` e o remote write ao Grafana Cloud foi validado ponta a ponta | A evidÃªncia apresentada comprova uma sÃ©rie real de CPU de processo, mas nÃ£o cada sÃ©rie HTTP, latÃªncia e erro | Validar no Explore as sÃ©ries HTTP, latÃªncia e erros |
-| MÃ©tricas CPU/memÃ³ria/disco | ðŸŸ  PARCIAL | Grafana Explore exibiu `agora_process_process_cpu_seconds_total` com `instance="127.0.0.1:3000"`, `job="prometheus.scrape.agora_api"` e `service="agora-api"` | MemÃ³ria, disco e alerta explÃ­cito de RAM nÃ£o foram comprovados | Completar regras e validar as sÃ©ries restantes |
+| MÃ©tricas HTTP/latÃªncia/erros | ðŸŸ  PARCIAL | Em 23/09/2026, dashboard exibiu requests por minuto e latÃªncia média/p95 reais; painel de 5xx exibiu `0 req/s` corretamente na ausência de erros | Nenhum erro HTTP 5xx real foi provocado ou observado nesta homologação | Validar cenário real de 5xx separadamente, se exigido |
+| MÃ©tricas CPU/memÃ³ria/disco | ðŸŸ  PARCIAL | CPU do processo Node já observada no Explore em 18/09/2026; painéis e telemetria de CPU e memória RSS do processo validados no dashboard em 23/09/2026 | Disco e alerta explÃ­cito de RAM nÃ£o foram comprovados | Validar disco e regras ainda ausentes separadamente |
 | Health/liveness/readiness | âœ… IMPLEMENTADO E VALIDADO | `/api/health`, `/live`, `/ready`; readiness retorna 503 quando o banco crÃ­tico falha; health local e `https://agora-techpark.duckdns.org/api/health` retornaram 200; smoke de produÃ§Ã£o passou | Nenhuma lacuna funcional observada nos checks executados | Manter monitoramento e smoke pÃ³s-deploy |
-| Alertas operacionais | ðŸŸ  PARCIAL | Regras para API, banco, sintÃ©tico, 5xx, CPU e disco; backend remoto de mÃ©tricas validado | Faltam evidÃªncias de disparo/recebimento e alerta explÃ­cito de RAM/latÃªncia/e-mail | Validar regras e entrega das notificaÃ§Ãµes |
+| Alertas operacionais | ðŸŸ  PARCIAL | Regras versionadas para API, banco, sintÃ©tico, 5xx, CPU de host e disco; backend remoto de mÃ©tricas validado | Faltam evidÃªncias de disparo/recebimento e alerta explÃ­cito de RAM do processo Node/latÃªncia/e-mail | Validar regras e entrega das notificaÃ§Ãµes |
 | Backup PostgreSQL | ðŸŸ  PARCIAL | `deploy/aws/deploy-backend.sh` executa `pg_dump` antes de migration | Backup fica no mesmo host; nÃ£o hÃ¡ retenÃ§Ã£o externa nem teste de restauraÃ§Ã£o | Projetar destino gratuito/seguro e teste restaurÃ¡vel |
 | Smoke tests | âœ… IMPLEMENTADO E VALIDADO | No CD #48, `scripts/smoke-test.mjs` validou HTTP 200 do health, status `ok`/`degraded`, banco `up`, HTTP 200 do frontend apÃ³s redirects e HTML com `<!doctype html>` | NÃ£o hÃ¡ evidÃªncia de que `SMOKE_EMAIL` e `SMOKE_PASSWORD` estavam presentes no #48; sem ambos, o script ignora o login. O script nÃ£o testa CORS | Registrar se o login foi executado e adicionar check de CORS se exigido |
 | SeguranÃ§a de aplicaÃ§Ã£o | ðŸŸ  PARCIAL | Helmet, CORS, JWT, rate limit, Zod, queries parametrizadas e auditoria de dependÃªncias High/Critical aprovada no CI #43 | NÃ£o hÃ¡ evidÃªncia de varredura completa de supply chain, dados e produÃ§Ã£o | Ampliar testes de abuso e configuraÃ§Ã£o |
@@ -118,7 +118,7 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 | Database | PostgreSQL 16 em produÃ§Ã£o na EC2; `postgresql.service` ativo e habilitado; integraÃ§Ã£o CI e conexÃ£o do exporter validadas |
 | HTTPS | `caddy.service` ativo e habilitado; API e health pÃºblicos servidos por HTTPS |
 | Email | Gmail SMTP via Nodemailer validado com `verify()`, envio real e health `email="up"` |
-| Observability | Alloy 1.19.2; `alloy.service` ativo e habilitado na EC2; remote write Prometheus e envio Loki ao Grafana Cloud validados em 18/09/2026; dashboards e alertas permanecem pendentes |
+| Observability | Alloy 1.19.2; `alloy.service` ativo e habilitado na EC2; remote write Prometheus e envio Loki validados em 18/09/2026; dashboard consolidado homologado em 23/09/2026; quatro dashboards específicos e disparo/recebimento de alertas permanecem pendentes |
 
 SeparaÃ§Ã£o DEV/PROD: **IMPLEMENTADA E VALIDADA para os ambientes comprovados**. DEV/test usam provider mock controlado sem SMTP externo, enquanto a produÃ§Ã£o usa AWS EC2/Amplify, PostgreSQL 16 e Gmail SMTP. O ambiente STAGING e a validaÃ§Ã£o integrada atual do DEV nÃ£o foram comprovados; por isso, o requisito agregado de ambientes permanece parcial.
 
@@ -161,20 +161,21 @@ Os valores quantitativos acima foram obtidos na baseline com timeout diagnÃ³st
 
 | Item | SituaÃ§Ã£o |
 |---|---|
-| Dashboard | Arquivos JSON para API, Application, Infrastructure e PostgreSQL; dashboards finais nÃ£o validados |
+| Dashboard | `Agora Tech Park - Production Overview` (UID `agora-production-overview`) importado e homologado no Grafana Cloud em 23/09/2026; quatro dashboards específicos versionados sem validação final |
 | URL | URL nÃ£o registrada na matriz; acesso ao Grafana Cloud Explore validado em 18/09/2026 |
 | Alloy | VersÃ£o 1.19.2 na EC2 Ubuntu 24.04; `alloy.service` ativo, habilitado no systemd e configuraÃ§Ã£o aprovada por `alloy validate`; sem novos erros no journal apÃ³s a correÃ§Ã£o da autenticaÃ§Ã£o |
-| Datasource | Prometheus remote write e Loki via Grafana Alloy validados ponta a ponta no Grafana Cloud em produÃ§Ã£o |
-| Ãšltimos dados recebidos | Em 18/09/2026, mÃ©trica real `agora_process_process_cpu_seconds_total` e log real de `GET /api/health` com `statusCode=200` observados no Explore |
-| Logs | Consulta `{service="agora-api"}` validada; JSON preservado, labels de aplicaÃ§Ã£o/ambiente/serviÃ§o observados e redaction `[REDACTED]` comprovada |
+| Datasource | Prometheus `grafanacloud-bluegerbil2886-prom` e Loki `grafanacloud-bluegerbil2886-logs` validados com dados reais no dashboard em 23/09/2026; `DS_LOKI` filtra fontes terminadas em `-logs` e exclui a fonte de histórico de alertas |
+| Ãšltimos dados recebidos | Em 23/09/2026, dashboard exibiu API e PostgreSQL `UP`, requests, latência média/p95, CPU e memória RSS do processo Node, conexões `active`, `idle` e `unknown`, e logs Pino reais no Loki |
+| Painéis sem erros | Em 23/09/2026, Erros HTTP 5xx exibiu `0 req/s` e Erros nos logs (5 min) exibiu linha em zero na ausência de registros Pino com `level >= 50`; fallback `vector(0)` validado operacionalmente, sem teste real de falha |
+| Logs | Consulta `{service="agora-api"}` validada; em 23/09/2026, painel mostrou logs Pino estruturados reais no Loki, inclusive registros com `level` 30, sem reproduzir conteúdo dos logs |
 | PostgreSQL exporter | ConexÃ£o estabelecida com PostgreSQL 16.15.0; usuÃ¡rio dedicado de observabilidade com `pg_monitor`, sem privilÃ©gios administrativos da aplicaÃ§Ã£o |
-| API / Application / Infrastructure / PostgreSQL | IngestÃ£o de mÃ©tricas da API, logs da aplicaÃ§Ã£o e conexÃ£o do exporter PostgreSQL comprovadas; dashboards consolidados e todas as sÃ©ries de infraestrutura nÃ£o comprovados |
+| API / Application / Infrastructure / PostgreSQL | Dashboard consolidado operacional com mÃ©tricas reais da API e PostgreSQL e logs da aplicaÃ§Ã£o; quatro dashboards específicos e demais sÃ©ries de infraestrutura nÃ£o foram validados integralmente |
 | Alertas mÃ­nimos | API down, database down, HTTP 5xx, CPU e disco configurados; sem evidÃªncia de disparo/recebimento |
 | Alertas adicionais | RAM, latÃªncia e falhas de e-mail incompletos ou sem validaÃ§Ã£o |
 
 Arquitetura validada em 18/09/2026: Node/Express `/metrics` â†’ Grafana Alloy â†’ Grafana Cloud Prometheus; Pino/journald â†’ Grafana Alloy â†’ Grafana Cloud Loki; PostgreSQL exporter â†’ Grafana Alloy â†’ Grafana Cloud Prometheus.
 
-Nenhum screenshot foi incorporado Ã  matriz. A validaÃ§Ã£o funcional foi realizada no Grafana Cloud Explore com dados reais, sem registrar secrets.
+Em 23/09/2026, foram realizadas capturas de tela manuais do Grafana Cloud com API e PostgreSQL `UP`, requests, latência, conexões PostgreSQL, logs Pino no Loki, painéis de 5xx e erros nos logs em zero e datasources Prometheus e Loki selecionados corretamente. Nenhuma captura foi incorporada ou versionada nesta matriz.
 
 ## Checklist da demonstraÃ§Ã£o em produÃ§Ã£o
 
@@ -217,10 +218,10 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | PostgreSQL persistente | PostgreSQL 16 ativo e habilitado na EC2; integraÃ§Ã£o CI e exporter validados | âœ… ATENDIDO |
 | Sonar | Job SonarQube Cloud passou no CI #43 | âœ… ATENDIDO |
 | Quality Gate | ExecuÃ§Ã£o PASS no CI #43 | âœ… ATENDIDO |
-| Observabilidade | Prometheus e Loki validados no Grafana Cloud em produÃ§Ã£o; dashboards finais e alertas ainda nÃ£o comprovados | PARCIAL |
-| Grafana | Dados reais de Prometheus e Loki observados no Explore; dashboards finais nÃ£o comprovados | PARCIAL |
+| Observabilidade | Dashboard consolidado homologado em 23/09/2026 com Prometheus, Loki, métricas da API/PostgreSQL e logs centralizados; alertas sem disparo/recebimento comprovado | PARCIAL |
+| Grafana | `Agora Tech Park - Production Overview` importado e homologado no Grafana Cloud em 23/09/2026; quatro dashboards específicos sem validação final | PARCIAL |
 | Logs | Pino/journald â†’ Alloy â†’ Loki validado, com JSON, labels e redaction observados | âœ… ATENDIDO |
-| MÃ©tricas | `/metrics` â†’ Alloy â†’ Prometheus validado com sÃ©rie real; conjunto completo de sÃ©ries operacionais nÃ£o comprovado | PARCIAL |
+| MÃ©tricas | Requests, latência, CPU/memória RSS do processo e PostgreSQL observados no dashboard em 23/09/2026; demais sÃ©ries operacionais nÃ£o comprovadas | PARCIAL |
 | Health Check | HTTP 200 local e em `https://agora-techpark.duckdns.org/api/health`; smoke #48 e Loki confirmaram o fluxo | âœ… ATENDIDO |
 | Backup | `pg_dump` local ao host AWS, sem restauraÃ§Ã£o/off-site | PARCIAL |
 | SeguranÃ§a e LGPD | Controles de aplicaÃ§Ã£o presentes; arquivo removido da Ã¡rvore, mas ainda recuperÃ¡vel no histÃ³rico pÃºblico | NÃƒO ATENDIDO |
@@ -262,9 +263,9 @@ Coverage frontend: comando oficial passou com thresholds superiores a 25%
 
 ### Observabilidade
 
-Grafana: ingestÃ£o Prometheus/Loki validada no Explore; dashboards finais nÃ£o comprovados
+Grafana: dashboard consolidado homologado em 23/09/2026 com Prometheus e Loki; quatro dashboards específicos sem validação final
 Logs: fluxo de produÃ§Ã£o validado ponta a ponta, com estrutura JSON e redaction observadas
-Metrics: remote write validado com sÃ©rie real; cobertura das sÃ©ries operacionais permanece parcial
+Metrics: requests, latência, CPU/memória RSS do processo e PostgreSQL observados; demais sÃ©ries operacionais permanecem parciais
 Alerts: configuraÃ§Ã£o parcial, sem evidÃªncia de disparo/recebimento
 
 ### DevOps e infraestrutura
@@ -284,7 +285,7 @@ Observabilidade: parcial
 - Comprovar a meta acadÃªmica de 75% de coverage backend com o relatÃ³rio atual.
 - Registrar a URL pÃºblica do frontend e manter as evidÃªncias de CI #43, CD #48, Sonar e Quality Gate.
 - Validar backup/restauraÃ§Ã£o e destino off-site; PostgreSQL persistente, e-mail real e smoke tests jÃ¡ foram comprovados.
-- Validar dashboards finais, sÃ©ries operacionais ainda nÃ£o observadas, alertas, SLO e retenÃ§Ã£o; a ingestÃ£o de mÃ©tricas e logs de produÃ§Ã£o jÃ¡ foi comprovada.
+- Validar os quatro dashboards específicos e sÃ©ries operacionais ainda nÃ£o observadas, além de disparo/recebimento de alertas, SLO e retenÃ§Ã£o; o dashboard consolidado e a ingestÃ£o de mÃ©tricas e logs de produÃ§Ã£o jÃ¡ foram comprovados.
 - Atualizar URLs e trade-offs conforme o sistema real.
 - Cumprir orientaÃ§Ãµes, prova de autoria, pÃ´ster/QR e participaÃ§Ã£o no Demo Day.
 

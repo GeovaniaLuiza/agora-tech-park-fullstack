@@ -60,7 +60,22 @@ O `deploy/aws/Caddyfile` bloqueia `/metrics` com resposta 404 antes do proxy. As
 
 ## Dashboards e alertas
 
-Existem quatro dashboards versionados em `monitoring/dashboards`: API, aplicação, infraestrutura e PostgreSQL. Eles referenciam métricas HTTP/latência, de negócio, host e banco, mas a importação e a validação final no Grafana ainda não foram comprovadas.
+Existem cinco dashboards versionados em `monitoring/dashboards`: API, aplicação, infraestrutura, PostgreSQL e `monitoring/dashboards/production-overview.json`. Os quatro dashboards anteriores referenciam métricas HTTP/latência, de negócio, host e banco. O novo **Agora Tech Park - Production Overview** reúne sinais essenciais de disponibilidade, tráfego, desempenho, processo Node, PostgreSQL e logs da API em uma única visão. A importação e a validação final no Grafana ainda não foram comprovadas.
+
+O dashboard unificado contém exatamente estes dez painéis:
+
+1. API up/down;
+2. Requests por minuto;
+3. Erros HTTP 5xx;
+4. Latência da API (média e p95);
+5. CPU do processo Node;
+6. Memória RSS do processo Node;
+7. PostgreSQL up/down;
+8. Conexões PostgreSQL, separadas por `state`;
+9. Logs recentes da API;
+10. Quantidade de erros nos logs Pino (`level >= 50`) em janelas de 5 minutos.
+
+Para importar manualmente no Grafana Cloud, abra **Dashboards > New > Import**, envie o arquivo `monitoring/dashboards/production-overview.json` e selecione os datasources Prometheus e Loki para as variáveis `DS_PROMETHEUS` e `DS_LOKI` durante a importação. Confira os painéis e salve o dashboard após selecionar as fontes corretas. Essa etapa operacional ainda está pendente.
 
 As regras em `monitoring/alerts/agora-alerts.yml` cobrem API down, banco down, falhas no health externo, HTTP 5xx acima de 5%, CPU acima de 90% e disco acima de 85%. O disparo e o recebimento ainda não foram comprovados. Synthetic Monitoring não está validado como ativo; o alerta de health externo depende dele. SLO e retenção também permanecem pendentes.
 

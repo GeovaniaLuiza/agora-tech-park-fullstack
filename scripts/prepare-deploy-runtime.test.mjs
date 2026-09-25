@@ -132,13 +132,16 @@ test('a SHA that diverges from the approved one aborts', async (t) => {
   const { sha, url } = await createOrigin(root);
   const shimDir = join(root, 'shim');
   await mkdir(shimDir, { recursive: true });
-  await writeFile(join(shimDir, 'git'), `#!/usr/bin/env bash
+  await writeFile(
+    join(shimDir, 'git'),
+    `#!/usr/bin/env bash
 for argument in "$@"; do
   if [[ "$argument" == *FETCH_HEAD* ]]; then printf '%s\\n' 'b%.0s' {1..40}; exit 0; fi
 done
 exec "$REAL_GIT" "$@"
-`, 'utf8');
-
+`,
+    { encoding: 'utf8', mode: 0o755 },
+  );
   const result = await runBootstrap(root, { sha, url, shimDir });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /does not match the approved SHA/);

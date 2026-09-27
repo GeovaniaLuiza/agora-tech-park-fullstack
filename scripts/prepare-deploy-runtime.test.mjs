@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
   REPOSITORY_URL,
@@ -268,9 +268,10 @@ test('bootstrap has no moving reference and no persistent fallback', () => {
 });
 
 test('the committed deploy runtime is present and syntactically valid', async () => {
-  const source = await readFile(new URL(`../${RUNTIME_PATH}`, import.meta.url));
+  const runtimeFile = fileURLToPath(new URL(`../${RUNTIME_PATH}`, import.meta.url));
+  const source = await readFile(runtimeFile);
   assert.ok(source.length > 0, `${RUNTIME_PATH} must not be empty`);
-  const check = spawnSync(shell, ['-n', new URL(`../${RUNTIME_PATH}`, import.meta.url).pathname.replace(/^\//, '')],
+  const check = spawnSync(shell, ['-n', runtimeFile.replaceAll('\\', '/')],
     { encoding: 'utf8', cwd: process.cwd() });
   assert.equal(check.status, 0, `${RUNTIME_PATH}: ${check.stderr}`);
   assert.doesNotMatch(source.toString('utf8'), /\/opt\/agora\/bin/);

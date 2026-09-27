@@ -30,7 +30,7 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: node --test scripts/deploy-backend.test.mjs scripts/deploy-backup.test.mjs scripts/smoke-test.test.mjs
+      - run: node --test scripts/deploy-backend.test.mjs scripts/deploy-backup.test.mjs scripts/prepare-deploy-runtime.test.mjs scripts/smoke-test.test.mjs
       - run: npm run audit
 
   backend-unit:

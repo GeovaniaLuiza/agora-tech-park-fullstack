@@ -52,7 +52,6 @@ O host adotado é Ubuntu 24.04. Confira usuário `agora`, Node.js 22, PostgreSQL
 
 ```bash
 sudo install -d -o agora -g agora /opt/agora/{releases,shared,backups,bin}
-sudo install -m 0755 deploy/aws/deploy-backend.sh /opt/agora/bin/deploy-backend.sh
 sudo install -m 0644 deploy/aws/agora-api.service /etc/systemd/system/agora-api.service
 sudo install -m 0644 deploy/aws/Caddyfile /etc/caddy/Caddyfile
 sudo test -e /opt/agora/shared/backend.env || sudo install -o agora -g agora -m 0600 deploy/aws/backend.env.example /opt/agora/shared/backend.env
@@ -102,7 +101,7 @@ A retenção mantém os cinco diretórios com maior mtime e preserva adicionalme
 
 Validação local: `node --test scripts/deploy-backend.test.mjs scripts/deploy-backup.test.mjs` executa uma cópia do script com apenas a restrição de raiz adaptada para diretório temporário, filesystem/symlinks reais e comandos git, npm, pg_dump, curl e systemctl simulados. Não acessa AWS, banco ou serviços reais. No Windows, o teste substitui `flock` por exclusão via diretório temporário; em Linux usa `flock` real, incluindo duas execuções concorrentes. A semântica Linux do lock ainda deve ser validada localmente em Linux quando os testes forem executados somente em Windows.
 
-Esta etapa não declara produção pronta. O script instalado em `/opt/agora/bin` deverá ser atualizado em etapa operacional autorizada; o checkout do workflow não o instala. Permanecem os limites do health local (sem comprovação do SHA, HTTPS/Caddy ou prazo total explícito), ausência de rollback após falhas do Amplify/smoke e os gaps de backup abaixo. Nenhuma ativação de CD é autorizada por esta correção.
+O CD não instala nem depende de `/opt/agora/bin/deploy-backend.sh` ou `/opt/agora/bin/deploy-backend.sh.previous`. A cada deploy e a cada rollback, o comando SSM cria um diretório com `mktemp -d`, registra `trap cleanup EXIT`, inicializa um repositório Git temporário, busca o SHA exato de 40 caracteres de `https://github.com/GeovaniaLuiza/agora-tech-park-fullstack.git` com `git fetch --depth 1 origin "$RELEASE_SHA"`, compara `rev-parse FETCH_HEAD^{commit}` com `RELEASE_SHA`, extrai `RELEASE_SHA:deploy/aws/deploy-backend.sh`, exige arquivo não vazio, executa `bash -n` e só então roda a cópia temporária com `RELEASE_SHA` e a ação `deploy` ou `rollback`. `main`, `latest`, `origin/main` e HEAD remoto não são consultados. Falha em `fetch`, comparação, extração ou `bash -n` aborta antes de tocar na release ativa; o `trap` apaga o diretório temporário em sucesso e em falha. O script viaja como Bash em texto no parâmetro SSM, sem base64 e sem cópia persistente no host, eliminando o drift entre o Git aprovado e o runtime da EC2. A única leitura do deploy continua sendo `GetCommandInvocation`; o bootstrap usa `git`, já exigido pelo script. Validação local: `node --test scripts/prepare-deploy-runtime.test.mjs` executa o bootstrap contra um repositório Git local real e cobre deploy, rollback, cleanup e cada condição de abort. Esta alteração não foi executada na EC2 e não altera `DEPLOY_ENABLED`. Permanecem os limites do health local (sem comprovação do SHA ou HTTPS/Caddy), a ausência de prazo total explícito para o deploy e os gaps de backup abaixo.
 
 ## Banco, migração e backup
 

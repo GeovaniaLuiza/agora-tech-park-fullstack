@@ -46,6 +46,7 @@ jobs:
           for value in AWS_ROLE_ARN AWS_REGION EC2_INSTANCE_ID API_URL FRONTEND_URL RELEASE_SHA; do
             test -n "${!value}" || { echo "Missing production variable: $value"; exit 1; }
           done
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "RELEASE_SHA must be a full 40-character commit SHA"; exit 1; }
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
           test "${API_URL%/}" = "${FRONTEND_URL%/}" || { echo "Production API and frontend must share the Caddy origin"; exit 1; }
       - name: Configure short-lived AWS credentials
@@ -56,12 +57,12 @@ jobs:
           role-session-name: agora-${{ github.run_id }}
       - name: Deploy joint release through Systems Manager
         run: |
-          parameters="$(jq -cn --arg command "sudo /opt/agora/bin/deploy-backend.sh $RELEASE_SHA" '{commands:[$command]}')"
+          node scripts/prepare-deploy-runtime.mjs deploy > "$RUNNER_TEMP/deploy-parameters.json"
           command_id="$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
             --document-name AWS-RunShellScript \
             --comment "Deploy Agora $RELEASE_SHA" \
-            --parameters "$parameters" \
+            --parameters "file://$RUNNER_TEMP/deploy-parameters.json" \
             --timeout-seconds 900 \
             --query 'Command.CommandId' \
             --output text)"
@@ -70,22 +71,21 @@ jobs:
           aws ssm wait command-executed --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID"
           set -e
           aws ssm get-command-invocation --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID"
-          status="$(aws ssm get-command-invocation \
+          test "$(aws ssm get-command-invocation \
             --command-id "$command_id" \
             --instance-id "$EC2_INSTANCE_ID" \
             --query Status \
-            --output text)"
-          test "$status" = "Success"
+            --output text)" = "Success"
       - name: Production smoke tests
         run: |
           if node scripts/smoke-test.mjs; then exit 0; fi
           echo "Public smoke failed; requesting joint release rollback" >&2
-          parameters="$(jq -cn --arg command "sudo /opt/agora/bin/deploy-backend.sh $RELEASE_SHA rollback" '{commands:[$command]}')"
+          node scripts/prepare-deploy-runtime.mjs rollback > "$RUNNER_TEMP/rollback-parameters.json"
           command_id="$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
             --document-name AWS-RunShellScript \
             --comment "Rollback Agora $RELEASE_SHA" \
-            --parameters "$parameters" \
+            --parameters "file://$RUNNER_TEMP/rollback-parameters.json" \
             --timeout-seconds 900 \
             --query 'Command.CommandId' \
             --output text)"

@@ -53,7 +53,8 @@ flowchart TB
     CD -->|OIDC / credenciais temporárias| SSM[AWS Systems Manager]
 
     subgraph EC2[AWS EC2 — Ubuntu 24.04]
-        DEPLOY["/opt/agora/bin/deploy-backend.sh"]
+        BOOTSTRAP["Bootstrap efêmero SSM<br/>(mktemp, fetch RELEASE_SHA, validação, extração, bash -n, cleanup)"]
+        RUNTIME["deploy-backend.sh temporário"]
         RELEASES["/opt/agora/releases/SHA"]
         CURRENT["/opt/agora/current"]
         CADDY[Caddy]
@@ -62,7 +63,8 @@ flowchart TB
         JOURNAL[journald]
         ALLOY[Grafana Alloy 1.19.2<br/>inclui prometheus.exporter.postgres]
 
-        DEPLOY --> RELEASES --> CURRENT --> API
+        BOOTSTRAP -->|executa com trap cleanup| RUNTIME
+        RUNTIME --> RELEASES --> CURRENT --> API
         CADDY -->|127.0.0.1:3000| API
         API -->|127.0.0.1:5432| DB
         ALLOY -->|scrape /metrics| API
@@ -71,7 +73,7 @@ flowchart TB
         ALLOY -->|exporter PostgreSQL| DB
     end
 
-    SSM --> DEPLOY
+    SSM --> BOOTSTRAP
     API -->|SMTP| GMAIL[Gmail SMTP]
     ALLOY -->|remote_write| PROM[Grafana Cloud Prometheus]
     ALLOY -->|logs| LOKI[Grafana Cloud Loki]
@@ -79,7 +81,7 @@ flowchart TB
 
 O GitHub Actions usa OIDC para assumir uma role e obter credenciais AWS temporárias; access keys fixas não fazem parte do fluxo. O CI executa antes do CD. O CI #43 aprovou lint/auditoria de dependências, testes unitários do backend, testes e build do frontend, integração PostgreSQL e SonarQube Cloud Quality Gate.
 
-O CD Production #48 implantou o backend via Systems Manager, publicou no Amplify o artefato já testado pelo CI e concluiu os smoke tests. O backend usa releases imutáveis em `/opt/agora/releases/<sha>`, symlink ativo `/opt/agora/current` e script persistente `/opt/agora/bin/deploy-backend.sh`.
+O CD Production #48 implantou o backend via Systems Manager, publicou no Amplify o artefato já testado pelo CI e concluiu os smoke tests. O backend usa releases imutáveis em `/opt/agora/releases/<sha>` e symlink ativo `/opt/agora/current`. O runtime de deploy não é persistente no host: a cada deploy ou rollback, o Systems Manager executa um bootstrap efêmero que cria diretório temporário (`mktemp -d`) com `trap cleanup`, busca estritamente o `RELEASE_SHA` exato de 40 caracteres com `git fetch --depth 1`, compara o commit resolvido ao SHA aprovado, extrai `deploy/aws/deploy-backend.sh` daquele commit, valida a sintaxe via `bash -n`, executa a cópia temporária e remove o diretório temporário ao término.
 
 ## Ambientes
 

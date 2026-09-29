@@ -20,7 +20,7 @@ env:
 jobs:
   quality:
     name: Lint and dependency audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
@@ -35,7 +35,7 @@ jobs:
 
   backend-unit:
     name: Backend unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
@@ -74,7 +74,7 @@ jobs:
 
   frontend-unit-build:
     name: Frontend tests and build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # EC2/Caddy serves the API from the same origin.
       VITE_API_URL: /api
@@ -105,7 +105,7 @@ jobs:
 
   backend-integration:
     name: PostgreSQL integration tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
@@ -141,7 +141,7 @@ jobs:
     name: SonarQube Cloud Quality Gate
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     needs: [quality, backend-unit, frontend-unit-build, backend-integration]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'GeovaniaLuiza_agora-tech-park-fullstack' }}

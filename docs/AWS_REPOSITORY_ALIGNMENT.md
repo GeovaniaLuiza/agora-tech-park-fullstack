@@ -1,5 +1,7 @@
 # Sincronização do repositório com AWS — 2026-09-11
 
+> **REGISTRO HISTÓRICO — não utilizar como descrição da arquitetura operacional atual.**
+> Este documento preserva o diagnóstico e o alinhamento realizados em 2026-09-11. A arquitetura operacional atual está documentada em `docs/AWS_PRODUCTION.md`, `docs/ARCHITECTURE.md` e `docs/CI_CD.md`.
 ## Diagnóstico e escopo original — 2026-09-11
 
 Arquitetura remota informada pelo responsável: us-east-1, Amplify main/PRODUCTION sem AutoBuild, EC2 Ubuntu 24.04 com Node.js 22/Express/systemd, Caddy, PostgreSQL 16 local em EBS, SSM com SSH desativado, OIDC e Grafana Alloy/Grafana Cloud. Nenhum recurso remoto foi consultado ou alterado nesta revisão; não houve deploy, migration em produção, commit ou push.
@@ -14,7 +16,7 @@ Problemas confirmados: ARN de jobs aplicado indevidamente às operações de bra
 | --- | --- |
 | `README.md` | Arquitetura adotada, domínio planejado, SSM/OIDC, bootstrap manual e build validado |
 | `docs/ARCHITECTURE.md` | Topologia, ambientes e contrato de LISTEN_HOST atualizados |
-| `docs/AWS_PRODUCTION.md` | Fonte operacional vigente: região/host, IAM, Caddy, Amplify, backup e bootstrap |
+| `docs/AWS_PRODUCTION.md` | Na revisão de 2026-09-11, era tratado como fonte operacional para região/host, IAM, Caddy, Amplify, backup e bootstrap; consultar a versão atual do arquivo para a arquitetura vigente |
 | `docs/CI_CD.md`, `DEPLOYMENT.md` | CI/CD e escopo correto de variáveis; artefato verificado antes do acesso AWS |
 | `GUIA_EXECUCAO.md` | Build local com variável pública e verificação automática |
 | `docs/MONITORING.md`, `deploy/aws/alloy*`, `monitoring/` | Alloy/Grafana Cloud vigentes; templates/dashboards preservados |

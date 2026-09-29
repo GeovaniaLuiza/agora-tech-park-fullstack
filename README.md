@@ -12,8 +12,8 @@ O fluxo de coleta por formulário e sua integração com Indicadores e Dashboard
 - Backend: Node.js 22, Express, ES Modules, JWT, Zod e PostgreSQL 16.
 - Organização backend: `routes → controllers → services → repositories → PostgreSQL`.
 - Desenvolvimento: Docker Compose com PostgreSQL; e-mail usa provider mock local, sem SMTP externo.
-- Produção adotada em `us-east-1`: Amplify para o frontend; EC2 Ubuntu 24.04 com Caddy, Node.js 22/systemd e PostgreSQL 16 local em EBS; Grafana Alloy → Grafana Cloud. Administração via SSM, SSH desativado e deploy via GitHub Actions/OIDC.
-- API pública planejada: `https://agora-techpark.duckdns.org`; o artefato preparado para EC2/Caddy usa `VITE_API_URL=/api`. O Amplify permanece com o último artefato absoluto aprovado durante a coexistência.
+- Produção em `us-east-1`: frontend React/Vite e backend Node.js/Express publicados conjuntamente em EC2 Ubuntu 24.04, com Caddy servindo a SPA e encaminhando `/api` para o backend; PostgreSQL 16 local em EBS; Grafana Alloy → Grafana Cloud. Administração via SSM, SSH desativado e deploy via GitHub Actions/OIDC.
+- Aplicação pública: `https://agora-techpark.duckdns.org`, com API disponível em `/api`. O frontend é construído com `VITE_API_URL=/api`, mantendo frontend e backend na mesma origem.
 - Bootstrap AWS manual; deploy da aplicação automatizado. Terraform/CloudFormation/CDK não são requisito desta etapa.
 
 Detalhes: [arquitetura](docs/ARCHITECTURE.md), [qualidade](docs/QUALITY.md), [CI/CD](docs/CI_CD.md), [produção AWS](docs/AWS_PRODUCTION.md) e [monitoramento](docs/MONITORING.md).

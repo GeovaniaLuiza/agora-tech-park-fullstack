@@ -1,6 +1,6 @@
 # ADR-0001: Separar frontend e backend em destinos distintos
 
-- Status: Aceito
+- Status: Superseded
 - Data: 2026-09-18
 
 ## Contexto
@@ -9,7 +9,7 @@ A aplicação possui uma SPA React/Vite, que gera artefatos estáticos, e uma AP
 
 ## Decisão
 
-Hospedar o frontend React/Vite no AWS Amplify e o backend Node.js/Express em uma instância AWS EC2. O frontend consome a API pública por HTTPS. Frontend e backend são publicados em hosts distintos, e a URL da API é incorporada ao artefato do frontend durante o build.
+Esta decisão foi válida para a arquitetura anterior: frontend React/Vite hospedado no AWS Amplify e backend Node.js/Express em uma instância AWS EC2. A arquitetura atual substituiu essa separação por uma release conjunta na EC2, com Caddy servindo a SPA e encaminhando `/api` para o backend na mesma origem.
 
 ## Consequências
 
@@ -24,8 +24,14 @@ Os documentos não registram uma comparação formal com uma implantação dos d
 
 ## Evidências
 
-- `docs/ARCHITECTURE.md`: visões de containers e deployment com React/Vite no Amplify e Node.js/Express na EC2.
-- `docs/CI_CD.md`: fluxo de publicação do artefato Vite aprovado no Amplify e implantação separada do backend.
-- `.github/workflows/cd-production.yml`: etapas distintas de deploy do backend via Systems Manager e do frontend via Amplify.
-- `docs/AWS_PRODUCTION.md`: arquitetura adotada e configuração operacional do Amplify.
+- `docs/ARCHITECTURE.md`: na versão vigente à época da decisão, registrava containers e deployment com React/Vite no Amplify e Node.js/Express na EC2.
+- `docs/CI_CD.md`: na versão vigente à época da decisão, registrava a publicação do artefato Vite no Amplify e a implantação separada do backend.
+- `.github/workflows/cd-production.yml`: na versão vigente à época da decisão, possuía etapas distintas de deploy do backend via Systems Manager e do frontend via Amplify.
+- `docs/AWS_PRODUCTION.md`: na versão vigente à época da decisão, registrava a configuração operacional do Amplify.
 - `deploy/aws/Caddyfile`: publicação da API hospedada na EC2.
+
+## Substituição da decisão
+
+Este ADR foi supersedido pela arquitetura atualmente adotada, na qual frontend React/Vite e backend Node.js/Express são publicados conjuntamente na EC2. O Caddy serve `frontend/dist` e encaminha `/api` para o backend na mesma origem.
+
+As referências a AWS Amplify, hosts distintos e fluxos separados permanecem neste ADR como registro histórico da decisão anterior.

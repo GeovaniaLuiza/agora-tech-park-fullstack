@@ -50,7 +50,7 @@ Integração requer PostgreSQL isolado e `DATABASE_URL` de teste. O workflow CI 
 
 ## Production
 
-Produção usa configuração descrita em [AWS_PRODUCTION.md](docs/AWS_PRODUCTION.md). Não execute o workflow de CD antes de aprovar custos e completar OIDC, EC2, Amplify, Grafana e GitHub Environment. Os exemplos de ambiente em `deploy/aws` contêm placeholders e nunca devem receber valores reais no Git.
+Produção usa configuração descrita em [AWS_PRODUCTION.md](docs/AWS_PRODUCTION.md). Não execute o workflow de CD antes de aprovar custos e completar OIDC, EC2, Systems Manager, Caddy, Grafana e GitHub Environment. Os exemplos de ambiente em `deploy/aws` contêm placeholders e nunca devem receber valores reais no Git.
 
 ## Diagnóstico rápido
 

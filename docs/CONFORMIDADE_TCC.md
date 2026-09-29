@@ -30,8 +30,8 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 | Arquitetura C4 ou equivalente | âœ… IMPLEMENTADO E VALIDADO | `docs/ARCHITECTURE.md` contÃ©m trÃªs diagramas Mermaid verificÃ¡veis: visÃ£o de contexto e visÃ£o de containers equivalentes ao C4, alÃ©m da visÃ£o de deployment; componentes, ambientes e fluxos correspondem Ã  produÃ§Ã£o validada | Nenhuma lacuna observada neste requisito | Manter os diagramas alinhados Ã  arquitetura efetivamente implantada |
 | ADRs / decisões arquiteturais | ✅ IMPLEMENTADO E VALIDADO | `docs/adr/` contém seis Architecture Decision Records aceitos e um índice, documentando decisões arquiteturais reais sobre separação frontend/backend, PostgreSQL, Caddy, CI/CD, e-mail e observabilidade | Nenhuma lacuna observada neste requisito | Manter os ADRs atualizados quando decisões arquiteturais relevantes forem alteradas |
 | ReferÃªncia acadÃªmica fornecida | âšª DOCUMENTADO / PLANEJADO | Tese de Nancy V. PÃ©rez, 2022, fornecida pelo usuÃ¡rio nesta auditoria | Ainda nÃ£o foi incorporada; nÃ£o constitui evidÃªncia tÃ©cnica | Usar apenas como fundamentaÃ§Ã£o, com autoria e referÃªncia bibliogrÃ¡fica completas |
-| Link funcional pÃºblico e estÃ¡vel | ðŸŸ  PARCIAL | API pÃºblica `https://agora-techpark.duckdns.org/api` e health pÃºblico validados; frontend implantado no AWS Amplify e smoke test concluÃ­do | O CD usa a variÃ¡vel GitHub `PRODUCTION_FRONTEND_URL`, mas seu valor nÃ£o estÃ¡ versionado nem documentado no repositÃ³rio | Registrar a URL real do Amplify e manter smoke checks periÃ³dicos |
-| Frontend React + Vite | ðŸŸ  PARCIAL | React 19.2.8 e Vite 8.2.2; job de testes/build e validaÃ§Ã£o do artefato passou no CI #43; artefato foi implantado no AWS Amplify pelo CD #48 | DocumentaÃ§Ã£o ainda informa React 18; URL do frontend nÃ£o registrada | Atualizar documentaÃ§Ã£o e registrar a URL do Amplify |
+| Link funcional público e estável | 🟡 PARCIAL | Frontend, API e health estão disponíveis em `https://agora-techpark.duckdns.org`; o CD Production #48 permanece como evidência histórica da implantação anterior do frontend no AWS Amplify e dos smoke tests | A evidência histórica do #48 não representa disponibilidade contínua futura | Manter a URL pública documentada e preservar smoke checks periódicos |
+| Frontend React + Vite | 🟡 PARCIAL | React 19.2.8 e Vite 8.2.2; job de testes/build e validação do artefato passou no CI #43; atualmente o frontend é servido pela EC2/Caddy na mesma origem da aplicação; o CD #48 permanece como evidência histórica da implantação anterior no Amplify | Documentação histórica ainda contém referências da arquitetura anterior | Manter documentação alinhada à arquitetura atual EC2/Caddy |
 | Backend Express | âœ… IMPLEMENTADO E VALIDADO | Express 5.2.1; 163 testes unitÃ¡rios passando; `agora-api.service` ativo e habilitado na EC2; API responde HTTP 200 | Meta acadÃªmica de coverage Ã© avaliada separadamente | Preservar testes, health e serviÃ§o systemd |
 | PostgreSQL 16 | âœ… IMPLEMENTADO E VALIDADO | PostgreSQL 16 em produÃ§Ã£o na EC2; `postgresql.service` ativo e habilitado; integraÃ§Ã£o PostgreSQL passou no CI #43; exporter Alloy conectado | Backup/restauraÃ§Ã£o e off-site sÃ£o requisitos separados | Manter integraÃ§Ã£o e validar restauraÃ§Ã£o separadamente |
 | MigraÃ§Ãµes incrementais | ðŸŸ  PARCIAL | `database/migrations/001...016`; runner calcula SHA-256, usa lock e registra `schema_migrations`; migrations e integraÃ§Ã£o PostgreSQL passaram no CI #43 | Compose DEV monta 001â€“013 e 016, omitindo 014 e 015; dois fluxos duplicados permanecem | Fazer Compose usar o runner Ãºnico e validar repetiÃ§Ã£o/checksum no DEV |
@@ -48,13 +48,13 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 | TrÃªs fluxos de negÃ³cio completos | ðŸŸ  PARCIAL | CÃ³digo e testes cobrem autenticaÃ§Ã£o, indicadores/formulÃ¡rios e importaÃ§Ãµes | NÃ£o foram validados ponta a ponta em ambiente integrado/publicado | Criar testes de aceitaÃ§Ã£o e smoke dos trÃªs fluxos |
 | CI no GitHub Actions | âœ… IMPLEMENTADO E VALIDADO | CI #43 passou: lint/audit, testes backend, testes/build frontend, integraÃ§Ã£o PostgreSQL e SonarQube Cloud Quality Gate | Nenhuma lacuna funcional observada nessa execuÃ§Ã£o | Manter o `main` protegido por CI verde |
 | CD no GitHub Actions | âœ… IMPLEMENTADO E VALIDADO | CD Production #48 passou: backend via AWS Systems Manager, frontend no AWS Amplify e smoke tests de produÃ§Ã£o | A evidÃªncia comprova a execuÃ§Ã£o #48, nÃ£o disponibilidade contÃ­nua futura | Monitorar execuÃ§Ãµes e preservar rollback |
-| AWS removida com seguranÃ§a | âšª DOCUMENTADO / PLANEJADO | AWS permanece como infraestrutura de produÃ§Ã£o validada: EC2, Systems Manager e Amplify foram usados no CD #48 | RemoÃ§Ã£o nÃ£o Ã© compatÃ­vel com a arquitetura produtiva atual e nÃ£o foi autorizada como migraÃ§Ã£o | Manter a infraestrutura validada; reavaliar remoÃ§Ã£o somente com destino substituto e autorizaÃ§Ã£o |
+| AWS removida com segurança | ⚪ DOCUMENTADO / PLANEJADO | AWS permanece como infraestrutura de produção validada. EC2 e Systems Manager integram a arquitetura atual; o Amplify foi utilizado historicamente no CD #48 | Remoção da AWS não é compatível com a arquitetura produtiva atual e não foi autorizada como migração | Manter a infraestrutura validada; reavaliar remoção somente com destino substituto e autorização |
 | Cloudflare Pages como frontend | âšª DOCUMENTADO / PLANEJADO | Apenas preferÃªncia do enunciado | A orientaÃ§Ã£o oficial de Web App veda plataformas otimizadas apenas para frontend; Cloudflare Pages exige decisÃ£o conservadora | NÃ£o adotar automaticamente; preferir hospedagem controlÃ¡vel ou obter confirmaÃ§Ã£o acadÃªmica |
 | SonarCloud configurado | âœ… IMPLEMENTADO E VALIDADO | Job `SonarQube Cloud Quality Gate` passou no CI #43 | Resultado refere-se Ã  execuÃ§Ã£o validada | Manter token, projeto e gate operacionais |
 | Quality Gate aprovado | âœ… IMPLEMENTADO E VALIDADO | Quality Gate passou no CI #43, apÃ³s os jobs de qualidade, testes, build e integraÃ§Ã£o | AprovaÃ§Ã£o acadÃªmica final nÃ£o decorre automaticamente do gate | Preservar o bloqueio do pipeline por Quality Gate |
 | DEV separado de produÃ§Ã£o | ðŸŸ  PARCIAL | Compose local, `.env.example` e documentaÃ§Ã£o distinguem DEV | Fluxo de migrations do Compose Ã© inconsistente; nÃ£o hÃ¡ DEV integrado validado nesta mÃ¡quina | Corrigir e validar do zero |
-| PROD/STAGING separado | ðŸŸ  PARCIAL | ProduÃ§Ã£o validada em AWS EC2/Amplify com configuraÃ§Ã£o distinta do DEV | Ambiente STAGING nÃ£o foi comprovado | Documentar produÃ§Ã£o e decidir/validar staging conforme o critÃ©rio acadÃªmico |
-| Deploy pÃºblico em nuvem | âœ… IMPLEMENTADO E VALIDADO | CD Production #48 implantou backend na AWS EC2 via Systems Manager e frontend no AWS Amplify; smoke tests passaram | URL do frontend nÃ£o registrada nesta matriz | Registrar URL do Amplify e manter validaÃ§Ã£o pÃ³s-deploy |
+| PROD/STAGING separado | 🟡 PARCIAL | Produção validada em AWS EC2/Caddy com configuração distinta do DEV | Ambiente STAGING não foi comprovado | Documentar produção e decidir/validar staging conforme o critério acadêmico |
+| Deploy público em nuvem | ✅ IMPLEMENTADO E VALIDADO | Atualmente frontend e backend são publicados conjuntamente na AWS EC2/Caddy; como evidência histórica, o CD Production #48 implantou backend via Systems Manager e frontend no AWS Amplify e concluiu smoke tests | A evidência histórica do #48 não representa disponibilidade contínua futura | Manter a URL pública atual documentada e preservar validação pós-deploy |
 | HTTPS pÃºblico | âœ… IMPLEMENTADO E VALIDADO | `caddy.service` ativo e habilitado; Caddy serve `https://agora-techpark.duckdns.org/api` e `/api/health` por HTTPS; endpoint respondeu HTTP 200 | Nenhuma lacuna observada na validaÃ§Ã£o informada | Monitorar certificado e disponibilidade |
 | Observabilidade | ðŸŸ  PARCIAL | Em 18/09/2026, Alloy 1.19.2 ativo e habilitado na EC2, com ingestão Prometheus/Loki comprovada; em 23/09/2026, dashboard consolidado homologado com mÃ©tricas reais da API e PostgreSQL e logs centralizados | Quatro dashboards específicos, disparo/recebimento de alertas, SLO e retenÃ§Ã£o nÃ£o foram validados | Validar os itens operacionais restantes sem presumir testes de falha |
 | Grafana Cloud recebendo dados | âœ… IMPLEMENTADO E VALIDADO | Em 18/09/2026, Explore exibiu CPU do processo via Prometheus e logs da API via Loki; em 23/09/2026, os datasources `grafanacloud-bluegerbil2886-prom` e `grafanacloud-bluegerbil2886-logs` exibiram dados reais no dashboard consolidado | Nenhuma lacuna de ingestÃ£o observada nessas validações; alertas sÃ£o avaliados separadamente | Preservar evidÃªncias sem expor credenciais e monitorar continuidade da ingestÃ£o |
@@ -113,25 +113,25 @@ O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nen
 
 | Componente | Estado real |
 |---|---|
-| Frontend | Implantado no AWS Amplify pelo CD Production #48; HTML validado pelo smoke test; URL lida de `PRODUCTION_FRONTEND_URL`, cujo valor nÃ£o estÃ¡ versionado |
+| Frontend | Atualmente servido pela EC2/Caddy em `https://agora-techpark.duckdns.org`; o CD Production #48 permanece como evidência histórica da implantação anterior no AWS Amplify |
 | Backend | Implantado na AWS EC2; `agora-api.service` ativo e habilitado; releases em `/opt/agora/releases` e symlink `/opt/agora/current`; API pÃºblica responde HTTP 200 |
 | Database | PostgreSQL 16 em produÃ§Ã£o na EC2; `postgresql.service` ativo e habilitado; integraÃ§Ã£o CI e conexÃ£o do exporter validadas |
 | HTTPS | `caddy.service` ativo e habilitado; API e health pÃºblicos servidos por HTTPS |
 | Email | Gmail SMTP via Nodemailer validado com `verify()`, envio real e health `email="up"` |
 | Observability | Alloy 1.19.2; `alloy.service` ativo e habilitado na EC2; remote write Prometheus e envio Loki validados em 18/09/2026; dashboard consolidado homologado em 23/09/2026; quatro dashboards específicos e disparo/recebimento de alertas permanecem pendentes |
 
-SeparaÃ§Ã£o DEV/PROD: **IMPLEMENTADA E VALIDADA para os ambientes comprovados**. DEV/test usam provider mock controlado sem SMTP externo, enquanto a produÃ§Ã£o usa AWS EC2/Amplify, PostgreSQL 16 e Gmail SMTP. O ambiente STAGING e a validaÃ§Ã£o integrada atual do DEV nÃ£o foram comprovados; por isso, o requisito agregado de ambientes permanece parcial.
+Separação DEV/PROD: **IMPLEMENTADA E VALIDADA para os ambientes comprovados**. DEV/test usam provider mock controlado sem SMTP externo, enquanto a produção usa AWS EC2/Caddy, PostgreSQL 16 e Gmail SMTP. O ambiente STAGING e a validação integrada atual do DEV não foram comprovados; por isso, o requisito agregado de ambientes permanece parcial.
 
 ## URLs funcionais
 
 ```text
-APPLICATION_URL=AWS Amplify (valor de PRODUCTION_FRONTEND_URL nÃ£o versionado)
+APPLICATION_URL=https://agora-techpark.duckdns.org
 API_URL=https://agora-techpark.duckdns.org/api
 HEALTH_URL=https://agora-techpark.duckdns.org/api/health
 GRAFANA_URL=
 ```
 
-A API e o health pÃºblicos foram validados via HTTPS, e o frontend implantado no Amplify passou no smoke test do CD #48. O workflow usa `PRODUCTION_FRONTEND_URL`, mas o valor nÃ£o estÃ¡ presente no repositÃ³rio; a URL do Grafana tambÃ©m nÃ£o foi registrada. **DEPLOY TÃ‰CNICO: ATENDE. DOCUMENTAÃ‡ÃƒO COMPLETA DAS URLs: PARCIAL.**
+A API, o health e o frontend atuais usam a mesma origem pública `https://agora-techpark.duckdns.org` via EC2/Caddy. Como evidência histórica, o frontend implantado anteriormente no Amplify passou no smoke test do CD #48. **DEPLOY TÉCNICO: ATENDE. DOCUMENTAÇÃO COMPLETA DAS URLs: PARCIAL.**
 
 ## Coverage tÃ©cnico versus acadÃªmico
 
@@ -202,8 +202,8 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 |---|---|---|
 | RepositÃ³rio pÃºblico | GitHub pÃºblico `GeovaniaLuiza/agora-tech-park-fullstack` | âœ… ATENDIDO |
 | HistÃ³rico de commits | 19 commits em 6 dias de desenvolvimento | PARCIAL |
-| Link funcional | API e health pÃºblicos via HTTPS; frontend no Amplify, com valor de `PRODUCTION_FRONTEND_URL` nÃ£o versionado | PARCIAL |
-| ProduÃ§Ã£o pÃºblica | Backend EC2 e frontend Amplify implantados; CD #48 e smoke tests passaram | âœ… ATENDIDO |
+| Link funcional | Frontend, API e health públicos via HTTPS na mesma origem `https://agora-techpark.duckdns.org` | PARCIAL |
+| Produção pública | Frontend e backend atualmente publicados na EC2/Caddy; CD #48 e smoke tests permanecem como evidência histórica da arquitetura anterior | ✅ ATENDIDO |
 | Arquitetura documentada | `docs/ARCHITECTURE.md` com diagramas Mermaid de contexto, containers e deployment equivalentes ao C4 e coerentes com a produÃ§Ã£o validada | âœ… ATENDIDO |
 | Wiki junto ao repositório | `docs/README.md` fornece índice navegável da documentação versionada, referenciado pelo `README.md` principal; 24 links locais foram validados sem destinos quebrados | ✅ ATENDIDO |
 | Requisitos, casos de uso e decisÃµes | `docs/REQUIREMENTS.md`, `docs/adr/` e `docs/RFC.md` | âœ… ATENDIDO |
@@ -213,7 +213,7 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | CD | CD Production #48 implantou backend/frontend e concluiu smoke tests | âœ… ATENDIDO |
 | DEV separado | Compose/variÃ¡veis locais; fluxo de migrations inconsistente | PARCIAL |
 | PROD separado | ProduÃ§Ã£o AWS distinta do DEV validada; STAGING nÃ£o comprovado | PARCIAL |
-| Deploy fora de localhost | Backend EC2 e frontend Amplify; API pÃºblica validada | âœ… ATENDIDO |
+| Deploy fora de localhost | Frontend e backend na EC2/Caddy; aplicação pública validada | ✅ ATENDIDO |
 | HTTPS | Caddy e endpoints pÃºblicos HTTPS validados | âœ… ATENDIDO |
 | PostgreSQL persistente | PostgreSQL 16 ativo e habilitado na EC2; integraÃ§Ã£o CI e exporter validados | âœ… ATENDIDO |
 | Sonar | Job SonarQube Cloud passou no CI #43 | âœ… ATENDIDO |
@@ -238,7 +238,7 @@ URL: `https://github.com/GeovaniaLuiza/agora-tech-park-fullstack`
 ### AplicaÃ§Ã£o, backend e health
 
 Status tÃ©cnico: `ATENDIDO`; registro completo de URLs: `PARCIAL`
-Application URL: AWS Amplify; valor de `PRODUCTION_FRONTEND_URL` nÃ£o versionado
+Application URL: https://agora-techpark.duckdns.org
 Backend URL: `https://agora-techpark.duckdns.org/api`
 Health URL: `https://agora-techpark.duckdns.org/api/health`
 

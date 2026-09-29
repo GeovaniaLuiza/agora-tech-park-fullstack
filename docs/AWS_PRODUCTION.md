@@ -4,15 +4,15 @@
 
 ## Arquitetura adotada
 
-Estado remoto informado pelo responsável em 2026-09-11, sem inspeção ou alteração da conta nesta revisão: região `us-east-1`; EC2 Ubuntu 24.04; Node.js 22; PostgreSQL 16 na mesma instância; systemd/Caddy; administração SSM com SSH desativado; GitHub OIDC e role de deploy com privilégio mínimo já criada. Amplify já criado com branch `main/PRODUCTION` e AutoBuild desativado. Grafana Alloy → Grafana Cloud permanece a arquitetura de observabilidade.
+Estado remoto informado pelo responsável em 2026-09-11, sem inspeção ou alteração da conta nesta revisão: região `us-east-1`; EC2 Ubuntu 24.04; Node.js 22; PostgreSQL 16 na mesma instância; systemd/Caddy; administração SSM com SSH desativado; GitHub OIDC e role de deploy com privilégio mínimo já criada. Como registro histórico, existiu anteriormente um app AWS Amplify com branch `main/PRODUCTION` e AutoBuild desativado. Ele não integra o fluxo operacional atual descrito neste documento. Grafana Alloy → Grafana Cloud permanece a arquitetura de observabilidade.
 
-API pública planejada: `https://agora-techpark.duckdns.org`. O artefato preparado para a futura hospedagem EC2/Caddy usa `VITE_API_URL=/api`; o Amplify preserva o último artefato aprovado com URL absoluta durante a coexistência. Não colocar `/api` em `PRODUCTION_API_URL`.
+Aplicação pública: `https://agora-techpark.duckdns.org`. O frontend é construído com `VITE_API_URL=/api` e servido pelo Caddy na mesma origem da API. Não colocar `/api` em `PRODUCTION_API_URL`.
 
-O bootstrap da infraestrutura foi manual. O deploy da aplicação será automatizado por GitHub Actions + OIDC + SSM/Amplify. Terraform, CloudFormation e CDK não são requisito desta etapa.
+O bootstrap da infraestrutura foi manual. O deploy da aplicação é automatizado por GitHub Actions + OIDC + AWS Systems Manager. Terraform, CloudFormation e CDK não são requisito desta etapa.
 
 ```text
 Internet
-├─ AWS Amplify Hosting — SPA React, HTTPS
+
 └─ Caddy/HTTPS — EC2 pública
    ├─ Express em 127.0.0.1:3000, systemd
    ├─ PostgreSQL 16 em 127.0.0.1:5432, volume EBS
@@ -28,7 +28,7 @@ Antes de criar qualquer recurso:
 
 1. confira em Billing a modalidade Free Plan/Paid Plan, créditos, expiração e serviços elegíveis;
 2. confira custos e elegibilidade na região adotada, `us-east-1`;
-3. estime Amplify, EC2, EBS, snapshots/tráfego e IPv4 público na AWS Pricing Calculator;
+3. estime EC2, EBS, snapshots/tráfego e IPv4 público na AWS Pricing Calculator;
 4. crie AWS Budget mensal com alertas em 50%, 80% e 100%; confirme e-mail;
 5. registre data, região, instance type, EBS, retenção de backup e responsável no registro operacional abaixo; `FREE_TIER_VERIFICATION.md` é histórico e não comprova a situação atual;
 6. só então mude `DEPLOY_ENABLED` para `true`.
@@ -95,7 +95,7 @@ O destino de `current` é normalizado e deve permanecer dentro de `/opt/agora/re
 
 SHA novo executa: clone → checkout → ambiente backend → dependências backend (npm ci) → dependências frontend (npm ci) → build frontend (VITE_API_URL=/api) → validação do artefato frontend/dist (scripts/validate-frontend-artifact.mjs) → validação de release conjunta (backend + dist/index.html) → remoção de frontend/node_modules → backup (pg_dump) → validação de migrations (dry-run) → migrations → troca atômica de `current` → restart `agora-api` → health local. Falha em qualquer etapa de dependências, build ou validação do frontend aborta imediatamente antes do backup ou das migrações, sem tocar em `current`. Falha no restart ou health tenta restaurar uma anterior com estrutura válida, reiniciar e verificar sua saúde; informa recuperação bem-sucedida ou falha, mantendo erro do deploy original. Releases legadas backend-only continuam reconhecidas e aceitas para rollback transitório da API. Primeiro deploy sem anterior válida não tem rollback. Não há rollback automático do banco, e compatibilidade das migrations continua obrigatória.
 
-Na Etapa 2 da migração frontend, novas releases passam a conter estrutura conjunta (backend + `frontend/dist`), mas o Caddy ainda NÃO serve o frontend (permanece proxy da API até a Etapa 3). O Amplify continua ativo como contingência operacional e frontend de produção, e as variáveis reais `CLIENT_URL` e `FRONTEND_URL` não foram alteradas.
+As releases atuais contêm backend e `frontend/dist` construído com `VITE_API_URL=/api`. O Caddy serve a SPA e encaminha `/api` para o backend. Frontend e backend são publicados conjuntamente como uma única release na EC2.
 
 A retenção mantém os cinco diretórios com maior mtime e preserva adicionalmente a release ativa, a anterior e a recém-ativada, comparando caminhos normalizados dentro da árvore de releases. Por isso pode manter mais de cinco diretórios. Preparações que falham podem deixar releases parciais; não há limpeza automática dessas releases. Falhas no pipeline ou na validação do backup removem o temporário. Alterações manuais fora do lock não são serializadas.
 
@@ -120,9 +120,9 @@ O script preserva `set -Eeuo pipefail` e passa a URI explicitamente por `pg_dump
 
 Próxima etapa: um serviço/timer systemd separado do deploy deverá executar backup diário, validar gzip e conteúdo, aplicar retenção e reportar falhas ao Alloy/Grafana. A cópia off-site criptografada deverá ser adicionada após esse backup, com destino, custo e credenciais de privilégio mínimo aprovados. Um procedimento independente deve restaurar em PostgreSQL 16 isolado, validar schema/dados e registrar RPO/RTO e data do teste. Nenhum recurso externo pago, timer ou restore foi criado nesta etapa.
 
-## Amplify
+## AWS Amplify — legado
 
-O app já existe; manter branch `main/PRODUCTION` e AutoBuild desativado. Confirmar rewrite SPA para `/index.html` com HTTP 200 para rotas da aplicação, preservando assets existentes. O CI agora prepara `frontend-dist` com `VITE_API_URL=/api` para a futura hospedagem na EC2; o workflow não publica esse artefato same-origin no Amplify. O código de deployment Amplify e o último artefato absoluto aprovado permanecem disponíveis para rollback. Ver [CI_CD.md](CI_CD.md).
+O AWS Amplify foi utilizado anteriormente para hospedagem do frontend. A arquitetura atual publica frontend e backend conjuntamente na EC2, com Caddy servindo a SPA e encaminhando `/api` para o backend. A eventual existência de recursos Amplify remotos é tratada separadamente na DEVOPS-02. Nenhum recurso remoto deve ser removido apenas com base nesta documentação. Ver [CI_CD.md](CI_CD.md).
 
 ## Ativação e validação
 
@@ -140,4 +140,3 @@ O app já existe; manter branch `main/PRODUCTION` e AutoBuild desativado. Confir
 - API falha: `journalctl -u agora-api -n 200 --no-pager` e `systemctl status agora-api`.
 - Caddy/HTTPS: confira DNS, portas 80/443, `journalctl -u caddy` e rate limits de certificado.
 - Banco: confira espaço, `pg_isready`, conexões e checksum de migrations; não edite migration antiga.
-- Amplify: consulte status/job logs e redeploy do último artefato aprovado.

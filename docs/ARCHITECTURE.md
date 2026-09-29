@@ -2,7 +2,7 @@
 
 ## Visão geral
 
-Em 18/09/2026, a arquitetura validada separa o frontend React/Vite no AWS Amplify do backend Node.js/Express em uma EC2 Ubuntu 24.04. A URL pública do frontend vem da variável GitHub `PRODUCTION_FRONTEND_URL` e não está versionada. A API pública é `https://agora-techpark.duckdns.org/api`, com health em `https://agora-techpark.duckdns.org/api/health`.
+A arquitetura de produção atual publica frontend React/Vite e backend Node.js/Express conjuntamente em uma EC2 Ubuntu 24.04. O acesso público ocorre por `https://agora-techpark.duckdns.org`, com Caddy terminando HTTPS, servindo a SPA e encaminhando `/api` para o backend em `127.0.0.1:3000`. O health público está disponível em `https://agora-techpark.duckdns.org/api/health`.
 
 Na EC2, Caddy termina HTTPS e encaminha requisições para a API em `127.0.0.1:3000`. A API é gerenciada por `agora-api.service`; Caddy por `caddy.service`; PostgreSQL 16 por `postgresql.service`; e Grafana Alloy 1.19.2 por `alloy.service`. Os quatro serviços foram comprovados como `active` e `enabled`.
 
@@ -21,15 +21,15 @@ flowchart LR
     AWS -->|hospeda e entrega| PLATAFORMA
 ```
 
-O limite lógico “Plataforma Agora Tech Park” reúne a SPA e a API sem atribuir responsabilidades internas. Na implantação, esses componentes ficam em destinos distintos: frontend no Amplify e backend na EC2.
+O limite lógico “Plataforma Agora Tech Park” reúne a SPA e a API sem atribuir responsabilidades internas. Na implantação atual, SPA e API fazem parte da mesma release na EC2 e são expostas pela mesma origem por meio do Caddy.
 
 ## Visão de containers — equivalente ao C4 Container
 
 ```mermaid
 flowchart LR
-    U([Usuário]) -->|HTTPS| FE[React/Vite<br/>AWS Amplify]
-    FE -->|API HTTPS| CADDY[Caddy<br/>EC2]
-    CADDY -->|127.0.0.1:3000| API[Node.js/Express API]
+    U([Usuário]) -->|HTTPS| CADDY[Caddy<br/>EC2]
+    CADDY -->|SPA| FE[React/Vite]
+    CADDY -->|/api → 127.0.0.1:3000| API[Node.js/Express API]
     API -->|127.0.0.1:5432| DB[(PostgreSQL 16)]
     API -->|SMTP| GMAIL[Gmail SMTP]
     ALLOY[Grafana Alloy<br/>inclui exporter PostgreSQL] -->|scrape GET /metrics| API
@@ -49,7 +49,7 @@ flowchart TB
     CI -->|sucesso em main| CD[CD Production]
     CI -->|artefato frontend testado| ART[frontend-dist]
     ART --> CD
-    CD -->|publicação| AMP[AWS Amplify]
+
     CD -->|OIDC / credenciais temporárias| SSM[AWS Systems Manager]
 
     subgraph EC2[AWS EC2 — Ubuntu 24.04]
@@ -81,7 +81,7 @@ flowchart TB
 
 O GitHub Actions usa OIDC para assumir uma role e obter credenciais AWS temporárias; access keys fixas não fazem parte do fluxo. O CI executa antes do CD. O CI #43 aprovou lint/auditoria de dependências, testes unitários do backend, testes e build do frontend, integração PostgreSQL e SonarQube Cloud Quality Gate.
 
-O CD Production #48 implantou o backend via Systems Manager, publicou no Amplify o artefato já testado pelo CI e concluiu os smoke tests. O backend usa releases imutáveis em `/opt/agora/releases/<sha>` e symlink ativo `/opt/agora/current`. O runtime de deploy não é persistente no host: a cada deploy ou rollback, o Systems Manager executa um bootstrap efêmero que cria diretório temporário (`mktemp -d`) com `trap cleanup`, busca estritamente o `RELEASE_SHA` exato de 40 caracteres com `git fetch --depth 1`, compara o commit resolvido ao SHA aprovado, extrai `deploy/aws/deploy-backend.sh` daquele commit, valida a sintaxe via `bash -n`, executa a cópia temporária e remove o diretório temporário ao término.
+Como evidência histórica da arquitetura anterior, o CD Production #48 implantou o backend via Systems Manager, publicou no Amplify o artefato já testado pelo CI e concluiu os smoke tests. O backend usa releases imutáveis em `/opt/agora/releases/<sha>` e symlink ativo `/opt/agora/current`. O runtime de deploy não é persistente no host: a cada deploy ou rollback, o Systems Manager executa um bootstrap efêmero que cria diretório temporário (`mktemp -d`) com `trap cleanup`, busca estritamente o `RELEASE_SHA` exato de 40 caracteres com `git fetch --depth 1`, compara o commit resolvido ao SHA aprovado, extrai `deploy/aws/deploy-backend.sh` daquele commit, valida a sintaxe via `bash -n`, executa a cópia temporária e remove o diretório temporário ao término.
 
 ## Ambientes
 
@@ -89,7 +89,7 @@ O CD Production #48 implantou o backend via Systems Manager, publicou no Amplify
 | --- | --- | --- | --- | --- |
 | development | React/Vite e Node locais; Compose quando aplicável | PostgreSQL local/Compose | provider mock por padrão, sem SMTP externo | Pino no console; métricas locais |
 | test/CI | GitHub runner | PostgreSQL 16 isolado | provider mock obrigatório, sem SMTP externo | logs de teste |
-| production | React/Vite no Amplify; Node/Express na EC2/systemd | PostgreSQL 16 local à EC2 | Gmail SMTP | journald + Alloy + Grafana Cloud |
+| production | React/Vite + Node/Express na EC2, com Caddy servindo SPA e `/api` | PostgreSQL 16 local à EC2 | Gmail SMTP | journald + Alloy + Grafana Cloud |
 
 Não há ambiente STAGING comprovado; ele não integra a arquitetura atual.
 

@@ -6,7 +6,7 @@ Os registros deste diretório documentam decisões já adotadas e comprovadas no
 
 | ADR | Decisão | Status |
 | --- | --- | --- |
-| [ADR-0001](ADR-0001-separar-frontend-e-backend-em-destinos-distintos.md) | Separar frontend e backend em destinos distintos | Aceito |
+| [ADR-0001](ADR-0001-separar-frontend-e-backend-em-destinos-distintos.md) | Separar frontend e backend em destinos distintos | Superseded |
 | [ADR-0002](ADR-0002-hospedar-postgresql-na-mesma-ec2-do-backend.md) | Hospedar PostgreSQL na mesma EC2 do backend nesta etapa | Aceito |
 | [ADR-0003](ADR-0003-usar-caddy-como-reverse-proxy-e-manter-api-em-loopback.md) | Usar Caddy como reverse proxy e manter API em loopback | Aceito |
 | [ADR-0004](ADR-0004-usar-github-actions-com-oidc-e-aws-systems-manager-para-deploy.md) | Usar GitHub Actions com OIDC e AWS Systems Manager para deploy | Aceito |

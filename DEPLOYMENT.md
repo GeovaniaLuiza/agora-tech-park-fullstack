@@ -2,7 +2,7 @@
 
 O fluxo oficial separa CI e CD. Consulte [CI/CD](docs/CI_CD.md) para checks e proteção de branch e [Produção AWS](docs/AWS_PRODUCTION.md) para arquitetura, custo, provisionamento, backup e rollback.
 
-Arquitetura vigente: Amplify `main/PRODUCTION` + EC2 Ubuntu 24.04 em `us-east-1`, Node.js 22/systemd, Caddy e PostgreSQL 16 local/EBS. Administração via SSM com SSH desativado, deploy via OIDC, observabilidade Alloy/Grafana Cloud. Bootstrap manual; IaC não é pré-requisito. Esta sincronização do repositório não executa deploy nem migrations remotas.
+Arquitetura vigente: frontend React/Vite e backend Node.js/Express publicados conjuntamente em uma EC2 Ubuntu 24.04 em `us-east-1`, com Caddy servindo a SPA e encaminhando `/api` para o backend. PostgreSQL 16 permanece local em EBS. Administração via AWS Systems Manager, SSH desativado, deploy via GitHub Actions/OIDC e observabilidade via Alloy/Grafana Cloud. Bootstrap manual; IaC não é pré-requisito.
 
 O CI valida a URL pública incorporada ao `frontend-dist`; o CD repete a validação antes de acessar AWS. Amplify mantém AutoBuild desativado.
 
@@ -12,7 +12,7 @@ O CI valida a URL pública incorporada ao `frontend-dist`; o CD repete a valida�
 - nenhuma issue Critical/High aberta;
 - branch `main` protegida;
 - AWS Budget, região e custos confirmados;
-- EC2/Amplify/Grafana previamente autorizados e configurados;
+- EC2, Systems Manager, OIDC, Caddy e Grafana previamente autorizados e configurados;
 - secrets somente no host ou GitHub Environment;
 - `DEPLOY_ENABLED=true` somente depois de uma release inicial validada.
 
@@ -21,11 +21,11 @@ O CI valida a URL pública incorporada ao `frontend-dist`; o CD repete a valida�
 ```text
 push main → CI → testes/build/Sonar → CD Production
                                       ├─ EC2: SSM → clone → deps backend/frontend → build frontend (/api) → validate dist → backup → dry-run → migrate → current → restart → health
-                                      ├─ frontend: artefato aprovado → Amplify (contingência/rollback)
+                                      ├─ frontend: artefato aprovado → `frontend/dist` da release na EC2
                                       └─ smoke: health → HTML → login opcional
 ```
 
-Na Etapa 2 da migração frontend, novas releases na EC2 passam a conter backend + `frontend/dist` construído com `VITE_API_URL=/api`. A compilação e validação do frontend ocorrem antes do backup do banco (`pg_dump`) e das migrações. O Caddy ainda NÃO serve o frontend nesta etapa (permanece proxy reverso para a API). O Amplify continua ativo como contingência operacional e frontend de produção.
+As releases atuais contêm backend e `frontend/dist` construído com `VITE_API_URL=/api`. O Caddy serve a SPA React/Vite e encaminha `/api` ao backend. O deploy é ativado como uma release conjunta e validado por smoke tests após a publicação.
 
 O workflow não aceita pull request como origem de deploy e usa credenciais AWS temporárias via OIDC. O backend faz checkout do SHA aprovado em uma release imutável; não usa `git pull` no diretório em execução.
 

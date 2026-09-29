@@ -140,3 +140,21 @@ O AWS Amplify foi utilizado anteriormente para hospedagem do frontend. A arquite
 - API falha: `journalctl -u agora-api -n 200 --no-pager` e `systemctl status agora-api`.
 - Caddy/HTTPS: confira DNS, portas 80/443, `journalctl -u caddy` e rate limits de certificado.
 - Banco: confira espaço, `pg_isready`, conexões e checksum de migrations; não edite migration antiga.
+
+## Encerramento do legado AWS Amplify
+
+Em 29/09/2026, a hospedagem legada no AWS Amplify foi descontinuada após a consolidação do frontend e do backend na EC2 com Caddy.
+
+Foram concluídas as seguintes ações operacionais:
+
+- remoção das variáveis `AMPLIFY_APP_ID` e `AMPLIFY_BRANCH` do environment `production` no GitHub;
+- desconexão da branch `main` do aplicativo Amplify;
+- retirada das permissões `amplify:CreateDeployment`, `amplify:StartDeployment` e `amplify:GetJob` da role `AgoraTechPark-GitHubDeploy-Role`;
+- validação da aplicação em `https://agora-techpark.duckdns.org` após a desconexão do Amplify;
+- confirmação de indisponibilidade da antiga URL `*.amplifyapp.com`.
+
+O fluxo operacional atual de produção é:
+
+`GitHub Actions → OIDC → AWS Systems Manager → EC2/Caddy`.
+
+A role de deploy permanece com as permissões necessárias para `ssm:SendCommand` e `ssm:GetCommandInvocation`.

@@ -2,6 +2,8 @@
 
 ## Visão geral
 
+> Esta página descreve a arquitetura vigente. Qualquer menção a AWS Amplify é histórica e não representa o ambiente atual de produção. A arquitetura ativa é EC2 + Caddy + AWS Systems Manager + GitHub Actions OIDC.
+
 A arquitetura de produção atual publica frontend React/Vite e backend Node.js/Express conjuntamente em uma EC2 Ubuntu 24.04. O acesso público ocorre por `https://agora-techpark.duckdns.org`, com Caddy terminando HTTPS, servindo a SPA e encaminhando `/api` para o backend em `127.0.0.1:3000`. O health público está disponível em `https://agora-techpark.duckdns.org/api/health`.
 
 Na EC2, Caddy termina HTTPS e encaminha requisições para a API em `127.0.0.1:3000`. A API é gerenciada por `agora-api.service`; Caddy por `caddy.service`; PostgreSQL 16 por `postgresql.service`; e Grafana Alloy 1.19.2 por `alloy.service`. Os quatro serviços foram comprovados como `active` e `enabled`.
@@ -79,9 +81,9 @@ flowchart TB
     ALLOY -->|logs| LOKI[Grafana Cloud Loki]
 ```
 
-O GitHub Actions usa OIDC para assumir uma role e obter credenciais AWS temporárias; access keys fixas não fazem parte do fluxo. O CI executa antes do CD. O CI #43 aprovou lint/auditoria de dependências, testes unitários do backend, testes e build do frontend, integração PostgreSQL e SonarQube Cloud Quality Gate.
+O GitHub Actions usa OIDC para assumir uma role e obter credenciais AWS temporárias; access keys fixas não fazem parte do fluxo. O CI executa antes do CD. O CI pós-merge #106 aprovou lint/auditoria de dependências, testes unitários do backend, testes e build do frontend, integração PostgreSQL e SonarQube Cloud Quality Gate.
 
-Como evidência histórica da arquitetura anterior, o CD Production #48 implantou o backend via Systems Manager, publicou no Amplify o artefato já testado pelo CI e concluiu os smoke tests. O backend usa releases imutáveis em `/opt/agora/releases/<sha>` e symlink ativo `/opt/agora/current`. O runtime de deploy não é persistente no host: a cada deploy ou rollback, o Systems Manager executa um bootstrap efêmero que cria diretório temporário (`mktemp -d`) com `trap cleanup`, busca estritamente o `RELEASE_SHA` exato de 40 caracteres com `git fetch --depth 1`, compara o commit resolvido ao SHA aprovado, extrai `deploy/aws/deploy-backend.sh` daquele commit, valida a sintaxe via `bash -n`, executa a cópia temporária e remove o diretório temporário ao término.
+O CD Production #117 executa o deploy conjunto para a EC2, valida smoke tests públicos e mantém rollback por release anterior compatível. O backend usa releases imutáveis em `/opt/agora/releases/<sha>` e symlink ativo `/opt/agora/current`. O runtime de deploy não é persistente no host: a cada deploy ou rollback, o Systems Manager executa um bootstrap efêmero que cria diretório temporário (`mktemp -d`) com `trap cleanup`, busca estritamente o `RELEASE_SHA` exato de 40 caracteres com `git fetch --depth 1`, compara o commit resolvido ao SHA aprovado, extrai `deploy/aws/deploy-backend.sh` daquele commit, valida a sintaxe via `bash -n`, executa a cópia temporária e remove o diretório temporário ao término.
 
 ## Ambientes
 

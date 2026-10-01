@@ -12,11 +12,16 @@ O fluxo de coleta por formulário e sua integração com Indicadores e Dashboard
 - Backend: Node.js 22, Express, ES Modules, JWT, Zod e PostgreSQL 16.
 - Organização backend: `routes → controllers → services → repositories → PostgreSQL`.
 - Desenvolvimento: Docker Compose com PostgreSQL; e-mail usa provider mock local, sem SMTP externo.
-- Produção em `us-east-1`: frontend React/Vite e backend Node.js/Express publicados conjuntamente em EC2 Ubuntu 24.04, com Caddy servindo a SPA e encaminhando `/api` para o backend; PostgreSQL 16 local em EBS; Grafana Alloy → Grafana Cloud. Administração via SSM, SSH desativado e deploy via GitHub Actions/OIDC.
+- Produção vigente em `us-east-1`: frontend React/Vite e backend Node.js/Express publicados conjuntamente em uma EC2 Ubuntu 24.04, com Caddy servindo a SPA e encaminhando `/api` para o backend; PostgreSQL 16 local em EBS; Grafana Alloy → Grafana Cloud. Administração via SSM, SSH desativado e deploy via GitHub Actions/OIDC.
 - Aplicação pública: `https://agora-techpark.duckdns.org`, com API disponível em `/api`. O frontend é construído com `VITE_API_URL=/api`, mantendo frontend e backend na mesma origem.
 - Bootstrap AWS manual; deploy da aplicação automatizado. Terraform/CloudFormation/CDK não são requisito desta etapa.
+- AWS Amplify: legado histórico, não faz parte da arquitetura de produção atual e não integra o fluxo operacional vigente.
 
 Detalhes: [arquitetura](docs/ARCHITECTURE.md), [qualidade](docs/QUALITY.md), [CI/CD](docs/CI_CD.md), [produção AWS](docs/AWS_PRODUCTION.md) e [monitoramento](docs/MONITORING.md).
+
+## Histórico e legado
+
+Arquivos históricos de diagnóstico e estimativas antigas, como [DIAGNOSTICO_PRODUCAO_AWS.md](DIAGNOSTICO_PRODUCAO_AWS.md), [FREE_TIER_VERIFICATION.md](FREE_TIER_VERIFICATION.md) e partes de ADRs/relatórios anteriores, preservam contexto de decisão e não descrevem a arquitetura ativa. O estado atual da produção é EC2 + Caddy + SSM e não deve ser interpretado como Amplify.
 
 ## Documentação
 

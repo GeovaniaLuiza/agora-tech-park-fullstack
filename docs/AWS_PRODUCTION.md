@@ -4,6 +4,8 @@
 
 ## Arquitetura adotada
 
+> Arquitetura vigente: EC2 Ubuntu 24.04 + Caddy + backend Node.js/Express + PostgreSQL 16 local + GitHub Actions + OIDC + AWS Systems Manager. Qualquer menção a AWS Amplify neste documento é histórica e não faz parte do fluxo de produção atual.
+
 Estado remoto informado pelo responsável em 2026-09-11, sem inspeção ou alteração da conta nesta revisão: região `us-east-1`; EC2 Ubuntu 24.04; Node.js 22; PostgreSQL 16 na mesma instância; systemd/Caddy; administração SSM com SSH desativado; GitHub OIDC e role de deploy com privilégio mínimo já criada. Como registro histórico, existiu anteriormente um app AWS Amplify com branch `main/PRODUCTION` e AutoBuild desativado. Ele não integra o fluxo operacional atual descrito neste documento. Grafana Alloy → Grafana Cloud permanece a arquitetura de observabilidade.
 
 Aplicação pública: `https://agora-techpark.duckdns.org`. O frontend é construído com `VITE_API_URL=/api` e servido pelo Caddy na mesma origem da API. Não colocar `/api` em `PRODUCTION_API_URL`.

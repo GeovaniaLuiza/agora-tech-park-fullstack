@@ -13,9 +13,11 @@ Baseline tÃ©cnica de 04/09/2026, com evidÃªncias de CI/CD e produÃ§Ã£o a
 
 ## Resumo executivo
 
-**DecisÃ£o atual: PARCIAL â€” produÃ§Ã£o funcional e tecnicamente validada, com pendÃªncias de seguranÃ§a/LGPD e de entrega acadÃªmica/documental.** CI #43 e CD Production #48 passaram; deploy, backend e frontend estÃ£o funcionando, a API e o health sÃ£o pÃºblicos via HTTPS, PostgreSQL e e-mail foram validados, e o Quality Gate passou. Isso nÃ£o representa aprovaÃ§Ã£o final: o arquivo com possÃ­veis dados pessoais permanece recuperÃ¡vel no histÃ³rico pÃºblico e constitui bloqueador real de seguranÃ§a/LGPD enquanto o histÃ³rico nÃ£o for sanitizado. A meta acadÃªmica de coverage backend, a documentaÃ§Ã£o obrigatÃ³ria e obrigaÃ§Ãµes acadÃªmicas/humanas tambÃ©m permanecem pendentes. O dashboard consolidado foi homologado em 23/09/2026; os quatro dashboards específicos, alertas, SLO, retenÃ§Ã£o e backup/restauraÃ§Ã£o continuam parciais ou pendentes.
+> Nota de vigência: este documento inclui evidências históricas e registros de conformidade anteriores. A arquitetura ativa de produção é EC2 Ubuntu 24.04 + Caddy + backend Node.js/Express + PostgreSQL 16 + GitHub Actions + OIDC + Systems Manager. Qualquer menção ao Amplify em CD Production #48 ou em evidências antigas é histórica e não representa a produção atual. O caso de segurança SEC-01 / Issue #37 permanece pendente exclusivamente quanto à confirmação do GitHub Support sobre refs/caches/objetos server-side, e a documentação não declara LGPD concluída.
 
-O repositÃ³rio mantÃ©m a arquitetura React + Vite, Express e PostgreSQL. Nenhuma mudanÃ§a arquitetural foi aplicada nesta baseline.
+**Decisão atual: PARCIAL — produção funcional e tecnicamente validada, com pendências de segurança/LGPD, operação e entrega acadêmica/documental.** CI pós-merge #106 e CD Production #117 passaram; deploy, backend e frontend estão funcionando, a API e o health são públicos via HTTPS, PostgreSQL e e-mail foram validados, e o Quality Gate passou. Isso não representa aprovação final: a sanitização local já foi validada; entretanto, a confirmação do GitHub Support sobre refs/caches/objetos server-side na SEC-01 permanece pendente, e também restam pendências humanas/acadêmicas. O dashboard consolidado foi homologado em 23/09/2026; os quatro dashboards específicos, alertas, SLO, retenção e backup/restauração continuam parciais ou pendentes.
+
+O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produção atual, sem reintrodução do Amplify. Nenhuma mudança arquitetural foi aplicada nesta baseline além da consolidação documental.
 
 ## Conformidade tÃ©cnica e acadÃªmica
 

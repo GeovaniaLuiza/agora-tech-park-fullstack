@@ -4,7 +4,7 @@ O fluxo oficial separa CI e CD. Consulte [CI/CD](docs/CI_CD.md) para checks e pr
 
 Arquitetura vigente: frontend React/Vite e backend Node.js/Express publicados conjuntamente em uma EC2 Ubuntu 24.04 em `us-east-1`, com Caddy servindo a SPA e encaminhando `/api` para o backend. PostgreSQL 16 permanece local em EBS. Administração via AWS Systems Manager, SSH desativado, deploy via GitHub Actions/OIDC e observabilidade via Alloy/Grafana Cloud. Bootstrap manual; IaC não é pré-requisito.
 
-O CI valida a URL pública incorporada ao `frontend-dist`; o CD repete a validação antes de acessar AWS. Amplify mantém AutoBuild desativado.
+A arquitetura ativa não usa AWS Amplify. Qualquer menção ao Amplify neste contexto é histórica e não representa o processo de produção atual. O CI valida a URL pública incorporada ao `frontend-dist`; o CD repete a validação antes de acessar AWS.
 
 ## Pré-condições
 

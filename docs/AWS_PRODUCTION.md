@@ -105,22 +105,36 @@ Validação local: `node --test scripts/deploy-backend.test.mjs scripts/deploy-b
 
 O CD não instala nem depende de `/opt/agora/bin/deploy-backend.sh` ou `/opt/agora/bin/deploy-backend.sh.previous`. A cada deploy e a cada rollback, o comando SSM cria um diretório com `mktemp -d`, registra `trap cleanup EXIT`, inicializa um repositório Git temporário, busca o SHA exato de 40 caracteres de `https://github.com/GeovaniaLuiza/agora-tech-park-fullstack.git` com `git fetch --depth 1 origin "$RELEASE_SHA"`, compara `rev-parse FETCH_HEAD^{commit}` com `RELEASE_SHA`, extrai `RELEASE_SHA:deploy/aws/deploy-backend.sh`, exige arquivo não vazio, executa `bash -n` e só então roda a cópia temporária com `RELEASE_SHA` e a ação `deploy` ou `rollback`. `main`, `latest`, `origin/main` e HEAD remoto não são consultados. Falha em `fetch`, comparação, extração ou `bash -n` aborta antes de tocar na release ativa; o `trap` apaga o diretório temporário em sucesso e em falha. O script viaja como Bash em texto no parâmetro SSM, sem base64 e sem cópia persistente no host, eliminando o drift entre o Git aprovado e o runtime da EC2. A única leitura do deploy continua sendo `GetCommandInvocation`; o bootstrap usa `git`, já exigido pelo script. Validação local: `node --test scripts/prepare-deploy-runtime.test.mjs` executa o bootstrap contra um repositório Git local real e cobre deploy, rollback, cleanup e cada condição de abort. Esta alteração não foi executada na EC2 e não altera `DEPLOY_ENABLED`. Permanecem os limites do health local (sem comprovação do SHA ou HTTPS/Caddy), a ausência de prazo total explícito para o deploy e os gaps de backup abaixo.
 
-## Banco, migração e backup
+## Banco, migração, backup e recuperação
 
 - Banco no volume EBS persistente; defina espaço livre mínimo de 15%.
 - O CD cria `pg_dump` comprimido antes de migrar, valida arquivo não vazio e integridade com `gzip -t`, publica o arquivo final atomicamente e mantém 14 dias por padrão (`BACKUP_RETENTION_DAYS`).
-- Configure job diário separado, retenção local curta e cópia externa criptografada somente após aprovar custo do destino.
-- Teste restauração periodicamente; backup não testado não é garantia.
 - Nunca execute `migrate:baseline` automaticamente. Um operador deve comparar objetos e confirmar a linha de base.
 - Migrações precisam ser backward compatible, pois rollback automático de schema não existe.
 
-### Gap de backup e recuperação
+### Backup lógico PostgreSQL
 
-O script preserva `set -Eeuo pipefail` e passa a URI explicitamente por `pg_dump --dbname="$DATABASE_URL"`, sem imprimir a conexão. O pipeline grava em temporário no mesmo diretório; somente após sucesso, tamanho maior que zero e `gzip -t` o arquivo é renomeado atomicamente para `.sql.gz`. Falhas removem o temporário e abortam antes das dependências, `migrate:dry` e `migrate`, preservando backups anteriores. O arquivo usa SQL plain, sem owners/privileges. A retenção só é aplicada ao final de deploy bem-sucedido. `node --test scripts/deploy-backup.test.mjs` exercita o trecho real de backup com `pg_dump` simulado em diretório temporário, verificando conexão explícita, ausência da URI nos logs, sucesso, limpeza em falhas de dump/compressão/validação e preservação de backups anteriores, sem conectar a banco ou executar o restante do deploy.
+O script preserva `set -Eeuo pipefail` e passa a URI explicitamente por `pg_dump --dbname="$DATABASE_URL"`, sem imprimir a conexão. O pipeline grava em temporário no mesmo diretório; somente após sucesso, tamanho maior que zero e `gzip -t` o arquivo é renomeado atomicamente para `.sql.gz`. Falhas removem o temporário e abortam antes das dependências, `migrate:dry` e `migrate`, preservando backups anteriores. O arquivo usa SQL plain, sem owners/privileges.
 
-`test -s` e `gzip -t` confirmam bytes e integridade do arquivo comprimido, mas não comprovam conteúdo SQL útil nem restauração. Restore continua sendo procedimento manual. Não foi feito dump ou restore de produção. Não existe job diário nem cópia off-site implementada; perda da EC2/EBS pode perder banco e backups. Registrar também permissões restritas dos dumps e espaço disponível.
+A retenção só é aplicada ao final de deploy bem-sucedido. `node --test scripts/deploy-backup.test.mjs` exercita o trecho real de backup com `pg_dump` simulado em diretório temporário, verificando conexão explícita, ausência da URI nos logs, sucesso, limpeza em falhas de dump/compressão/validação e preservação de backups anteriores, sem conectar a banco ou executar o restante do deploy.
 
-Próxima etapa: um serviço/timer systemd separado do deploy deverá executar backup diário, validar gzip e conteúdo, aplicar retenção e reportar falhas ao Alloy/Grafana. A cópia off-site criptografada deverá ser adicionada após esse backup, com destino, custo e credenciais de privilégio mínimo aprovados. Um procedimento independente deve restaurar em PostgreSQL 16 isolado, validar schema/dados e registrar RPO/RTO e data do teste. Nenhum recurso externo pago, timer ou restore foi criado nesta etapa.
+`test -s` e `gzip -t` confirmam bytes e integridade do arquivo comprimido, mas não comprovam conteúdo SQL útil nem restauração. Os dumps PostgreSQL existentes em `/opt/agora/backups` constituem uma camada complementar de recuperação, porém não foi executado restore lógico de `pg_dump` nesta validação.
+
+### AWS Backup e restauração de EBS
+
+O volume EBS de produção `vol-052715cd3003f3f23`, de 30 GiB, tipo `gp3`, criptografado com `aws/ebs`, está protegido pelo AWS Backup.
+
+Foi configurado o plano `agora-tech-park-prod-backup`, com a regra `daily-ebs-prod`, cofre `Default`, execução diária às `12:30 America/Sao_Paulo` e retenção de 14 dias.
+
+Um backup on-demand foi executado com sucesso para o volume de produção. O job `C6DD6466-95B7-855D-1C89-426DA1403AB8` foi concluído e gerou o recovery point/snapshot `snap-046748087c4c04aad`.
+
+A recuperabilidade do recovery point também foi validada. O restore job `2156d79f-bfca-433f-b391-17a3664cd087` criou com sucesso um novo volume EBS de 30 GiB, `vol-0b18fff7293b8a310`, na AZ `us-east-1f`. A criação do volume restaurado levou aproximadamente 1 minuto.
+
+O volume restaurado foi mantido isolado, não foi anexado à EC2 de produção e foi removido após a validação. O volume original `vol-052715cd3003f3f23` permaneceu intacto durante todo o procedimento.
+
+Essa validação comprova backup e restauração no nível de infraestrutura EBS. Ela não deve ser interpretada como teste de restore lógico do PostgreSQL, nem como comprovação de que o snapshot EBS é application-consistent. Também não representa o RTO completo da aplicação: o tempo de aproximadamente 1 minuto refere-se somente à criação do volume EBS restaurado.
+
+Para recuperação de desastre, a estratégia atual combina duas camadas: snapshots EBS automatizados via AWS Backup e dumps lógicos PostgreSQL produzidos pelo fluxo de deploy. Um teste futuro de restore lógico do `pg_dump` pode ampliar a evidência de recuperação em nível de banco, sem invalidar a validação de EBS concluída nesta issue.
 
 ## AWS Amplify — legado
 

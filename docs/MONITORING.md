@@ -6,7 +6,7 @@ Em 18/09/2026, a produção usa AWS EC2 com Ubuntu 24.04, API Node.js/Express em
 
 Os serviços `agora-api.service`, `postgresql.service`, `caddy.service` e `alloy.service` foram comprovados como `active` e `enabled`. O Alloy está instalado, sua configuração foi validada com `alloy validate` e, após a correção da autenticação, não houve novos erros no journal.
 
-O ambiente usa Grafana Cloud; plano, limites, retenção e custos devem ser conferidos na conta. Foi observado um período de trial, portanto o plano não deve ser presumido como Free.
+Em 05/10/2026, o fechamento técnico da Issue #57 confirmou Grafana Cloud, Grafana Alloy, Prometheus e Loki em produção, com métricas e logs chegando ao Grafana. A retenção validada do Grafana Cloud Free é de 14 dias para métricas Prometheus e 14 dias para logs Loki. O período de trial observado anteriormente é histórico; limites e custos devem continuar sendo acompanhados na conta.
 
 Configuração operacional do Alloy:
 
@@ -88,7 +88,45 @@ Na homologação de 23/09/2026, o dashboard importado usou `grafanacloud-blueger
 
 Foram realizadas capturas de tela manuais do Grafana Cloud em 23/09/2026 mostrando API e PostgreSQL `UP`, requests, latência, conexões PostgreSQL, logs Pino no Loki, 5xx e erros nos logs em zero, e Prometheus e Loki selecionados corretamente. As capturas não estão versionadas neste repositório.
 
-As regras em `monitoring/alerts/agora-alerts.yml` cobrem API down, banco down, falhas no health externo, HTTP 5xx acima de 5%, CPU do host acima de 90% e disco acima de 85%; não há regra versionada para memória do processo Node. O disparo e o recebimento ainda não foram comprovados. Synthetic Monitoring não está validado como ativo; o alerta de health externo depende dele. SLO e retenção também permanecem pendentes.
+As regras em `monitoring/alerts/agora-alerts.yml` cobrem API down, banco down, falhas no health externo, HTTP 5xx acima de 5%, CPU do host acima de 90% e disco acima de 85%; não há regra versionada para memória do processo Node. O alerta operacional de indisponibilidade da API foi validado no Grafana Cloud em 05/10/2026, conforme o registro abaixo. O disparo e a entrega dos demais alertas permanecem sem comprovação. Synthetic Monitoring não está validado como ativo; o alerta de health externo depende dele.
+
+### Alerta operacional validado em 05/10/2026
+
+| Configuração | Valor validado |
+|---|---|
+| Nome | `Agora API unavailable` |
+| Condição | `IS BELOW 1` |
+| Evaluation interval | `1m` |
+| Pending period | `1m` |
+| Contact point | `agora-production-email` |
+
+Query PromQL:
+
+```promql
+last_over_time(up{job="prometheus.scrape.agora_api"}[5m])
+```
+
+O teste operacional foi controlado: `agora-api.service` foi interrompido temporariamente, o alerta passou de `Normal -> Pending` e depois de `Pending -> Alerting`, e uma notificação `Firing` foi gerada. O Grafana registrou `Delivery outcome: Delivered successfully` para a entrega ao contact point configurado.
+
+O serviço foi restaurado, a produção foi restabelecida, o alerta passou de `Alerting -> Normal` e uma notificação `Resolved` foi gerada. O teste comprova o ciclo operacional de indisponibilidade e recuperação da API e a entrega registrada pelo Grafana.
+
+## SLO e retenção
+
+O SLO de disponibilidade foi validado em produção em 05/10/2026:
+
+| Configuração / indicador | Valor validado |
+|---|---|
+| Nome | `Agora API availability` |
+| Target | 99% |
+| Janela | 28 dias |
+| SLI | Baseado na métrica Prometheus `up` |
+| `team_name` | `agora-tech-park` |
+| `service_name` | `agora-api` |
+| `environment` | `production` |
+| 28d SLI observado | 100.0% |
+| Remaining error budget | 100% |
+
+Os indicadores acima representam os valores observados nessa validação. A janela configurada do SLO é de 28 dias; a retenção validada no Grafana Cloud Free é de 14 dias para métricas Prometheus e 14 dias para logs Loki. Esses períodos são distintos, e o valor observado do SLI não comprova, por si só, 28 dias completos de histórico retido.
 
 ## Validação operacional
 
@@ -129,8 +167,7 @@ A causa foi o uso inicial do UUID/ID administrativo do token em vez da credencia
 ## Pendências
 
 - importar e validar os quatro dashboards específicos de API, aplicação, infraestrutura e PostgreSQL; o dashboard consolidado de produção já foi homologado em 23/09/2026;
-- provocar alertas de forma controlada e confirmar o recebimento;
+- provocar os demais alertas de forma controlada e confirmar sua entrega; o alerta `Agora API unavailable` e sua entrega já foram validados em 05/10/2026;
 - configurar e validar Synthetic Monitoring, se exigido;
-- definir SLO;
-- confirmar retenção, plano, limites e política definitiva de custos do Grafana Cloud;
-- validar no Grafana as demais séries operacionais ainda não observadas, incluindo disco, host, tamanho do banco e métricas de aplicação; não foram executados testes reais de indisponibilidade da API, falha do PostgreSQL ou resposta HTTP 5xx.
+- acompanhar limites e política definitiva de custos do Grafana Cloud; SLO e retenção do plano Free já foram validados em 05/10/2026;
+- validar no Grafana as demais séries operacionais ainda não observadas, incluindo disco, host, tamanho do banco e métricas de aplicação; o teste controlado de indisponibilidade e recuperação da API foi executado em 05/10/2026, mas falha do PostgreSQL e resposta HTTP 5xx ainda não foram testadas.

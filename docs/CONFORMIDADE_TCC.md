@@ -15,7 +15,9 @@ Baseline tÃ©cnica de 04/09/2026, com evidÃªncias de CI/CD e produÃ§Ã£o a
 
 > Nota de vigência: este documento inclui evidências históricas e registros de conformidade anteriores. A arquitetura ativa de produção é EC2 Ubuntu 24.04 + Caddy + backend Node.js/Express + PostgreSQL 16 + GitHub Actions + OIDC + Systems Manager. Qualquer menção ao Amplify em CD Production #48 ou em evidências antigas é histórica e não representa a produção atual. O caso de segurança SEC-01 / Issue #37 permanece pendente exclusivamente quanto à confirmação do GitHub Support sobre refs/caches/objetos server-side, e a documentação não declara LGPD concluída.
 
-**Decisão atual: PARCIAL — produção funcional e tecnicamente validada, com pendências de segurança/LGPD, operação e entrega acadêmica/documental.** CI pós-merge #106 e CD Production #117 passaram; deploy, backend e frontend estão funcionando, a API e o health são públicos via HTTPS, PostgreSQL e e-mail foram validados, e o Quality Gate passou. Isso não representa aprovação final: a sanitização local já foi validada; entretanto, a confirmação do GitHub Support sobre refs/caches/objetos server-side na SEC-01 permanece pendente, e também restam pendências humanas/acadêmicas. O dashboard consolidado foi homologado em 23/09/2026; os quatro dashboards específicos, alertas, SLO e retenção continuam parciais ou pendentes. Backup e restauração de EBS foram posteriormente validados por meio do AWS Backup.
+**Decisão atual: PARCIAL — produção funcional e tecnicamente validada, com pendências de segurança/LGPD, operação e entrega acadêmica/documental.** CI pós-merge #106 e CD Production #117 passaram; deploy, backend e frontend estão funcionando, a API e o health são públicos via HTTPS, PostgreSQL e e-mail foram validados, e o Quality Gate passou. Isso não representa aprovação final: a sanitização local já foi validada; entretanto, a confirmação do GitHub Support sobre refs/caches/objetos server-side na SEC-01 permanece pendente, e também restam pendências humanas/acadêmicas. O dashboard consolidado foi homologado em 23/09/2026; em 05/10/2026, na Issue #57, foram validados o alerta de indisponibilidade da API, a entrega da notificação, o SLO e a retenção. Na observabilidade, permanecem pendentes somente os quatro dashboards específicos, demais séries operacionais não observadas e demais alertas sem teste comprovado. Backup e restauração de EBS foram posteriormente validados por meio do AWS Backup.
+
+Em 05/10/2026, o fechamento técnico da Issue #57 validou a observabilidade de produção com Grafana Cloud, Grafana Alloy, Prometheus e Loki, métricas e logs recebidos, alerta de indisponibilidade da API, entrega de notificação, SLO e retenção. Essa validação atualiza as pendências operacionais de observabilidade citadas acima; os quatro dashboards específicos e demais séries e alertas sem teste continuam pendentes.
 
 O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produção atual, sem reintrodução do Amplify. Nenhuma mudança arquitetural foi aplicada nesta baseline além da consolidação documental.
 
@@ -58,13 +60,15 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | PROD/STAGING separado | 🟡 PARCIAL | Produção validada em AWS EC2/Caddy com configuração distinta do DEV | Ambiente STAGING não foi comprovado | Documentar produção e decidir/validar staging conforme o critério acadêmico |
 | Deploy público em nuvem | ✅ IMPLEMENTADO E VALIDADO | Atualmente frontend e backend são publicados conjuntamente na AWS EC2/Caddy; como evidência histórica, o CD Production #48 implantou backend via Systems Manager e frontend no AWS Amplify e concluiu smoke tests | A evidência histórica do #48 não representa disponibilidade contínua futura | Manter a URL pública atual documentada e preservar validação pós-deploy |
 | HTTPS pÃºblico | âœ… IMPLEMENTADO E VALIDADO | `caddy.service` ativo e habilitado; Caddy serve `https://agora-techpark.duckdns.org/api` e `/api/health` por HTTPS; endpoint respondeu HTTP 200 | Nenhuma lacuna observada na validaÃ§Ã£o informada | Monitorar certificado e disponibilidade |
-| Observabilidade | ðŸŸ  PARCIAL | Em 18/09/2026, Alloy 1.19.2 ativo e habilitado na EC2, com ingestão Prometheus/Loki comprovada; em 23/09/2026, dashboard consolidado homologado com mÃ©tricas reais da API e PostgreSQL e logs centralizados | Quatro dashboards específicos, disparo/recebimento de alertas, SLO e retenÃ§Ã£o nÃ£o foram validados | Validar os itens operacionais restantes sem presumir testes de falha |
+| Observabilidade | ✅ IMPLEMENTADO E VALIDADO no escopo da Issue #57 | Ingestão Prometheus/Loki via Alloy comprovada em 18/09/2026; dashboard consolidado homologado em 23/09/2026; métricas e logs chegando ao Grafana Cloud, alerta da API, entrega de notificação, SLO e retenção validados em 05/10/2026 | Quatro dashboards específicos e demais séries e alertas não foram validados integralmente | Preservar as evidências e validar separadamente os itens complementares |
 | Grafana Cloud recebendo dados | âœ… IMPLEMENTADO E VALIDADO | Em 18/09/2026, Explore exibiu CPU do processo via Prometheus e logs da API via Loki; em 23/09/2026, os datasources `grafanacloud-bluegerbil2886-prom` e `grafanacloud-bluegerbil2886-logs` exibiram dados reais no dashboard consolidado | Nenhuma lacuna de ingestÃ£o observada nessas validações; alertas sÃ£o avaliados separadamente | Preservar evidÃªncias sem expor credenciais e monitorar continuidade da ingestÃ£o |
 | Logs estruturados e redaction | âœ… IMPLEMENTADO E VALIDADO | Pino em journald; Alloy filtra somente `agora-api.service`; Loki recebeu JSON com `application="agora-tech-park"`, `environment="production"`, `service="agora-api"` e redaction `[REDACTED]` | A validaÃ§Ã£o comprova o fluxo e uma ocorrÃªncia de redaction, nÃ£o todas as variaÃ§Ãµes possÃ­veis de dados sensÃ­veis | Manter testes de regressÃ£o da redaction e o filtro da unit |
 | MÃ©tricas HTTP/latÃªncia/erros | ðŸŸ  PARCIAL | Em 23/09/2026, dashboard exibiu requests por minuto e latÃªncia média/p95 reais; painel de 5xx exibiu `0 req/s` corretamente na ausência de erros | Nenhum erro HTTP 5xx real foi provocado ou observado nesta homologação | Validar cenário real de 5xx separadamente, se exigido |
 | MÃ©tricas CPU/memÃ³ria/disco | ðŸŸ  PARCIAL | CPU do processo Node já observada no Explore em 18/09/2026; painéis e telemetria de CPU e memória RSS do processo validados no dashboard em 23/09/2026 | Disco e alerta explÃ­cito de RAM nÃ£o foram comprovados | Validar disco e regras ainda ausentes separadamente |
 | Health/liveness/readiness | âœ… IMPLEMENTADO E VALIDADO | `/api/health`, `/live`, `/ready`; readiness retorna 503 quando o banco crÃ­tico falha; health local e `https://agora-techpark.duckdns.org/api/health` retornaram 200; smoke de produÃ§Ã£o passou | Nenhuma lacuna funcional observada nos checks executados | Manter monitoramento e smoke pÃ³s-deploy |
-| Alertas operacionais | ðŸŸ  PARCIAL | Regras versionadas para API, banco, sintÃ©tico, 5xx, CPU de host e disco; backend remoto de mÃ©tricas validado | Faltam evidÃªncias de disparo/recebimento e alerta explÃ­cito de RAM do processo Node/latÃªncia/e-mail | Validar regras e entrega das notificaÃ§Ãµes |
+| Alertas operacionais | ✅ IMPLEMENTADO E VALIDADO para indisponibilidade da API (Issue #57) | `Agora API unavailable` testado em 05/10/2026: `Normal -> Pending -> Alerting`, notificação `Firing` e `Delivery outcome: Delivered successfully` no contact point `agora-production-email`; após restauração, `Alerting -> Normal` e notificação `Resolved` | Demais regras versionadas para banco, sintético, 5xx, CPU e disco sem teste comprovado; RAM do processo Node, latência e e-mail continuam incompletos ou sem validação | Manter o alerta validado e testar separadamente as demais regras |
+| SLO de disponibilidade | ✅ IMPLEMENTADO E VALIDADO | `Agora API availability`, target 99%, janela de 28 dias, SLI baseado em `up`; em 05/10/2026, 28d SLI observado de 100.0% e Remaining error budget de 100% | A janela configurada do SLO não comprova 28 dias completos de histórico retido | Acompanhar SLI e orçamento de erro |
+| Retenção de observabilidade | ✅ IMPLEMENTADO E VALIDADO | Grafana Cloud Free: métricas Prometheus e logs Loki com retenção de 14 dias, validada em 05/10/2026 | Retenção de 14 dias distinta da janela de 28 dias do SLO | Acompanhar retenção e limites do plano |
 | Backup e recuperação | ✅ IMPLEMENTADO E VALIDADO | Dumps PostgreSQL locais existem em `/opt/agora/backups`; AWS Backup protege o EBS de produção diariamente com retenção de 14 dias; backup on-demand e restauração para novo volume EBS foram concluídos com sucesso | O restore validado foi de EBS; não foi executado restore lógico de `pg_dump` e não se declara o snapshot como application-consistent | Manter o plano AWS Backup e testar periodicamente a recuperabilidade; restore lógico pode ser validado como evidência complementar |
 | Smoke tests | âœ… IMPLEMENTADO E VALIDADO | No CD #48, `scripts/smoke-test.mjs` validou HTTP 200 do health, status `ok`/`degraded`, banco `up`, HTTP 200 do frontend apÃ³s redirects e HTML com `<!doctype html>` | NÃ£o hÃ¡ evidÃªncia de que `SMOKE_EMAIL` e `SMOKE_PASSWORD` estavam presentes no #48; sem ambos, o script ignora o login. O script nÃ£o testa CORS | Registrar se o login foi executado e adicionar check de CORS se exigido |
 | SeguranÃ§a de aplicaÃ§Ã£o | ðŸŸ  PARCIAL | Helmet, CORS, JWT, rate limit, Zod, queries parametrizadas e auditoria de dependÃªncias High/Critical aprovada no CI #43 | NÃ£o hÃ¡ evidÃªncia de varredura completa de supply chain, dados e produÃ§Ã£o | Ampliar testes de abuso e configuraÃ§Ã£o |
@@ -121,7 +125,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Backup | AWS Backup configurado para o EBS de produção, com execução diária e retenção de 14 dias; backup on-demand e restore para volume EBS isolado validados com sucesso |
 | HTTPS | `caddy.service` ativo e habilitado; API e health pÃºblicos servidos por HTTPS |
 | Email | Gmail SMTP via Nodemailer validado com `verify()`, envio real e health `email="up"` |
-| Observability | Alloy 1.19.2; `alloy.service` ativo e habilitado na EC2; remote write Prometheus e envio Loki validados em 18/09/2026; dashboard consolidado homologado em 23/09/2026; quatro dashboards específicos e disparo/recebimento de alertas permanecem pendentes |
+| Observability | Alloy 1.19.2; `alloy.service` ativo e habilitado na EC2; remote write Prometheus e envio Loki validados em 18/09/2026; dashboard consolidado homologado em 23/09/2026; em 05/10/2026, métricas e logs chegando ao Grafana Cloud, alerta da API e entrega de notificação, SLO e retenção validados; produção restaurada após teste controlado; quatro dashboards específicos e demais alertas continuam sem validação final |
 
 Separação DEV/PROD: **IMPLEMENTADA E VALIDADA para os ambientes comprovados**. DEV/test usam provider mock controlado sem SMTP externo, enquanto a produção usa AWS EC2/Caddy, PostgreSQL 16 e Gmail SMTP. O ambiente STAGING e a validação integrada atual do DEV não foram comprovados; por isso, o requisito agregado de ambientes permanece parcial.
 
@@ -173,7 +177,11 @@ Os valores quantitativos acima foram obtidos na baseline com timeout diagnÃ³st
 | Logs | Consulta `{service="agora-api"}` validada; em 23/09/2026, painel mostrou logs Pino estruturados reais no Loki, inclusive registros com `level` 30, sem reproduzir conteúdo dos logs |
 | PostgreSQL exporter | ConexÃ£o estabelecida com PostgreSQL 16.15.0; usuÃ¡rio dedicado de observabilidade com `pg_monitor`, sem privilÃ©gios administrativos da aplicaÃ§Ã£o |
 | API / Application / Infrastructure / PostgreSQL | Dashboard consolidado operacional com mÃ©tricas reais da API e PostgreSQL e logs da aplicaÃ§Ã£o; quatro dashboards específicos e demais sÃ©ries de infraestrutura nÃ£o foram validados integralmente |
-| Alertas mÃ­nimos | API down, database down, HTTP 5xx, CPU e disco configurados; sem evidÃªncia de disparo/recebimento |
+| Alertas mínimos | ✅ VALIDADO em 05/10/2026: `Agora API unavailable`; query `last_over_time(up{job="prometheus.scrape.agora_api"}[5m])`, condição `IS BELOW 1`, evaluation interval `1m`, pending period `1m`, contact point `agora-production-email`; demais alertas de banco, HTTP 5xx, CPU e disco sem teste comprovado |
+| Entrega de notificação | ✅ VALIDADA: notificação `Firing` gerada e Grafana registrou `Delivery outcome: Delivered successfully`; após recuperação, notificação `Resolved` gerada |
+| Teste operacional controlado | ✅ VALIDADO: interrupção temporária de `agora-api.service`, `Normal -> Pending -> Alerting`; serviço e produção restaurados, `Alerting -> Normal` |
+| SLO | ✅ VALIDADO: `Agora API availability`, target 99%, janela 28 dias, SLI baseado na métrica Prometheus `up`; labels `team_name=agora-tech-park`, `service_name=agora-api`, `environment=production`; 28d SLI observado 100.0% e Remaining error budget 100% em 05/10/2026 |
+| Retenção | ✅ VALIDADA no Grafana Cloud Free: métricas Prometheus 14 dias e logs Loki 14 dias; a janela do SLO é distinta da retenção, e o SLI observado não comprova 28 dias completos de histórico retido |
 | Alertas adicionais | RAM, latÃªncia e falhas de e-mail incompletos ou sem validaÃ§Ã£o |
 
 Arquitetura validada em 18/09/2026: Node/Express `/metrics` â†’ Grafana Alloy â†’ Grafana Cloud Prometheus; Pino/journald â†’ Grafana Alloy â†’ Grafana Cloud Loki; PostgreSQL exporter â†’ Grafana Alloy â†’ Grafana Cloud Prometheus.
@@ -221,7 +229,10 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | PostgreSQL persistente | PostgreSQL 16 ativo e habilitado na EC2; integraÃ§Ã£o CI e exporter validados | âœ… ATENDIDO |
 | Sonar | Job SonarQube Cloud passou no CI #43 | âœ… ATENDIDO |
 | Quality Gate | ExecuÃ§Ã£o PASS no CI #43 | âœ… ATENDIDO |
-| Observabilidade | Dashboard consolidado homologado em 23/09/2026 com Prometheus, Loki, métricas da API/PostgreSQL e logs centralizados; alertas sem disparo/recebimento comprovado | PARCIAL |
+| Observabilidade | Dashboard consolidado homologado em 23/09/2026; Grafana Cloud, Alloy, Prometheus e Loki com métricas e logs recebidos, alerta da API e entrega de notificação, SLO e retenção validados em 05/10/2026 (Issue #57); itens complementares permanecem registrados separadamente | ✅ ATENDIDO no escopo da Issue #57 |
+| Alertas e entrega de notificação | `Agora API unavailable`: teste controlado com `Firing`, entrega registrada como `Delivered successfully`, recuperação e `Resolved`; produção restaurada | ✅ ATENDIDO para indisponibilidade da API |
+| SLO | `Agora API availability`: target 99%, janela 28 dias, SLI `up`, 28d SLI observado 100.0% e orçamento restante 100% | ✅ ATENDIDO |
+| Retenção de observabilidade | Grafana Cloud Free: Prometheus 14 dias e Loki 14 dias | ✅ ATENDIDO |
 | Grafana | `Agora Tech Park - Production Overview` importado e homologado no Grafana Cloud em 23/09/2026; quatro dashboards específicos sem validação final | PARCIAL |
 | Logs | Pino/journald â†’ Alloy â†’ Loki validado, com JSON, labels e redaction observados | âœ… ATENDIDO |
 | MÃ©tricas | Requests, latência, CPU/memória RSS do processo e PostgreSQL observados no dashboard em 23/09/2026; demais sÃ©ries operacionais nÃ£o comprovadas | PARCIAL |
@@ -269,14 +280,17 @@ Coverage frontend: comando oficial passou com thresholds superiores a 25%
 Grafana: dashboard consolidado homologado em 23/09/2026 com Prometheus e Loki; quatro dashboards específicos sem validação final
 Logs: fluxo de produÃ§Ã£o validado ponta a ponta, com estrutura JSON e redaction observadas
 Metrics: requests, latência, CPU/memória RSS do processo e PostgreSQL observados; demais sÃ©ries operacionais permanecem parciais
-Alerts: configuraÃ§Ã£o parcial, sem evidÃªncia de disparo/recebimento
+Alerts: `Agora API unavailable` validado em 05/10/2026, com `Firing`, entrega registrada como `Delivered successfully`, recuperação e `Resolved`; demais alertas sem teste comprovado
+SLO: `Agora API availability` validado, target 99%, janela 28 dias, SLI baseado em `up`, 28d SLI observado 100.0% e Remaining error budget 100%
+Retenção: validada no Grafana Cloud Free, Prometheus 14 dias e Loki 14 dias
+Teste operacional: controlado, com interrupção temporária de `agora-api.service`; serviço e produção restaurados
 
 ### DevOps e infraestrutura
 
 CI/CD: atendido nas execuÃ§Ãµes #43/#48
 Ambientes: parcial
 Deploy: atendido tecnicamente
-Observabilidade: parcial
+Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards específicos, demais séries e alertas complementares permanecem sem validação integral
 
 ### Resultado geral
 
@@ -287,7 +301,7 @@ Observabilidade: parcial
 - Confirmar a natureza dos dados e executar, mediante autorizaÃ§Ãµes separadas, a limpeza local e a publicaÃ§Ã£o do histÃ³rico sanitizado conforme `docs/SECURITY_DATA_REMOVAL.md`.
 - Comprovar a meta acadÃªmica de 75% de coverage backend com o relatÃ³rio atual.
 - Registrar a URL pÃºblica do frontend e manter as evidÃªncias de CI #43, CD #48, Sonar e Quality Gate.
-- Validar os quatro dashboards específicos e sÃ©ries operacionais ainda nÃ£o observadas, além de disparo/recebimento de alertas, SLO e retenÃ§Ã£o; o dashboard consolidado e a ingestÃ£o de mÃ©tricas e logs de produÃ§Ã£o jÃ¡ foram comprovados.
+- Validar os quatro dashboards específicos, séries operacionais ainda não observadas e os demais alertas; o dashboard consolidado, a ingestão de métricas e logs, o alerta de indisponibilidade da API e sua entrega, o SLO e a retenção já foram comprovados no escopo da Issue #57.
 - Atualizar URLs e trade-offs conforme o sistema real.
 - Cumprir orientaÃ§Ãµes, prova de autoria, pÃ´ster/QR e participaÃ§Ã£o no Demo Day.
 

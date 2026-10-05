@@ -1,5 +1,19 @@
 # CHECKPOINT — REMOÇÃO DE DADOS
 
+## Validação técnica de 05/10/2026 — Issue #37 / SEC-01
+
+- **Arquivo sensível:** `frontend/imgs/Locatários Perini Business 2026.xlsx`.
+- **Introdução:** commit `55faede`, mensagem "Tela de importar planilha de residentes no frontend".
+- **Remoção da árvore atual:** commit `7af0840`, mensagem "chore: align AWS production architecture and CI validation".
+- **Main atual: saneada quanto ao arquivo alvo.** A árvore atual de `origin/main` não contém mais o arquivo; isso não comprova a sanitização de todas as refs históricas.
+- **Blob histórico identificado:** `54b236f1796d100c64259e54bfff3d43854005b5`.
+- **Refs históricas de PR:** a auditoria de refs remotas confirmou que `55faede` continua alcançável, incluindo `refs/pull/8/head` até `refs/pull/29/head`.
+- **SEC-01: pendente.** Essas refs de Pull Request são mantidas server-side pelo GitHub e exigem avaliação/purge pelo GitHub Support. O encerramento depende de confirmação/remoção server-side pelo Support; a sanitização LGPD não está concluída.
+
+Este registro prevalece quanto ao estado atual. Os SHAs, inventários, estados locais e autorizações abaixo referem-se aos checkpoints de setembro e são preservados como histórico, sem comprovar o encerramento atual. Nenhum conteúdo da planilha ou dado pessoal é reproduzido nesta validação.
+
+## Registro histórico do checkpoint de setembro
+
 Revalidado em 10/09/2026. **PARADO, aguardando `APROVADO PARA LIMPEZA DO HISTÓRICO`.**
 Nesta execução, nenhum rewrite, commit, push, reset ou alteração remota foi executado.
 

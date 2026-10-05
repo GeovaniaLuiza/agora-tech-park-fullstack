@@ -4,7 +4,19 @@
 
 Em 04/09/2026, a auditoria identificou padrões compatíveis com e-mail e CPF/CNPJ no arquivo operacional `frontend/imgs/Locatários Perini Business 2026.xlsx`. O conteúdo não foi reproduzido nos relatórios.
 
-O arquivo foi removido da árvore de trabalho e seu padrão foi incluído no `.gitignore`. Ele continua recuperável no commit `55faede` e no objeto Git `54b236f1796d100c64259e54bfff3d43854005b5` até que o histórico remoto seja reescrito.
+O arquivo foi removido da árvore de trabalho e seu padrão foi incluído no `.gitignore`. Ele continua recuperável no commit `55faede` e no objeto Git `54b236f1796d100c64259e54bfff3d43854005b5` pelas refs históricas de PR identificadas na validação de 05/10/2026; a pendência server-side exige avaliação/purge pelo GitHub Support.
+
+## Validação técnica de 05/10/2026 — Issue #37 / SEC-01
+
+- **Arquivo sensível:** `frontend/imgs/Locatários Perini Business 2026.xlsx`.
+- **Introdução:** commit `55faede`, mensagem "Tela de importar planilha de residentes no frontend".
+- **Remoção da árvore atual:** commit `7af0840`, mensagem "chore: align AWS production architecture and CI validation".
+- **Main atual: saneada quanto ao arquivo alvo.** A árvore atual de `origin/main` não contém mais o arquivo; isso não comprova a sanitização de todas as refs históricas.
+- **Blob histórico identificado:** `54b236f1796d100c64259e54bfff3d43854005b5`.
+- **Refs históricas de PR:** a auditoria de refs remotas confirmou que `55faede` continua alcançável, incluindo `refs/pull/8/head` até `refs/pull/29/head`.
+- **SEC-01: pendente.** Essas refs de Pull Request são mantidas server-side pelo GitHub e exigem avaliação/purge pelo GitHub Support. O encerramento depende de confirmação/remoção server-side pelo Support; a sanitização LGPD não está concluída.
+
+Este registro atualiza o estado do incidente e prevalece sobre descrições anteriores do estado atual. Os checkpoints e procedimentos de setembro permanecem como histórico. Nenhum conteúdo da planilha ou dado pessoal é reproduzido nesta validação.
 
 ## Impacto
 

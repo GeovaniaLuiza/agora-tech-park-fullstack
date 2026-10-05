@@ -57,7 +57,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | InstalaÃ§Ã£o limpa frontend | âœ… IMPLEMENTADO E VALIDADO | `npm ci --prefix frontend`, testes, coverage e build passaram no CI #43 | Nenhuma falha de instalaÃ§Ã£o observada nessa execuÃ§Ã£o | Manter lockfile consistente |
 | Lint local | âœ… IMPLEMENTADO E VALIDADO | `npm run lint` concluiu localmente e no job `Lint and dependency audit` do CI #43 | Nenhuma lacuna observada nesta etapa | Manter o gate no CI |
 | Testes unitÃ¡rios backend | âœ… IMPLEMENTADO E VALIDADO | 163 testes unitÃ¡rios aprovados; job `Backend unit tests` passou no CI #43 | NÃ£o substituem a meta acadÃªmica de coverage | Preservar e ampliar suÃ­te |
-| Cobertura backend â‰¥ 75% | ðŸŸ  PARCIAL | `npm run test:coverage --prefix backend` passou no CI #43 nos thresholds tÃ©cnicos configurados | NÃ£o foram fornecidos percentuais atuais que comprovem a meta acadÃªmica de 75% | Registrar o relatÃ³rio atual e elevar/comprovar a meta acadÃªmica |
+| Cobertura backend ≥ 75% | ✅ IMPLEMENTADO E VALIDADO | `npm run test:coverage --prefix backend`, validado localmente em 05/10/2026: 45 arquivos e 357 testes aprovados; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04% | Nenhuma lacuna no threshold exigido de 75% nas quatro métricas | Preservar o threshold e as evidências de cobertura |
 | Testes unitÃ¡rios frontend | âœ… IMPLEMENTADO E VALIDADO | Job `Frontend tests and build` passou no CI #43, incluindo o comando oficial de coverage | Quantidade atual de testes nÃ£o registrada nesta matriz | Registrar a contagem atual nas evidÃªncias |
 | Cobertura frontend â‰¥ 25% | âœ… IMPLEMENTADO E VALIDADO | O comando oficial `npm run test:coverage --prefix frontend` passou no CI #43 com thresholds configurados acima de 25% | Percentuais exatos da execuÃ§Ã£o #43 nÃ£o foram registrados nesta matriz | Anexar o relatÃ³rio atual como evidÃªncia quantitativa |
 | TDD verificÃ¡vel | ðŸŸ  PARCIAL | Existem testes de domÃ­nio, rotas e pÃ¡ginas | O histÃ³rico disponÃ­vel nÃ£o demonstra de forma suficiente ciclos teste-primeiro | Registrar prÃ³ximos incrementos com teste falhando â†’ implementaÃ§Ã£o â†’ refatoraÃ§Ã£o |
@@ -105,7 +105,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Lint | Sim | Sim â€” CI #43 |
 | Testes backend | Sim | Sim â€” 163 testes no CI #43 |
 | Testes frontend | Sim | Sim â€” CI #43 |
-| Coverage | Sim | Sim nos thresholds tÃ©cnicos; meta acadÃªmica backend de 75% nÃ£o comprovada |
+| Coverage | Sim | Sim — CI #43 como evidência histórica; backend validado localmente em 05/10/2026 com 75% atendidos nas quatro métricas |
 | Audit | Sim | Sim â€” critÃ©rio High/Critical no CI #43 |
 | Build | Sim | Sim â€” artefato validado no CI #43 e implantado pelo CD #48 |
 | Sonar | Sim | Sim â€” CI #43 |
@@ -156,14 +156,14 @@ A API, o health e o frontend atuais usam a mesma origem pública `https://agora-
 
 ### Backend
 
-| MÃ©trica | Resultado da baseline de 04/09/2026 | Threshold tÃ©cnico | Meta acadÃªmica |
+| Métrica | Resultado local de 05/10/2026 | Threshold exigido | Status |
 |---|---:|---:|---:|
-| Statements | 47,68% | 45% | 75% |
-| Branches | 39,92% | 40% | 75% nÃ£o confirmado por mÃ©trica |
-| Functions | 39,32% | 30% | 75% nÃ£o confirmado por mÃ©trica |
-| Lines | 53,62% | 50% | 75% |
+| Statements | 79.38% | 75% | APROVADO |
+| Branches | 75.83% | 75% | APROVADO |
+| Functions | 76.00% | 75% | APROVADO |
+| Lines | 84.04% | 75% | APROVADO |
 
-Os percentuais acima sÃ£o histÃ³ricos da baseline de 04/09/2026. O comando oficial de coverage backend passou no CI #43 nos thresholds tÃ©cnicos atuais, mas os percentuais dessa execuÃ§Ã£o nÃ£o foram fornecidos. Como o Playbook nÃ£o define qual mÃ©trica representa isoladamente os 75%, nenhuma interpretaÃ§Ã£o favorÃ¡vel Ã© presumida. **Status acadÃªmico: NÃƒO CONFIRMADO â€” PENDÃŠNCIA ACADÃŠMICA DE COVERAGE.**
+Validação final local em 05/10/2026 com `npm run test:coverage --prefix backend`: **Test Files: 45 passed; Tests: 357 passed**. O threshold atual exigido é 75% em Statements, Branches, Functions e Lines, atendido nas quatro métricas. `repository-postgres-lot6.test.js`: 8 testes aprovados com PostgreSQL real. Migrations: sem pendências na validação local. Esta evidência supera a baseline de cobertura backend de 04/09/2026 e não representa uma nova execução de CI ou Sonar. **Status acadêmico: ATENDIDO quanto à cobertura backend.**
 
 ### Frontend
 
@@ -251,7 +251,7 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | Health Check | HTTP 200 local e em `https://agora-techpark.duckdns.org/api/health`; smoke #48 e Loki confirmaram o fluxo | âœ… ATENDIDO |
 | Backup | `pg_dump` local existente e AWS Backup diário do EBS de produção com retenção de 14 dias; backup on-demand e restore para novo volume EBS concluídos com sucesso | ✅ ATENDIDO |
 | Segurança e LGPD | Controles de aplicação presentes; em 05/10/2026, main saneada quanto ao arquivo alvo, removido em `7af0840`; refs históricas de PR ainda alcançam `55faede`; SEC-01 pendente de confirmação/remoção server-side pelo GitHub Support | NÃO ATENDIDO |
-| Backend coverage acadÃªmico | Comando tÃ©cnico passou no CI #43; percentuais atuais nÃ£o comprovam 75% | PARCIAL |
+| Backend coverage acadêmico | Validação local em 05/10/2026: 45 arquivos e 357 testes aprovados; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04%; threshold de 75% nas quatro métricas atendido | ✅ ATENDIDO |
 | Frontend coverage acadÃªmico | Comando oficial passou no CI #43 com thresholds superiores a 25% | âœ… ATENDIDO |
 
 ## Conformidade â€” requisitos de entrega
@@ -284,7 +284,7 @@ STAGING: `NÃƒO COMPROVADO`
 
 Quality Gate: `PASS` no CI #43
 Critical/High: `check-sonar-quality.mjs` passou no CI #43 sem issues abertas nos filtros legados `BLOCKER,CRITICAL` e MQR `BLOCKER,HIGH`; o audit de dependÃªncias High/Critical tambÃ©m passou
-Coverage backend: gate tÃ©cnico passou; meta acadÃªmica de 75% nÃ£o comprovada
+Coverage backend: validado localmente em 05/10/2026; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04%; threshold de 75% atendido nas quatro métricas (evidência local, sem nova validação Sonar)
 Coverage frontend: comando oficial passou com thresholds superiores a 25%
 
 ### Observabilidade
@@ -311,7 +311,6 @@ Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards espec
 ### PendÃªncias reais
 
 - Issue #37 / SEC-01: solicitar avaliação/purge das refs históricas de PR pelo GitHub Support e aguardar confirmação/remoção server-side. A árvore atual de `origin/main` está saneada quanto ao arquivo alvo; a sanitização LGPD permanece pendente, conforme `docs/SECURITY_DATA_REMOVAL.md`.
-- Comprovar a meta acadÃªmica de 75% de coverage backend com o relatÃ³rio atual.
 - Registrar a URL pÃºblica do frontend e manter as evidÃªncias de CI #43, CD #48, Sonar e Quality Gate.
 - Validar os quatro dashboards específicos, séries operacionais ainda não observadas e os demais alertas; o dashboard consolidado, a ingestão de métricas e logs, o alerta de indisponibilidade da API e sua entrega, o SLO e a retenção já foram comprovados no escopo da Issue #57.
 - Atualizar URLs e trade-offs conforme o sistema real.
@@ -326,14 +325,14 @@ Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards espec
 | `npm ci --prefix frontend` | **PASS** â€” CI #43 |
 | `npm run lint` | **PASS** â€” CI #43 |
 | Testes backend | **PASS** â€” 163 testes no CI #43 |
-| Cobertura backend | **PASS tÃ©cnico** no CI #43; meta acadÃªmica de 75% nÃ£o comprovada |
+| Cobertura backend | **PASS** local em 05/10/2026 — `npm run test:coverage --prefix backend`; 45 arquivos e 357 testes aprovados; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04%; threshold de 75% nas quatro métricas atendido |
 | Testes frontend | **PASS** â€” CI #43; contagem atual nÃ£o registrada nesta matriz |
 | Cobertura frontend padrÃ£o | **PASS** â€” CI #43 |
 | Cobertura frontend diagnÃ³stica (`--testTimeout=15000`) | EvidÃªncia histÃ³rica superada pelo **PASS** do comando oficial no CI #43 |
 | Build frontend | **PASS** â€” artefato validado no CI #43 e implantado no Amplify pelo CD #48 |
 | `npm audit --audit-level=high` | **PASS no critÃ©rio High/Critical** â€” CI #43 |
 | `docker compose config --quiet` | **PASS sintÃ¡tico** |
-| IntegraÃ§Ã£o/migrations local | **NÃƒO EXECUTADO** â€” Docker Engine indisponÃ­vel |
+| Integração/migrations local | **PASS** na validação local de 05/10/2026 — `repository-postgres-lot6.test.js`: 8 testes aprovados com PostgreSQL real; migrations sem pendências |
 | IntegraÃ§Ã£o PostgreSQL no CI | **PASS** â€” CI #43 |
 | CI remoto atual | **PASS** â€” CI #43 |
 | CD remoto atual | **PASS** â€” CD Production #48 |

@@ -1,6 +1,19 @@
 # Qualidade, testes e Sonar
 
-## Estado de referência
+## Validação final da cobertura backend — 05/10/2026
+
+Evidência validada localmente em 05/10/2026 com `npm run test:coverage --prefix backend`: **Test Files: 45 passed; Tests: 357 passed**.
+
+| Métrica | Resultado | Threshold exigido | Status |
+| --- | ---: | ---: | --- |
+| Statements | 79.38% | 75% | APROVADO |
+| Branches | 75.83% | 75% | APROVADO |
+| Functions | 76.00% | 75% | APROVADO |
+| Lines | 84.04% | 75% | APROVADO |
+
+As quatro métricas atendem ao threshold atual de 75%. `repository-postgres-lot6.test.js`: 8 testes aprovados com PostgreSQL real. Migrations: sem pendências na validação local.
+
+## Estado de referência histórico
 
 Em 12 de agosto de 2026, a suíte local validada possuía 86 testes backend e 70 testes frontend, além de um teste de integração PostgreSQL. A cobertura medida foi:
 
@@ -9,7 +22,7 @@ Em 12 de agosto de 2026, a suíte local validada possuía 86 testes backend e 70
 | backend | 47,31% | 46,42% | 34,92% | 53,89% |
 | frontend | 58,52% | 54,14% | 42,31% | 67,91% |
 
-Os thresholds de regressão ficam abaixo dessa medição (`backend: 45/40/30/50`; `frontend: 55/50/40/65`). A meta para código novo no Sonar é 80%, sem criar testes artificiais.
+A medição acima é histórica e foi superada, para o backend, pela validação de 05/10/2026. O threshold atual do backend é 75% em Statements, Branches, Functions e Lines; os thresholds de regressão frontend são `55/50/40/65`. A meta para código novo no Sonar é 80%, um critério separado da cobertura global do backend, sem criar testes artificiais.
 
 ## Estratégia
 

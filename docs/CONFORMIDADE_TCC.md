@@ -2,6 +2,18 @@
 
 Baseline tÃ©cnica de 04/09/2026, com evidÃªncias de CI/CD e produÃ§Ã£o atualizadas em 18/09/2026 e homologação do dashboard consolidado de observabilidade em 23/09/2026. Esta matriz registra o estado observado antes das correÃ§Ãµes e as validaÃ§Ãµes posteriores explicitamente identificadas. Ela nÃ£o Ã© evidÃªncia de aprovaÃ§Ã£o acadÃªmica nem substitui resultados do GitHub Actions, SonarCloud, provedor de nuvem ou Grafana.
 
+## Validação técnica de 05/10/2026 — Issue #37 / SEC-01
+
+- **Arquivo sensível:** `frontend/imgs/Locatários Perini Business 2026.xlsx`.
+- **Introdução:** commit `55faede`, mensagem "Tela de importar planilha de residentes no frontend".
+- **Remoção da árvore atual:** commit `7af0840`, mensagem "chore: align AWS production architecture and CI validation".
+- **Main atual: saneada quanto ao arquivo alvo.** A árvore atual de `origin/main` não contém mais o arquivo; isso não comprova a sanitização de todas as refs históricas.
+- **Blob histórico identificado:** `54b236f1796d100c64259e54bfff3d43854005b5`.
+- **Refs históricas de PR:** a auditoria de refs remotas confirmou que `55faede` continua alcançável, incluindo `refs/pull/8/head` até `refs/pull/29/head`.
+- **SEC-01: pendente.** Essas refs de Pull Request são mantidas server-side pelo GitHub e exigem avaliação/purge pelo GitHub Support. O encerramento depende de confirmação/remoção server-side pelo Support; a sanitização LGPD não está concluída.
+
+Este registro atualiza a evidência de segurança da matriz, preservando as demais validações e a baseline histórica. Nenhum conteúdo da planilha ou dado pessoal é reproduzido nesta validação.
+
 ## Legenda
 
 - âœ… **IMPLEMENTADO E VALIDADO** â€” existe e foi verificado por execuÃ§Ã£o ou consulta objetiva.
@@ -72,7 +84,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Backup e recuperação | ✅ IMPLEMENTADO E VALIDADO | Dumps PostgreSQL locais existem em `/opt/agora/backups`; AWS Backup protege o EBS de produção diariamente com retenção de 14 dias; backup on-demand e restauração para novo volume EBS foram concluídos com sucesso | O restore validado foi de EBS; não foi executado restore lógico de `pg_dump` e não se declara o snapshot como application-consistent | Manter o plano AWS Backup e testar periodicamente a recuperabilidade; restore lógico pode ser validado como evidência complementar |
 | Smoke tests | âœ… IMPLEMENTADO E VALIDADO | No CD #48, `scripts/smoke-test.mjs` validou HTTP 200 do health, status `ok`/`degraded`, banco `up`, HTTP 200 do frontend apÃ³s redirects e HTML com `<!doctype html>` | NÃ£o hÃ¡ evidÃªncia de que `SMOKE_EMAIL` e `SMOKE_PASSWORD` estavam presentes no #48; sem ambos, o script ignora o login. O script nÃ£o testa CORS | Registrar se o login foi executado e adicionar check de CORS se exigido |
 | SeguranÃ§a de aplicaÃ§Ã£o | ðŸŸ  PARCIAL | Helmet, CORS, JWT, rate limit, Zod, queries parametrizadas e auditoria de dependÃªncias High/Critical aprovada no CI #43 | NÃ£o hÃ¡ evidÃªncia de varredura completa de supply chain, dados e produÃ§Ã£o | Ampliar testes de abuso e configuraÃ§Ã£o |
-| Dados pessoais/LGPD no repositÃ³rio | ðŸ”´ AUSENTE / FALHANDO | O arquivo `frontend/imgs/LocatÃ¡rios Perini Business 2026.xlsx` foi removido da Ã¡rvore atual, mas continua no commit `55faede`; a inspeÃ§Ã£o OOXML contou 251 padrÃµes de e-mail e 467 de CPF/CNPJ | Potencial incidente permanece no histÃ³rico pÃºblico | Seguir `docs/SECURITY_DATA_REMOVAL.md`; reescrever e publicar o histÃ³rico somente em checkpoints autorizados |
+| Dados pessoais/LGPD no repositório | 🔴 AUSENTE / FALHANDO — SEC-01 pendente | Validação de 05/10/2026 (Issue #37): arquivo alvo removido em `7af0840`, ausente da árvore atual de `origin/main`; `55faede` ainda alcançável por refs históricas de PR, incluindo `refs/pull/8/head` até `refs/pull/29/head`; registro histórico da baseline: inspeção OOXML contou 251 padrões de e-mail e 467 de CPF/CNPJ | Main saneada quanto ao arquivo alvo; sanitização LGPD não concluída | Solicitar avaliação/purge e aguardar confirmação/remoção server-side pelo GitHub Support conforme `docs/SECURITY_DATA_REMOVAL.md` |
 | Metadados pessoais em artefatos | ðŸŸ  PARCIAL | Duas planilhas tÃªm propriedades `creator`/`lastModifiedBy`; DOCX sem esses campos detectados | Metadados podem identificar autores/mÃ¡quinas | Sanitizar cÃ³pias destinadas Ã  publicaÃ§Ã£o e verificar novamente |
 | E-mail transacional | âœ… IMPLEMENTADO E VALIDADO | Gmail SMTP via Nodemailer validado em produÃ§Ã£o; `nodemailer.verify()` e envio real passaram; health reporta `email="up"`; DEV/test usam provider mock sem SMTP externo | Nenhuma lacuna funcional observada na validaÃ§Ã£o informada | Monitorar entrega e manter secrets fora dos logs |
 | Secrets fora do cÃ³digo | ðŸŸ¡ IMPLEMENTADO, PENDENTE DE VALIDAÃ‡ÃƒO | `.gitignore`, `.env.example`, validaÃ§Ã£o de ambiente; nenhum `.env` real rastreado na Ã¡rvore atual | Secrets remotos nÃ£o sÃ£o consultÃ¡veis; arquivos binÃ¡rios exigem tratamento de dados | Configurar apenas via secrets do ambiente e executar scanner apropriado |
@@ -238,7 +250,7 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | MÃ©tricas | Requests, latência, CPU/memória RSS do processo e PostgreSQL observados no dashboard em 23/09/2026; demais sÃ©ries operacionais nÃ£o comprovadas | PARCIAL |
 | Health Check | HTTP 200 local e em `https://agora-techpark.duckdns.org/api/health`; smoke #48 e Loki confirmaram o fluxo | âœ… ATENDIDO |
 | Backup | `pg_dump` local existente e AWS Backup diário do EBS de produção com retenção de 14 dias; backup on-demand e restore para novo volume EBS concluídos com sucesso | ✅ ATENDIDO |
-| SeguranÃ§a e LGPD | Controles de aplicaÃ§Ã£o presentes; arquivo removido da Ã¡rvore, mas ainda recuperÃ¡vel no histÃ³rico pÃºblico | NÃƒO ATENDIDO |
+| Segurança e LGPD | Controles de aplicação presentes; em 05/10/2026, main saneada quanto ao arquivo alvo, removido em `7af0840`; refs históricas de PR ainda alcançam `55faede`; SEC-01 pendente de confirmação/remoção server-side pelo GitHub Support | NÃO ATENDIDO |
 | Backend coverage acadÃªmico | Comando tÃ©cnico passou no CI #43; percentuais atuais nÃ£o comprovam 75% | PARCIAL |
 | Frontend coverage acadÃªmico | Comando oficial passou no CI #43 com thresholds superiores a 25% | âœ… ATENDIDO |
 
@@ -298,7 +310,7 @@ Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards espec
 
 ### PendÃªncias reais
 
-- Confirmar a natureza dos dados e executar, mediante autorizaÃ§Ãµes separadas, a limpeza local e a publicaÃ§Ã£o do histÃ³rico sanitizado conforme `docs/SECURITY_DATA_REMOVAL.md`.
+- Issue #37 / SEC-01: solicitar avaliação/purge das refs históricas de PR pelo GitHub Support e aguardar confirmação/remoção server-side. A árvore atual de `origin/main` está saneada quanto ao arquivo alvo; a sanitização LGPD permanece pendente, conforme `docs/SECURITY_DATA_REMOVAL.md`.
 - Comprovar a meta acadÃªmica de 75% de coverage backend com o relatÃ³rio atual.
 - Registrar a URL pÃºblica do frontend e manter as evidÃªncias de CI #43, CD #48, Sonar e Quality Gate.
 - Validar os quatro dashboards específicos, séries operacionais ainda não observadas e os demais alertas; o dashboard consolidado, a ingestão de métricas e logs, o alerta de indisponibilidade da API e sua entrega, o SLO e a retenção já foram comprovados no escopo da Issue #57.
@@ -337,7 +349,7 @@ Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards espec
 - Nenhuma credencial foi solicitada, impressa ou gravada.
 - Nesta revisÃ£o documental, nenhum deploy, mutaÃ§Ã£o de infraestrutura, alteraÃ§Ã£o de banco ou reescrita de histÃ³rico Git foi executado; as evidÃªncias de deploy registradas vieram do CD Production #48 jÃ¡ concluÃ­do.
 - Os nÃºmeros de padrÃµes pessoais foram registrados apenas de forma agregada; nenhum valor da planilha foi reproduzido.
-- A planilha operacional foi removida da Ã¡rvore atual em 04/09/2026, mas a limpeza do histÃ³rico nÃ£o foi executada.
+- A remoção local da planilha foi registrada na baseline de 04/09/2026; a validação de 05/10/2026 confirma sua remoção da árvore no commit `7af0840` e ausência em `origin/main`. As refs históricas de PR ainda alcançam `55faede`; a SEC-01 permanece pendente de confirmação/remoção server-side pelo GitHub Support.
 
 ## Fontes oficiais do critÃ©rio
 

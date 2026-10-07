@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -78,6 +78,145 @@ describe('telas de importação de indicadores', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Próxima' }));
     expect(screen.getByText('Empresa 21')).toBeTruthy();
     expect(screen.getByText('Exibindo 21–21 de 21')).toBeTruthy();
+  });
+
+  it.each([2, 3])('exclui logicamente dois dos %i eventos e restaura após salvar a revisão', async (total) => {
+    const items = Array.from({ length: total }, (_, index) => ({
+      ...eventItems[0], id: `event-${index + 2}`, sourceRows: [index + 2], name: `Evento ${index + 1}`,
+      included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID', duplicateGroup: null, issues: [],
+    }));
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...eventBatch, year: 2026, draft: { items } });
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    // O servidor retorna IGNORED nos registros excluídos ao salvar o draft.
+    api.saveIndicatorImportReview.mockImplementation(async (_id, reviewed) => ({
+      ...eventBatch, year: 2026, draft: { items: reviewed.map((item) => ({
+        ...item, validationStatus: item.reviewStatus === 'EXCLUDED' ? 'IGNORED' : 'VALID',
+      })) },
+    }));
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await screen.findByText('Evento 1');
+    const rows = () => items.map((item) => screen.getByText(item.name).closest('tr'));
+    const selectTwo = () => rows().slice(0, 2).forEach((row) => fireEvent.click(within(row).getByRole('checkbox')));
+    const assertRows = (excluded) => rows().forEach((row, index) => {
+      const isExcluded = excluded && index < 2;
+      expect(within(row).getByRole('button', { name: isExcluded ? 'Não' : 'Sim' }).className).toContain('active');
+      expect(within(row).getByText(isExcluded ? 'Ignorado' : 'Válido')).toBeTruthy();
+      expect(within(row).getByRole('checkbox').checked).toBe(false);
+    });
+    const monthly = () => screen.getByRole('heading', { name: 'Preview mensal' }).closest('section');
+    expect(within(monthly()).getByText('Mar').parentElement.querySelector('strong').textContent).toBe(String(total));
+    selectTwo();
+    expect(screen.getByText('2 selecionado(s)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir dos indicadores' }));
+    assertRows(true);
+    expect(screen.getByText('0 selecionado(s)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Excluir dos indicadores' }).disabled).toBe(true);
+    expect(within(monthly()).getByText('Mar').parentElement.querySelector('strong').textContent).toBe(String(total - 2));
+    fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith('batch-1', items.map((item, index) => expect.objectContaining({
+      id: item.id, included: index >= 2, reviewStatus: index < 2 ? 'EXCLUDED' : 'VALIDATED',
+    })));
+    assertRows(true);
+    selectTwo();
+    fireEvent.click(screen.getByRole('button', { name: /Restaurar/ }));
+    assertRows(false);
+    expect(screen.getByText('0 selecionado(s)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Restaurar/ }).disabled).toBe(true);
+    expect(within(monthly()).getByText('Mar').parentElement.querySelector('strong').textContent).toBe(String(total));
+    fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith('batch-1', items.map((item) => expect.objectContaining({
+      id: item.id, included: true, reviewStatus: 'VALIDATED',
+    })));
+    assertRows(false);
+  });
+
+  it('exclui e restaura residentes em lote respeitando contratos e continuidade', async () => {
+    const items = [
+      { ...residentItems[0], name: 'Residente contínuo' },
+      {
+        ...residentItems[0], id: 'resident-2', name: 'Residente descontínuo', discontinuous: true,
+        contracts: [{ ...residentItems[0].contracts[0], eligibleBlock: false }],
+      },
+    ];
+    const loaded = { ...residentBatch, draft: { items } };
+    api.uploadIndicatorImport.mockResolvedValueOnce(loaded);
+    api.saveIndicatorImportReview.mockImplementation(async (_id, reviewed) => ({ ...loaded, draft: { items: reviewed } }));
+    render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+    await screen.findByRole('option', { name: 'Centro de Inovação' });
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['x'], 'residentes.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
+    const rows = () => items.map((item) => screen.getByText(item.name).closest('tr'));
+    const selectResidents = () => rows().forEach((row) => fireEvent.click(within(row).getAllByRole('checkbox')[0]));
+    const assertSelectionCleared = () => {
+      expect(screen.getByText('0 selecionado(s)')).toBeTruthy();
+      rows().forEach((row) => expect(within(row).getAllByRole('checkbox')[0].checked).toBe(false));
+      expect(screen.getByRole('button', { name: 'Excluir dos indicadores' }).disabled).toBe(true);
+      expect(screen.getByRole('button', { name: /Restaurar/ }).disabled).toBe(true);
+    };
+
+    selectResidents();
+    expect(screen.getByText('2 selecionado(s)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir dos indicadores' }));
+    assertSelectionCleared();
+    rows().forEach((row) => {
+      expect(within(row).getAllByRole('checkbox')[1].checked).toBe(false);
+      expect(within(row).getByText('Ignorado')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenNthCalledWith(1, 'batch-2', items.map((item) => ({
+      ...item, included: false, reviewStatus: 'EXCLUDED',
+    })));
+
+    selectResidents();
+    fireEvent.click(screen.getByRole('button', { name: /Restaurar/ }));
+    assertSelectionCleared();
+    expect(within(rows()[0]).getAllByRole('checkbox')[1].checked).toBe(true);
+    expect(within(rows()[1]).getAllByRole('checkbox')[1].checked).toBe(false);
+    expect(within(rows()[0]).getByText('Válido')).toBeTruthy();
+    expect(within(rows()[1]).getByText('Aviso')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenNthCalledWith(2, 'batch-2', [
+      { ...items[0], included: true, reviewStatus: 'VALIDATED' },
+      { ...items[1], included: false, reviewStatus: 'WITH_WARNINGS' },
+    ]);
+  });
+
+  it('restaura evento com issues preservando a necessidade de revisão no payload', async () => {
+    const item = {
+      ...eventItems[0], included: true, reviewStatus: 'VALIDATED', validationStatus: 'REVIEW_REQUIRED',
+      duplicateGroup: null, issues: [{ message: 'Data inválida na linha 2' }],
+    };
+    api.uploadIndicatorImport.mockResolvedValueOnce({ ...eventBatch, draft: { items: [item] } });
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await screen.findByRole('option', { name: 'Centro de Inovação' });
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['x'], 'eventos.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
+    const row = () => screen.getByText(item.name).closest('tr');
+
+    fireEvent.click(within(row()).getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir dos indicadores' }));
+    expect(within(row()).getByText('Ignorado')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenNthCalledWith(1, 'batch-1', [{
+      ...item, included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED',
+    }]);
+
+    fireEvent.click(within(row()).getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: /Restaurar/ }));
+    expect(within(row()).getByText('Revisão necessária')).toBeTruthy();
+    expect(within(row()).getByRole('button', { name: 'Sim' }).className).toContain('active');
+    fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenNthCalledWith(2, 'batch-1', [{
+      ...item, included: true, reviewStatus: 'VALIDATED', validationStatus: 'REVIEW_REQUIRED',
+    }]);
   });
 
   it('permite excluir, restaurar, agrupar e filtrar reservas revisadas', async () => {

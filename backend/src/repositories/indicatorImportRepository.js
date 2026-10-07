@@ -73,6 +73,14 @@ export async function replaceBatchRecords(batch, records, userId) {
       [batch.file_hash, batch.import_type, batch.innovation_center_id, batch.year, userId],
     );
     for (const record of records) {
+      if (record.recordType === 'RESIDENT_COMPANY' && record.extra?.document) {
+        await client.query(
+          `UPDATE indicator_records SET active=FALSE,deleted_at=NOW(),updated_at=NOW(),updated_by=$3
+           WHERE innovation_center_id=$1 AND record_type='RESIDENT_COMPANY' AND active AND deleted_at IS NULL
+             AND extra->>'documentHash'=$2`,
+          [batch.innovation_center_id, record.extra.documentHash, userId],
+        );
+      }
       await client.query(
         `INSERT INTO indicator_records(
            innovation_center_id,record_type,name,start_date,end_date,event_at,location,theme,mode,subtype,
@@ -110,7 +118,7 @@ export async function recordsForOfficialWorkbook(centerId, year) {
      LEFT JOIN indicator_import_batches b ON b.id=r.import_batch_id
      WHERE r.innovation_center_id=$1 AND r.record_type IN ('EVENT','RESIDENT_COMPANY')
        AND r.active AND r.deleted_at IS NULL
-       AND (EXTRACT(YEAR FROM r.event_at)=$2::int OR (r.start_date<=make_date($2::int,12,31) AND (r.end_date IS NULL OR r.end_date>=make_date($2::int,1,1))))
+       AND (EXTRACT(YEAR FROM r.event_at)=$2::int OR (r.record_type='RESIDENT_COMPANY' AND (r.start_date IS NULL OR r.start_date<=make_date($2::int,12,31)) AND (r.end_date IS NULL OR r.end_date>=make_date($2::int,1,1))))
      ORDER BY r.record_type,COALESCE(r.event_at,r.start_date),r.name`,
     [centerId, year],
   );

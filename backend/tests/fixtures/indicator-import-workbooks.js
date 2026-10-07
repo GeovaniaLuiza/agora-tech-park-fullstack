@@ -16,20 +16,19 @@ export async function eventWorkbookFixture() {
 
 export async function residentWorkbookFixture() {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Locatários Perini Business');
-  sheet.addRow(['Relação anonimizada']);
+  const sheet = workbook.addWorksheet('Clientes');
   sheet.addRow([]);
-  sheet.addRow(['Legenda ', 'Bloco', 'Bloco e Modúlo ', 'Cliente', 'Área ', 'CNPJ', 'Vigência ', 'Fim ', 'Locador ', 'Atividades', 'Nacionalidade', 'Nome ', 'Telefone', 'E-mail ']);
+  sheet.addRow(['Legenda ', 'Locador ', 'Bloco', 'Bloco e Modúlo ', 'Área ', 'EMPRESA', 'CNPJ', 'Vigência ', 'Fim ', 'Atividades', 'Nacionalidade']);
   const add = ({ legend = 'Locada', block, room, name, document, start, end, sector = 'Tecnologia' }) =>
-    sheet.addRow([legend, block, room, name, 50, document, start, end, 'Locador anonimizado', sector, 'Brasileira', '', '', '']);
-  add({ block: 'HUB', room: 'HUB 201', name: 'Empresa Anônima A', document: '00.000.000/0000-00', start: '01/01/2026', end: '31/12/2026' });
-  add({ block: 'UNI', room: 'UNI 301', name: 'Empresa Anônima A', document: '00.000.000/0000-00', start: '01/03/2026', end: '' });
-  add({ block: 'MOB', room: 'MOB 101', name: 'Profissional Anônimo B', document: '000.000.000-00', start: '01/06/2026', end: '30/09/2026', sector: 'Consultoria' });
+    sheet.addRow([legend, 'Locador anonimizado', block, room, 50, name, document, start, end, sector, 'Brasileira']);
+  add({ block: 'HUB', room: 'HUB 201', name: 'Empresa Anônima A', document: '11.222.333/0001-81', start: '01/01/2026', end: '31/12/2026' });
+  add({ block: 'UNI', room: 'UNI 301', name: 'Empresa Anônima A', document: '11222333000181', start: '01/03/2026', end: '' });
+  add({ block: 'MOB', room: 'MOB 101', name: 'Empresa B', document: '04.252.011/0001-10', start: '01/06/2026', end: '30/09/2026', sector: 'Consultoria' });
   add({ block: 'Z', room: 'Z 10', name: 'Empresa Fora do Centro', document: '00.000.000/0000-01', start: '01/01/2026', end: '31/12/2026' });
   add({ block: 'HUB', room: 'HUB 401', name: 'Empresa Sem Documento', document: '', start: '01/01/2026', end: '28/02/2026' });
   add({ block: 'HUB', room: 'HUB 402', name: 'Empresa Sem Documento', document: '', start: '01/07/2026', end: '31/08/2026' });
-  sheet.addRow(['Novos contratos']);
-  sheet.addRow(['Rescindidos']);
+  add({ legend: 'Disponível', block: 'HUB', room: 'HUB 501' });
+  add({ legend: 'Áreas Comuns', block: 'UNI', room: 'Hall' });
   return asBuffer(workbook);
 }
 

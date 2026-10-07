@@ -2,14 +2,14 @@ import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
 import { parseResidentWorkbook, summarizeResidents } from '../src/services/residentImportParser.js';
 
-const bufferFor = async (rows, { sheetName = 'Locatários Perini Business', validHeader = true } = {}) => {
+const bufferFor = async (rows, { sheetName = 'Clientes', validHeader = true } = {}) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(sheetName);
-  sheet.addRow(['RelaÃ§Ã£o']); sheet.addRow([]);
+  sheet.addRow([]);
   sheet.addRow(validHeader
-    ? ['Legenda ', 'Bloco', 'Bloco e Modúlo ', 'Cliente', 'Área ', 'CNPJ', 'Vigência ', 'Fim ', 'Locador ', 'Atividades', 'Nacionalidade', 'Nome ', 'Telefone', 'E-mail ']
+    ? ['Legenda ', 'Locador ', 'Bloco', 'Bloco e Modúlo ', 'Área ', 'EMPRESA', 'CNPJ', 'Vigência ', 'Fim ', 'Atividades', 'Nacionalidade']
     : ['Cabecalho incorreto']);
-  rows.forEach((row) => sheet.addRow(row));
+  rows.forEach((row) => sheet.addRow([row[0], row[8], row[1], row[2], row[4], row[3], row[5], row[6], row[7], row[9], row[10]]));
   return Buffer.from(await workbook.xlsx.writeBuffer());
 };
 
@@ -27,13 +27,13 @@ describe('residentImportParser lote 5', () => {
       ['Comodato', 'HUB', '101', 'Empresa CNPJ', 10, '11.222.333/0001-81', '01/01/2020', '01/01/2021', '', 'Tecnologia'],
       ['Cessão', 'MOB', '102', 'Pessoa CPF', 10, '529.982.247-25', '01/01/2099', '', '', 'Pesquisa'],
       ['Locada', 'UNI', '103', 'Empresa Ativa', 10, '', 'data invalida', '', '', 'Serviços'],
-      ['', '', '', '', '', '', '', '', '', 'observacao'],
+      ['Disponível', '', '', '', '', '', '', '', '', 'observacao'],
     ];
     const parsed = await parseResidentWorkbook(await bufferFor(rows));
-    expect(parsed.items.find((item) => item.name === 'Empresa CNPJ')).toMatchObject({ documentMasked: '11.***.***/0001-81', contractType: 'Comodato', status: 'ENDED', reviewStatus: 'VALIDATED' });
-    expect(parsed.items.find((item) => item.name === 'Pessoa CPF')).toMatchObject({ documentMasked: '***.982.247-**', contractType: 'Cessão', status: 'FUTURE', reviewStatus: 'VALIDATED' });
-    expect(parsed.warnings.map((warning) => warning.code)).toContain('INVALID_CONTRACT_DATE');
-    expect(parsed.summary.ignoredObservationRows).toBe(1);
+    expect(parsed.items.find((item) => item.name === 'Empresa CNPJ')).toMatchObject({ documentMasked: '11.222.333/0001-81', contractType: 'Comodato', status: 'ENDED', reviewStatus: 'VALIDATED' });
+    expect(parsed.items.find((item) => item.name === 'Pessoa CPF')).toMatchObject({ documentMasked: '529.982.247-25', contractType: 'Cessão', status: 'FUTURE', reviewStatus: 'PENDING' });
+    expect(parsed.warnings.map((warning) => warning.code)).toContain('RESIDENT_REVIEW');
+    expect(parsed.summary.ignored).toBe(1);
   });
 
   it('resume incluidos, excluidos e override manual de periodo e bloco', () => {

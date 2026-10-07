@@ -80,13 +80,11 @@ export function normalizeResident(company) {
 export function consolidateResidents(items) {
   const groups = new Map();
   for (const item of items) {
-    const key = !item.ignored && item.reviewStatus !== 'EXCLUDED' && item.document ? 'doc:' + documentDigits(item.document) : 'row:' + item.sourceRows[0];
+    const key = !item.ignored && item.document ? 'doc:' + documentDigits(item.document) : 'row:' + item.sourceRows[0];
     if (!groups.has(key)) groups.set(key, item);
     else {
       const group = groups.get(key);
-      groups.set(key, normalizeResident({ ...group,
-        original: group.original ? { ...group.original, contracts: [...group.original.contracts, ...(item.original?.contracts || item.contracts)] } : undefined,
-        sourceRows: [...group.sourceRows, ...item.sourceRows], contracts: [...group.contracts, ...item.contracts], included: group.included || item.included, manuallyCorrected: group.manuallyCorrected || item.manuallyCorrected }));
+      groups.set(key, normalizeResident({ ...group, sourceRows: [...group.sourceRows, ...item.sourceRows], contracts: [...group.contracts, ...item.contracts], included: group.included || item.included, manuallyCorrected: group.manuallyCorrected || item.manuallyCorrected }));
     }
   }
   return [...groups.values()];
@@ -101,7 +99,7 @@ export async function parseResidentWorkbook(buffer, { year = IMPORT_YEAR } = {})
     const values = RESIDENT_HEADERS.map((_, index) => row.getCell(index + 1).value);
     const ignored = ignoredLegend(values[0]);
     rows.push(normalizeResident({
-      id: 'resident-' + rowNumber, sourceRows: [rowNumber], name: cleanText(values[5]), document: cleanText(values[6]), documentRaw: cleanText(values[6]),
+      id: 'resident-' + rowNumber, sourceRows: [rowNumber], name: cleanText(values[5]), document: cleanText(values[6]),
       ignored, included: !ignored, reviewStatus: ignored ? 'EXCLUDED' : 'PENDING',
       contracts: [{
         sourceRow: rowNumber, legend: cleanText(values[0]), landlord: cleanText(values[1]),

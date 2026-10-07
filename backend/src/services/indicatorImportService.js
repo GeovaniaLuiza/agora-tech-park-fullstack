@@ -3,9 +3,9 @@ import { EVENT_MODES, EVENT_TYPES, IMPORT_STATUS, IMPORT_TYPES, IMPORT_TYPE_VALU
 import * as repository from '../repositories/indicatorImportRepository.js';
 import { record as audit } from '../repositories/auditRepository.js';
 import { recompute } from './indicatorCalculationService.js';
-import { parseEventWorkbook, summarizeEvents } from './eventImportParser.js';
+import { normalizeEventMode, parseEventWorkbook, summarizeEvents, validateEvent } from './eventImportParser.js';
 import { parseResidentWorkbook, summarizeResidents } from './residentImportParser.js';
-import { cleanText, parseDateValue } from './indicatorImportUtils.js';
+import { cleanText, normalizedKey, parseDateValue, parseNumberValue } from './indicatorImportUtils.js';
 import { serviceError } from '../utils/validation.js';
 
 const managerRoles = new Set(['ADMIN', 'PESQUISADOR']);
@@ -44,7 +44,7 @@ function validateFile({ fileName, mimeType, buffer }) {
 
 const presentBatch = (batch) => ({
   id: batch.id, importType: batch.import_type, fileName: batch.file_name, fileHash: batch.file_hash,
-  sheetName: batch.sheet_name, centerId: batch.innovation_center_id, centerName: batch.center_name,
+  sheetName: batch.sheet_name, fileSize: batch.file_size, centerId: batch.innovation_center_id, centerName: batch.center_name,
   year: batch.year, status: batch.status, summary: batch.summary, warnings: batch.warnings,
   draft: batch.draft, createdAt: batch.created_at, updatedAt: batch.updated_at, confirmedAt: batch.confirmed_at,
 });
@@ -86,14 +86,17 @@ function reviewedEvents(original, submitted) {
   return submitted.map((item) => {
     const source = originals.get(item.id);
     if (!source) throw serviceError(422, 'A revisão contém um evento desconhecido.', 'INVALID_REVIEW_ITEM');
-    const mode = item.mode || '';
-    if (mode && !EVENT_MODES.includes(mode)) throw serviceError(422, 'Modo de evento inválido.', 'INVALID_EVENT_MODE');
+    const mode = normalizeEventMode(item.mode);
     const subtype = text(item.subtype, 100);
-    if (subtype && !EVENT_TYPES.includes(subtype)) throw serviceError(422, 'Tipo de evento inválido.', 'INVALID_EVENT_SUBTYPE');
-    return { ...source, name: text(item.name), location: text(item.location), startAt: parseDateValue(item.startAt)?.toISOString() || source.startAt,
-      endAt: parseDateValue(item.endAt)?.toISOString() || null, participants: integerOrNull(item.participants, 'Participantes'),
-      theme: text(item.theme, 160), mode, subtype, participatingCompanies: integerOrNull(item.participatingCompanies, 'Empresas participantes'),
+    const reviewed = { ...source, name: text(item.name), location: text(item.location), startAt: parseDateValue(item.startAt)?.toISOString() || null,
+      endAt: parseDateValue(item.endAt)?.toISOString() || null, participants: parseNumberValue(item.participants, { integer: true }) ?? (cleanText(item.participants) || null),
+      theme: text(item.theme, 160), mode, subtype, participatingCompanies: parseNumberValue(item.participatingCompanies, { integer: true }) ?? (cleanText(item.participatingCompanies) || null),
       included: Boolean(item.included), reviewStatus: item.included ? 'VALIDATED' : item.reviewStatus === 'EXCLUDED' ? 'EXCLUDED' : 'PENDING' };
+    reviewed.issues = validateEvent(reviewed);
+    reviewed.duplicateKey = reviewed.startAt ? `${reviewed.startAt.slice(0, 10)}|${normalizedKey(reviewed.name)}` : `row:${source.sourceRows[0]}`;
+    reviewed.validationStatus = reviewed.reviewStatus === 'EXCLUDED' ? 'IGNORED' : reviewed.issues.length ? 'REVIEW_REQUIRED' : reviewed.duplicateGroup ? 'WARNING' : 'VALID';
+    reviewed.manuallyCorrected = source.manuallyCorrected || ['name', 'location', 'startAt', 'participants', 'theme', 'mode', 'subtype', 'participatingCompanies'].some((field) => cleanText(source[field]) !== cleanText(reviewed[field]));
+    return reviewed;
   });
 }
 
@@ -126,11 +129,13 @@ export async function saveReview(id, payload, user) {
   ensureManager(user); const batch = await ensureBatch(id);
   if (![IMPORT_STATUS.REVIEW_PENDING, IMPORT_STATUS.WITH_WARNINGS, IMPORT_STATUS.VALIDATED].includes(batch.status)) throw serviceError(409, 'Esta importação não pode mais ser revisada.', 'IMPORT_NOT_EDITABLE');
   if (!Array.isArray(payload.items) || payload.items.length > 2500) throw serviceError(422, 'Revisão inválida.', 'INVALID_REVIEW');
+  if (batch.import_type === IMPORT_TYPES.EVENTS && (payload.items.length !== (batch.draft.items || []).length || new Set(payload.items.map((item) => item.id)).size !== payload.items.length)) throw serviceError(422, 'Preserve todos os registros na revisão; use Ignorado para excluir.', 'INVALID_REVIEW');
   const items = batch.import_type === IMPORT_TYPES.EVENTS
     ? reviewedEvents(batch.draft.items || [], payload.items)
     : reviewedResidents(batch.draft.items || [], payload.items);
   const summary = batch.import_type === IMPORT_TYPES.EVENTS ? summarizeEvents(items, batch.year) : summarizeResidents(items, batch.year);
-  const saved = await repository.saveDraft(id, { draft: { ...batch.draft, items }, summary, warnings: batch.warnings, status: batch.warnings.length ? IMPORT_STATUS.WITH_WARNINGS : IMPORT_STATUS.VALIDATED });
+  const warnings = batch.import_type === IMPORT_TYPES.EVENTS ? items.flatMap((item) => (item.issues || []).map((issue) => ({ ...issue, code: 'REVIEW_REQUIRED' }))) : batch.warnings;
+  const saved = await repository.saveDraft(id, { draft: { ...batch.draft, items }, summary, warnings, status: warnings.length ? IMPORT_STATUS.WITH_WARNINGS : IMPORT_STATUS.VALIDATED });
   if (!saved) throw serviceError(409, 'Esta importação não pode mais ser revisada.', 'IMPORT_NOT_EDITABLE');
   return presentBatch({ ...saved, center_name: batch.center_name });
 }
@@ -138,9 +143,10 @@ export async function saveReview(id, payload, user) {
 export async function groupEvents(id, { itemIds, participantStrategy = 'MANUAL', participants = null }, user) {
   ensureManager(user); const batch = await ensureBatch(id);
   if (batch.import_type !== IMPORT_TYPES.EVENTS) throw serviceError(422, 'Agrupamento disponível apenas para eventos.', 'INVALID_IMPORT_TYPE');
+  if (![IMPORT_STATUS.REVIEW_PENDING, IMPORT_STATUS.WITH_WARNINGS, IMPORT_STATUS.VALIDATED].includes(batch.status)) throw serviceError(409, 'Esta importação não pode mais ser revisada.', 'IMPORT_NOT_EDITABLE');
   const selected = (batch.draft.items || []).filter((item) => itemIds?.includes(item.id));
   if (selected.length < 2 || new Set(selected.map((item) => item.duplicateKey)).size !== 1) throw serviceError(422, 'Selecione reservas com o mesmo nome e data.', 'INVALID_EVENT_GROUP');
-  const known = selected.map((item) => item.participants).filter((value) => value !== null);
+  const known = selected.map((item) => parseNumberValue(item.participants, { integer: true })).filter((value) => value !== null);
   let participantValue = integerOrNull(participants, 'Participantes');
   if (participantStrategy === 'MAX') participantValue = known.length ? Math.max(...known) : null;
   if (participantStrategy === 'SUM') participantValue = known.length ? known.reduce((sum, value) => sum + value, 0) : null;
@@ -149,6 +155,8 @@ export async function groupEvents(id, { itemIds, participantStrategy = 'MANUAL',
   const merged = { ...selected[0], id: `event-group-${createHash('sha256').update(sourceRows.join(',')).digest('hex').slice(0, 12)}`,
     sourceRows, location: [...new Set(selected.map((item) => item.location).filter(Boolean))].join(' / '),
     participants: participantValue, participantStrategy, duplicateGroup: null, grouped: true, included: true, reviewStatus: 'VALIDATED' };
+  merged.issues = validateEvent(merged);
+  merged.validationStatus = merged.issues.length ? 'REVIEW_REQUIRED' : 'VALID';
   const remaining = (batch.draft.items || []).filter((item) => !itemIds.includes(item.id));
   const items = [...remaining, merged];
   const summary = summarizeEvents(items, batch.year);
@@ -183,13 +191,22 @@ export async function confirm(id, user) {
   if (![IMPORT_STATUS.REVIEW_PENDING, IMPORT_STATUS.WITH_WARNINGS, IMPORT_STATUS.VALIDATED].includes(batch.status)) throw serviceError(409, 'Importação indisponível para confirmação.', 'IMPORT_NOT_CONFIRMABLE');
   const included = (batch.draft.items || []).filter((item) => item.included);
   if (!included.length) throw serviceError(422, 'Selecione ao menos um registro antes de confirmar.', 'NO_INCLUDED_RECORDS');
+  const unresolved = included.flatMap((item) => batch.import_type === IMPORT_TYPES.EVENTS ? validateEvent(item) : []);
+  if (unresolved.length) throw serviceError(422, unresolved[0].message + '. Corrija ou ignore o registro antes de confirmar.', 'REVIEW_REQUIRED', { issues: unresolved });
   const records = included.map(batch.import_type === IMPORT_TYPES.EVENTS ? eventRecord : residentRecord);
   await repository.replaceBatchRecords(batch, records, user.sub);
   await recompute(batch.innovation_center_id, batch.year, user.sub);
   const summary = batch.import_type === IMPORT_TYPES.EVENTS ? summarizeEvents(batch.draft.items, batch.year) : summarizeResidents(batch.draft.items, batch.year);
-  const saved = await repository.markImported(id, { imported: records.length, ignored: (batch.draft.items || []).length - records.length, summary, userId: user.sub });
+  const ignored = (batch.draft.items || []).length - records.length;
+  if (batch.import_type === IMPORT_TYPES.EVENTS) {
+    summary.processed = records.length;
+    summary.indicatorsUpdated = true;
+    summary.ignored = ignored;
+    summary.excluded = ignored;
+  }
+  const saved = await repository.markImported(id, { imported: records.length, ignored, summary, userId: user.sub });
   await audit({ userId: user.sub, action: 'INDICATOR_IMPORT_CONFIRMED', entity: 'indicator_import_batch', entityId: id,
-    details: { importType: batch.import_type, imported: records.length, ignored: (batch.draft.items || []).length - records.length, fileHash: batch.file_hash } });
+    details: { importType: batch.import_type, imported: records.length, ignored, fileHash: batch.file_hash } });
   return presentBatch({ ...saved, center_name: batch.center_name });
 }
 

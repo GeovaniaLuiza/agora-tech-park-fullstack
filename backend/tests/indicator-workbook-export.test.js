@@ -70,3 +70,20 @@ describe('geração da planilha oficial', () => {
       .rejects.toMatchObject({ code: 'EVENT_TEMPLATE_CAPACITY_EXCEEDED' });
   });
 });
+
+
+it('exporta os campos de eventos confirmados após revisão', async () => {
+  mocks.records.mockResolvedValue([
+    event({ theme: 'Temática revisada', mode: 'HYBRID', subtype: 'Tipo do arquivo', participants: 35, participating_companies: 3 }),
+
+  ]);
+  const report = await generateOfficialWorkbook({ centerId: 'center-1', year: 2026, strategy: 'REPLACE' }, { sub: 'user-1' });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(report.body);
+  const sheet = workbook.getWorksheet('CI JOINVILLE');
+  expect(sheet.getCell('D89').value).toBe('Temática revisada');
+  expect(sheet.getCell('E89').value).toBe('Híbrido');
+  expect(sheet.getCell('F89').value).toBe('Tipo do arquivo');
+  expect(sheet.getCell('G89').value).toBe(35);
+  expect(sheet.getCell('H89').value).toBe(3);
+});

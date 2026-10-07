@@ -58,8 +58,9 @@ describe('indicatorImportService lote 5', () => {
     const original = { id: 'e1', name: 'Evento', startAt: '2026-01-01T10:00:00.000Z', sourceRows: [2], duplicateKey: 'demo', participants: 1 };
     mocks.repo.findBatch.mockResolvedValue(batch([original]));
     await expect(service.saveReview('batch-1', { items: 'invalidos' }, admin)).rejects.toMatchObject({ code: 'INVALID_REVIEW' });
-    await expect(service.saveReview('batch-1', { items: [{ ...original, mode: 'INVALIDO' }] }, admin)).rejects.toMatchObject({ code: 'INVALID_EVENT_MODE' });
-    await expect(service.saveReview('batch-1', { items: [{ ...original, subtype: 'INVALIDO' }] }, admin)).rejects.toMatchObject({ code: 'INVALID_EVENT_SUBTYPE' });
+    mocks.repo.saveDraft.mockImplementation(async (_id, data) => batch(data.draft.items));
+    await service.saveReview('batch-1', { items: [{ ...original, mode: 'INVALIDO', subtype: 'Tipo real do arquivo' }] }, admin);
+    expect(mocks.repo.saveDraft).toHaveBeenCalledWith('batch-1', expect.objectContaining({ draft: { items: [expect.objectContaining({ validationStatus: 'REVIEW_REQUIRED', subtype: 'Tipo real do arquivo' })] } }));
   });
 
   it('revisa evento excluido e trata conflito concorrente ao salvar', async () => {

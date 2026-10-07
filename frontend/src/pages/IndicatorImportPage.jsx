@@ -160,7 +160,18 @@ export default function IndicatorImportPage({ type }) {
   const save = async () => { setSaving(true); setError(''); try { const loaded = await saveIndicatorImportReview(batch.id, items); setBatch(loaded); setItems(loaded.draft.items || []); setDirty(false); setMessage('Revisão salva com sucesso.'); return loaded; } catch (reason) { setError(reason.message); } finally { setSaving(false); } };
   const confirm = async () => { if (realFormatFlow && stage !== 5) { if (dirty && !await save()) return; setStage(5); return; } setConfirming(true); setError(''); try { if (dirty) await saveIndicatorImportReview(batch.id, items); const loaded = await confirmIndicatorImport(batch.id); setBatch(loaded); setItems(loaded.draft.items || items); setDirty(false); setStage(6); setMessage('Importação confirmada e indicadores atualizados.'); } catch (reason) { setError(reason.message); } finally { setConfirming(false); } };
   const toggleSelected = (id) => setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  const bulk = (restore) => { setReviewedItems((current) => current.map((item) => selected.has(item.id) && !item.ignored ? { ...item, included: restore ? (type === 'RESIDENTS' ? item.contracts.some((contract) => contract.eligibleBlock) : false) : false, reviewStatus: restore ? (item.discontinuous ? 'WITH_WARNINGS' : type === 'EVENTS' ? 'PENDING' : 'VALIDATED') : 'EXCLUDED' } : item)); setSelected(new Set()); };
+  const bulk = (restore) => {
+    setReviewedItems((current) => current.map((item) => {
+      if (!selected.has(item.id) || item.ignored) return item;
+      if (type === 'EVENTS') return {
+        ...item, included: restore, reviewStatus: restore ? 'VALIDATED' : 'EXCLUDED',
+        validationStatus: restore ? (item.issues?.length ? 'REVIEW_REQUIRED' : item.duplicateGroup ? 'WARNING' : 'VALID') : 'IGNORED',
+      };
+      return { ...item, included: restore ? item.contracts.some((contract) => contract.eligibleBlock) : false,
+        reviewStatus: restore ? (item.discontinuous ? 'WITH_WARNINGS' : 'VALIDATED') : 'EXCLUDED' };
+    }));
+    setSelected(new Set());
+  };
   const group = async () => { setError(''); try { if (dirty && !await save()) return; const loaded = await groupImportedEvents(batch.id, { itemIds: [...selected], participantStrategy: groupStrategy, participants: groupParticipants }); setBatch(loaded); setItems(loaded.draft.items || []); setSelected(new Set()); setDirty(false); setMessage('Reservas agrupadas em um único evento.'); } catch (reason) { setError(reason.message); } };
   const openExport = async () => { setStage(7); setError(''); try { const status = await getOfficialWorkbookStatus(centerId, batch?.year || 2026); setExportDialog({ status, strategy: 'CANCEL' }); } catch (reason) { setError(reason.message); } };
   const generate = async () => { setGenerating(true); try { const report = await downloadOfficialIndicatorWorkbook({ centerId, year: batch?.year || 2026, strategy: exportDialog.strategy }); downloadBlob(report); setExported(true); setExportDialog(null); setMessage('Planilha oficial gerada sem alterar o template original.'); } catch (reason) { setError(reason.message); } finally { setGenerating(false); } };

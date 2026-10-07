@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -78,6 +78,58 @@ describe('telas de importação de indicadores', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Próxima' }));
     expect(screen.getByText('Empresa 21')).toBeTruthy();
     expect(screen.getByText('Exibindo 21–21 de 21')).toBeTruthy();
+  });
+
+  it.each([2, 3])('exclui logicamente dois dos %i eventos e restaura após salvar a revisão', async (total) => {
+    const items = Array.from({ length: total }, (_, index) => ({
+      ...eventItems[0], id: `event-${index + 2}`, sourceRows: [index + 2], name: `Evento ${index + 1}`,
+      included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID', duplicateGroup: null, issues: [],
+    }));
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...eventBatch, year: 2026, draft: { items } });
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    // O servidor retorna IGNORED nos registros excluídos ao salvar o draft.
+    api.saveIndicatorImportReview.mockImplementation(async (_id, reviewed) => ({
+      ...eventBatch, year: 2026, draft: { items: reviewed.map((item) => ({
+        ...item, validationStatus: item.reviewStatus === 'EXCLUDED' ? 'IGNORED' : 'VALID',
+      })) },
+    }));
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await screen.findByText('Evento 1');
+    const rows = () => items.map((item) => screen.getByText(item.name).closest('tr'));
+    const selectTwo = () => rows().slice(0, 2).forEach((row) => fireEvent.click(within(row).getByRole('checkbox')));
+    const assertRows = (excluded) => rows().forEach((row, index) => {
+      const isExcluded = excluded && index < 2;
+      expect(within(row).getByRole('button', { name: isExcluded ? 'Não' : 'Sim' }).className).toContain('active');
+      expect(within(row).getByText(isExcluded ? 'Ignorado' : 'Válido')).toBeTruthy();
+      expect(within(row).getByRole('checkbox').checked).toBe(false);
+    });
+    const monthly = () => screen.getByRole('heading', { name: 'Preview mensal' }).closest('section');
+    expect(within(monthly()).getByText('Mar').parentElement.querySelector('strong').textContent).toBe(String(total));
+    selectTwo();
+    expect(screen.getByText('2 selecionado(s)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir dos indicadores' }));
+    assertRows(true);
+    expect(screen.getByText('0 selecionado(s)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Excluir dos indicadores' }).disabled).toBe(true);
+    expect(within(monthly()).getByText('Mar').parentElement.querySelector('strong').textContent).toBe(String(total - 2));
+    fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith('batch-1', items.map((item, index) => expect.objectContaining({
+      id: item.id, included: index >= 2, reviewStatus: index < 2 ? 'EXCLUDED' : 'VALIDATED',
+    })));
+    assertRows(true);
+    selectTwo();
+    fireEvent.click(screen.getByRole('button', { name: /Restaurar/ }));
+    assertRows(false);
+    expect(screen.getByText('0 selecionado(s)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Restaurar/ }).disabled).toBe(true);
+    expect(within(monthly()).getByText('Mar').parentElement.querySelector('strong').textContent).toBe(String(total));
+    fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith('batch-1', items.map((item) => expect.objectContaining({
+      id: item.id, included: true, reviewStatus: 'VALIDATED',
+    })));
+    assertRows(false);
   });
 
   it('permite excluir, restaurar, agrupar e filtrar reservas revisadas', async () => {

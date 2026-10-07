@@ -20,6 +20,7 @@ const batch = (items = [], overrides = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.repo.replaceBatchRecords.mockImplementation(async (_batch, _records, _user, finalize) => finalize(undefined));
   mocks.repo.saveDraft.mockReset();
   mocks.repo.findCenter.mockResolvedValue({ id: 'center-1', name: 'Centro' });
   mocks.audit.mockResolvedValue();
@@ -111,7 +112,7 @@ describe('indicatorImportService lote 5', () => {
     mocks.repo.findBatch.mockResolvedValue(residentBatch);
     mocks.repo.markImported.mockResolvedValue({ ...residentBatch, status: 'IMPORTED' });
     await service.confirm('batch-1', admin);
-    expect(mocks.repo.replaceBatchRecords).toHaveBeenCalledWith(residentBatch, [expect.objectContaining({ recordType: 'RESIDENT_COMPANY', location: 'HUB - Salas 101', subtype: null })], 'admin-1');
-    expect(mocks.repo.markImported).toHaveBeenCalledWith('batch-1', expect.objectContaining({ imported: 1, ignored: 1 }));
+    expect(mocks.repo.replaceBatchRecords).toHaveBeenCalledWith(residentBatch, [expect.objectContaining({ recordType: 'RESIDENT_COMPANY', location: 'HUB - Salas 101', subtype: null })], 'admin-1', expect.any(Function));
+    expect(mocks.repo.markImported).toHaveBeenCalledWith('batch-1', expect.objectContaining({ imported: 1, ignored: 1 }), undefined);
   });
 });

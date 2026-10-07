@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { RECORD_TYPES } from '../domain/indicatorManagementCatalog.js';
 import { EVENT_MODES, EVENT_TYPES, IMPORT_STATUS, IMPORT_TYPES, IMPORT_TYPE_VALUES, IMPORT_YEAR, MAX_IMPORT_BYTES, XLSX_MIME } from '../domain/indicatorImportCatalog.js';
 import * as repository from '../repositories/indicatorImportRepository.js';
 import { record as audit } from '../repositories/auditRepository.js';
@@ -204,15 +205,17 @@ export async function confirm(id, user) {
   const unresolved = included.flatMap((item) => batch.import_type === IMPORT_TYPES.EVENTS ? validateEvent(item) : item.document === undefined ? [] : normalizeResident(item).issues);
   if (unresolved.length) throw serviceError(422, unresolved[0].message + '. Corrija ou ignore o registro antes de confirmar.', 'REVIEW_REQUIRED', { issues: unresolved });
   const records = included.map(batch.import_type === IMPORT_TYPES.EVENTS ? eventRecord : residentRecord);
-  await repository.replaceBatchRecords(batch, records, user.sub);
-  await recompute(batch.innovation_center_id, batch.year, user.sub);
   const summary = batch.import_type === IMPORT_TYPES.EVENTS ? summarizeEvents(batch.draft.items, batch.year) : summarizeResidents(batch.draft.items, batch.year);
   summary.processed = records.length;
   summary.indicatorsUpdated = true;
   const ignored = batch.import_type === IMPORT_TYPES.RESIDENTS ? summary.excluded : (batch.draft.items || []).length - records.length;
   summary.ignored = ignored;
   summary.excluded = ignored;
-  const saved = await repository.markImported(id, { imported: records.length, ignored, summary, userId: user.sub });
+  const saved = await repository.replaceBatchRecords(batch, records, user.sub, async (client) => {
+    const recordType = batch.import_type === IMPORT_TYPES.EVENTS ? 'EVENT' : 'RESIDENT_COMPANY';
+    await recompute(batch.innovation_center_id, batch.year, user.sub, client, RECORD_TYPES[recordType].indicatorCodes);
+    return repository.markImported(id, { imported: records.length, ignored, summary, userId: user.sub }, client);
+  });
   await audit({ userId: user.sub, action: 'INDICATOR_IMPORT_CONFIRMED', entity: 'indicator_import_batch', entityId: id,
     details: { importType: batch.import_type, imported: records.length, ignored, fileHash: batch.file_hash } });
   return presentBatch({ ...saved, center_name: batch.center_name });

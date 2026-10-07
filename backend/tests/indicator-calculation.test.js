@@ -10,6 +10,20 @@ const calculate = (definitions, records = [], manualValues = []) => calculateInd
 const value = (rows, code, month) => rows.find((row) => row.indicatorId === `id-${code}` && row.month === month)?.numericValue;
 
 describe('serviço central de cálculo de indicadores', () => {
+  it('deduplica residentes pela primeira identificação disponível, inclusive pela referência do objeto', () => {
+    const resident = (data) => ({ record_type: 'RESIDENT_COMPANY', active: true, ...data });
+    const anonymous = resident({});
+    const rows = calculate([definition('EMPRESAS_RESIDENTES', 'AUTOMATIC', 'LAST_VALUE')], [
+      resident({ id: 'hash-a', extra: { documentHash: 'hash', document: 'document-a' } }),
+      resident({ id: 'hash-b', extra: { documentHash: 'hash', document: 'document-b' } }),
+      resident({ id: 'document-a', extra: { document: 'document' } }),
+      resident({ id: 'document-b', extra: { document: 'document' } }),
+      resident({ id: 'id' }), resident({ id: 'id', extra: {} }),
+      anonymous, anonymous, resident({}),
+    ]);
+    for (const month of [1, 12, null]) expect(value(rows, 'EMPRESAS_RESIDENTES', month)).toBe(5);
+  });
+
   it('recalcula evento ao mover de agosto para setembro e ao excluir', () => {
     const definitions = [definition('EVENTOS_REALIZADOS')];
     const august = calculate(definitions, [{ record_type: 'EVENT', name: 'Demo Day', event_at: '2026-08-14T12:00:00Z', active: true }]);

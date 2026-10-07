@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventWorkbookFixture, residentWorkbookFixture } from './fixtures/indicator-import-workbooks.js';
 import { XLSX_MIME } from '../src/domain/indicatorImportCatalog.js';
@@ -10,15 +11,15 @@ import * as service from '../src/services/indicatorImportService.js';
 
 const admin = { sub: 'admin-1', role: 'ADMIN' };
 const eventBatch = (items, status = 'WITH_WARNINGS') => ({ id: 'batch-1', import_type: 'EVENTS', innovation_center_id: 'center-1', center_name: 'Centro', year: 2026, status, file_hash: 'HASH', warnings: [], summary: {}, draft: { items } });
-beforeEach(() => { vi.clearAllMocks(); mocks.findCenter.mockResolvedValue({ id: 'center-1', name: 'Centro' }); mocks.record.mockResolvedValue(); mocks.recompute.mockResolvedValue(); });
+beforeEach(() => { vi.clearAllMocks(); mocks.findPrevious.mockReset(); mocks.findCenter.mockResolvedValue({ id: 'center-1', name: 'Centro' }); mocks.record.mockResolvedValue(); mocks.recompute.mockResolvedValue(); });
 
 describe('importação de indicadores (RF-009)', () => {
   it('gera preview válido de eventos com aviso e persiste o rascunho', async () => {
     const buffer = await eventWorkbookFixture();
     mocks.createBatch.mockImplementation(async (data) => ({ id: 'batch-1', import_type: data.importType, file_name: data.fileName, file_hash: data.fileHash, innovation_center_id: data.centerId, year: data.year, status: data.status, summary: data.summary, warnings: data.warnings, draft: data.draft }));
     const preview = await service.preview({ type: 'EVENTS', fileName: 'eventos.xlsx', mimeType: XLSX_MIME, buffer, centerId: 'center-1' }, admin);
-    expect(preview.status).toBe('WITH_WARNINGS'); expect(preview.draft.items).toHaveLength(2);
-    expect(mocks.createBatch).toHaveBeenCalledWith(expect.objectContaining({ totalRecords: 2, totalWarnings: expect.any(Number) }));
+    expect(preview.status).toBe('WITH_WARNINGS'); expect(preview.draft.items).toHaveLength(4);
+    expect(mocks.createBatch).toHaveBeenCalledWith(expect.objectContaining({ totalRecords: 4, totalWarnings: expect.any(Number) }));
   });
   it('rejeita perfil, tipo, arquivo e centro inválidos', async () => {
     const valid = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
@@ -41,7 +42,7 @@ describe('importação de indicadores (RF-009)', () => {
     await expect(service.getBatch('missing', admin)).rejects.toMatchObject({ code: 'IMPORT_NOT_FOUND' });
   });
   it('salva revisão de eventos e rejeita item, modo e status inválidos', async () => {
-    const original = { id: 'e1', name: 'Evento', startAt: '2026-01-01T10:00:00.000Z', sourceRows: [2], participants: 1 };
+    const original = { id: 'e1', name: 'Evento', location: 'Auditório', startAt: '2026-01-01T10:00:00.000Z', sourceRows: [2], participants: 1 };
     mocks.findBatch.mockResolvedValue(eventBatch([original])); mocks.saveDraft.mockImplementation(async (_id, data) => ({ ...eventBatch(data.draft.items), ...data }));
     const saved = await service.saveReview('batch-1', { items: [{ ...original, included: true, mode: 'ONLINE', subtype: 'Workshop' }] }, admin);
     expect(saved.draft.items[0]).toMatchObject({ included: true, reviewStatus: 'VALIDATED', mode: 'ONLINE' });
@@ -58,7 +59,7 @@ describe('importação de indicadores (RF-009)', () => {
     expect(parsed).toBeInstanceOf(Buffer);
   });
   it('confirma importação, converte evento e recalcula', async () => {
-    const item = { id: 'e1', name: 'Evento', startAt: '2026-04-01T10:00:00.000Z', sourceRows: [2], included: true, mode: 'NOT_INFORMED', grouped: false };
+    const item = { id: 'e1', name: 'Evento', location: 'Auditório', startAt: '2026-04-01T10:00:00.000Z', sourceRows: [2], included: true, mode: 'NOT_INFORMED', grouped: false };
     const batch = eventBatch([item], 'VALIDATED'); mocks.findBatch.mockResolvedValue(batch); mocks.markImported.mockResolvedValue({ ...batch, status: 'IMPORTED' });
     await expect(service.confirm('batch-1', admin)).resolves.toMatchObject({ status: 'IMPORTED' });
     expect(mocks.replaceBatchRecords).toHaveBeenCalledWith(batch, [expect.objectContaining({ recordType: 'EVENT', mode: null })], 'admin-1');
@@ -73,3 +74,68 @@ describe('importação de indicadores (RF-009)', () => {
     await expect(service.confirm('batch-1', admin)).rejects.toMatchObject({ code: 'NO_INCLUDED_RECORDS' });
   });
 });
+
+
+  it.each([
+    ['EVENTS', 'Eventos.xlsx', 'Eventos', { records: 4 }, eventWorkbookFixture],
+  ])('gera apenas draft do formato %s usando XLSX sintético', async (type, fileName, sheetName, summary, fixture) => {
+    const buffer = await fixture();
+    mocks.createBatch.mockImplementation(async (data) => ({
+      id: 'synthetic-file-batch', import_type: data.importType, file_name: data.fileName,
+      sheet_name: data.sheetName, file_size: data.fileSize, summary: data.summary, draft: data.draft,
+    }));
+    const result = await service.preview({ type, fileName, mimeType: XLSX_MIME, buffer, centerId: 'center-1' }, admin);
+    expect(result).toMatchObject({ fileName, sheetName, fileSize: buffer.length, summary });
+    expect(mocks.createBatch).toHaveBeenCalledOnce();
+    expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
+    expect(mocks.markImported).not.toHaveBeenCalled();
+    expect(mocks.recompute).not.toHaveBeenCalled();
+  });
+
+  it('rejeita Eventos com aba incorreta antes de criar o draft', async () => {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await eventWorkbookFixture());
+    workbook.getWorksheet('Eventos').name = 'Outra';
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    await expect(service.preview({ type: 'EVENTS', fileName: 'Eventos.xlsx', mimeType: XLSX_MIME, buffer, centerId: 'center-1' }, admin))
+      .rejects.toMatchObject({ code: 'SHEET_NOT_FOUND', message: 'Aba "Eventos" não encontrada.' });
+    expect(mocks.createBatch).not.toHaveBeenCalled();
+    expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
+    expect(mocks.recompute).not.toHaveBeenCalled();
+  });
+
+  it('upload e revisão gravam apenas draft, mantendo o registro definitivo para confirmar', async () => {
+    const buffer = await eventWorkbookFixture();
+    mocks.createBatch.mockImplementation(async (data) => ({ ...eventBatch(data.draft.items), import_type: data.importType, sheet_name: data.sheetName, file_size: data.fileSize, summary: data.summary, warnings: data.warnings }));
+    const result = await service.preview({ type: 'EVENTS', fileName: 'Eventos.xlsx', mimeType: XLSX_MIME, buffer, centerId: 'center-1' }, admin);
+    expect(result).toMatchObject({ sheetName: 'Eventos', fileSize: buffer.length });
+    expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
+    expect(mocks.recompute).not.toHaveBeenCalled();
+    mocks.findBatch.mockResolvedValue(eventBatch(result.draft.items));
+    mocks.saveDraft.mockImplementation(async (_id, data) => ({ ...eventBatch(data.draft.items), ...data }));
+    const reviewed = result.draft.items.map((item, index) => ({ ...item, included: index === 0, reviewStatus: index === 0 ? 'VALIDATED' : 'EXCLUDED', theme: index === 0 ? 'Tecnologia revisada' : item.theme }));
+    const saved = await service.saveReview('batch-1', { items: reviewed }, admin);
+    expect(saved.draft.items[0]).toMatchObject({ theme: 'Tecnologia revisada', manuallyCorrected: true });
+    expect(saved.summary).toMatchObject({ included: 1, reviewed: 4, corrected: 1 });
+    expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
+    expect(mocks.recompute).not.toHaveBeenCalled();
+    const ready = { ...eventBatch(saved.draft.items), summary: saved.summary };
+    mocks.findBatch.mockResolvedValue(ready);
+    mocks.markImported.mockResolvedValue({ ...ready, status: 'IMPORTED' });
+    await service.confirm('batch-1', admin);
+    expect(mocks.replaceBatchRecords).toHaveBeenCalledWith(ready, [expect.objectContaining({ theme: 'Tecnologia revisada', participatingCompanies: 3 })], admin.sub);
+    expect(mocks.recompute).toHaveBeenCalledTimes(1);
+  });
+
+  it('bloqueia problemas incluídos na confirmação, mas permite guardar a revisão incompleta', async () => {
+    const { parseEventWorkbook } = await import('../src/services/eventImportParser.js');
+    const parsed = await parseEventWorkbook(await eventWorkbookFixture());
+    const pending = parsed.items.map((item, index) => ({ ...item, included: index === 3 }));
+    mocks.findBatch.mockResolvedValue(eventBatch(pending));
+    mocks.saveDraft.mockImplementation(async (_id, data) => ({ ...eventBatch(data.draft.items), ...data }));
+    const saved = await service.saveReview('batch-1', { items: pending }, admin);
+    expect(saved.draft.items[3].validationStatus).toBe('REVIEW_REQUIRED');
+    mocks.findBatch.mockResolvedValue(eventBatch(saved.draft.items));
+    await expect(service.confirm('batch-1', admin)).rejects.toMatchObject({ code: 'REVIEW_REQUIRED', message: expect.stringContaining('linha 5') });
+    expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
+  });

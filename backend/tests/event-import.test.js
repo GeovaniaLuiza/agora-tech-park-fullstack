@@ -16,12 +16,11 @@ describe('importação de eventos', () => {
   it('interpreta datas, preserva participante ausente e sinaliza linha inválida e duplicidade', async () => {
     const parsed = await parseEventWorkbook(await eventWorkbookFixture());
     expect(parsed.errors).toEqual([]);
-    expect(parsed.items).toHaveLength(2); // One was filtered
+    expect(parsed.items).toHaveLength(4);
     expect(parsed.items[0].startAt).toBe('2026-03-15T09:00:00.000Z');
     expect(parsed.items[1].participants).toBeNull();
     expect(parsed.items[0].duplicateGroup).toBe(parsed.items[1].duplicateGroup);
-    // Removed INVALID_EVENT_ROW as it was filtered out early
-    expect(parsed.warnings.map((warning) => warning.code)).toEqual(expect.arrayContaining(['MISSING_PARTICIPANTS', 'POSSIBLE_DUPLICATE']));
+    expect(parsed.warnings.map((warning) => warning.code)).toEqual(expect.arrayContaining(['INVALID_EVENT_ROW', 'POSSIBLE_DUPLICATE']));
     expect(parsed.items.every((item) => item.included === false && item.reviewStatus === 'PENDING')).toBe(true);
   });
 
@@ -32,7 +31,7 @@ describe('importação de eventos', () => {
     mocks.findBatch.mockResolvedValue(batch);
     mocks.saveDraft.mockImplementation(async (_id, data) => ({ ...batch, ...data }));
     const grouped = await groupEvents('batch-1', { itemIds: [parsed.items[0].id, parsed.items[1].id], participantStrategy: 'MANUAL', participants: null }, { sub: 'user-1', role: 'ADMIN' });
-    expect(grouped.draft.items).toHaveLength(1); // One item left after grouping 2
+    expect(grouped.draft.items).toHaveLength(3);
     const event = grouped.draft.items.find((item) => item.grouped);
     expect(event.location).toBe('Auditório / Rooftop 02');
     expect(event.participants).toBeNull();

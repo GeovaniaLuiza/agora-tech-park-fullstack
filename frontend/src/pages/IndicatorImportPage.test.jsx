@@ -25,6 +25,11 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+const openReview = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Preview' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
+};
+
 describe('telas de importação de indicadores', () => {
   it('não importa no upload: valida, mostra preview e salva a decisão humana', async () => {
     render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
@@ -33,6 +38,7 @@ describe('telas de importação de indicadores', () => {
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [file] } });
     expect(api.uploadIndicatorImport).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
     expect(await screen.findByText('Evento Anônimo')).toBeTruthy();
     expect(screen.getByText(/Possível mesmo evento/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Sim' }));
@@ -80,14 +86,15 @@ describe('telas de importação de indicadores', () => {
     await screen.findByRole('option', { name: 'Centro de Inovação' });
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['x'], 'eventos.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
     await screen.findAllByText('Evento Anônimo');
 
     let selection = screen.getAllByRole('checkbox').filter((element) => !element.closest('label'));
     fireEvent.click(selection[0]); fireEvent.click(selection[1]);
-    fireEvent.change(screen.getAllByPlaceholderText('Não informado')[0], { target: { value: '35' } });
-    fireEvent.change(screen.getAllByPlaceholderText('Pendente')[0], { target: { value: 'Tecnologia' } });
+    fireEvent.change(screen.getByLabelText('Participantes da linha 2'), { target: { value: '35' } });
+    fireEvent.change(screen.getByLabelText('Temática da linha 2'), { target: { value: 'Tecnologia' } });
     fireEvent.click(screen.getByRole('button', { name: 'Excluir dos indicadores' }));
-    expect(screen.getAllByText('Excluído').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Ignorado').length).toBeGreaterThan(0);
 
     selection = screen.getAllByRole('checkbox').filter((element) => !element.closest('label'));
     fireEvent.click(selection[0]); fireEvent.click(selection[1]);
@@ -116,10 +123,13 @@ describe('telas de importação de indicadores', () => {
 
     render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
     expect(await screen.findByText('Evento Anônimo')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+    expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+    expect(screen.getByText('Resumo final')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
     await screen.findByText(/Importação confirmada/);
-    expect(screen.getByText('Indicadores atualizados').closest('li').className).toBe('done');
-    expect(screen.getByText('Baixar XLSX').closest('li').className).toBe('active');
+    expect(screen.getAllByText('Indicadores atualizados').find((element) => element.closest('li')).closest('li').className).toBe('active');
+    expect(screen.getByText('Baixar XLSX').closest('li').className).toBe('');
     fireEvent.click(screen.getByRole('button', { name: /Gerar Planilha de Indicadores/ }));
     await screen.findByRole('heading', { name: 'Gerar Planilha de Indicadores' });
     expect(screen.getByRole('button', { name: 'Gerar arquivo' }).disabled).toBe(true);
@@ -156,4 +166,29 @@ describe('telas de importação de indicadores', () => {
     fireEvent.change(screen.getByPlaceholderText('Buscar empresa'), { target: { value: 'ausente' } });
     expect(screen.getByText('Nenhuma empresa corresponde aos filtros.')).toBeTruthy();
   });
+});
+
+
+it('mostra orientação exata e percorre validação, preview e revisão sem confirmar', async () => {
+  api.uploadIndicatorImport.mockResolvedValueOnce({ ...eventBatch, sheetName: 'Eventos', fileSize: 4096, year: 2026, summary: { records: 1, rowsRead: 1 }, draft: { items: [{ ...eventItems[0], validationStatus: 'VALID' }] } });
+  render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+  expect(screen.getByText('Campos principais')).toBeTruthy();
+  expect(screen.getByText('Lista · Data · Local')).toBeTruthy();
+  expect(screen.getByText(/Cabeçalho: linha 1/)).toBeTruthy();
+  expect(screen.getByText(/Nº de Empresas Participantes/)).toBeTruthy();
+  await screen.findByRole('option', { name: 'Centro de Inovação' });
+  fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['xlsx'], 'Eventos.xlsx')] } });
+  expect(screen.getByText('Eventos.xlsx')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+  await screen.findByRole('button', { name: 'Preview' });
+  expect(screen.getByText('Registros encontrados')).toBeTruthy();
+  expect(screen.getByText('Válidos')).toBeTruthy();
+  expect(screen.getByText('Com aviso')).toBeTruthy();
+  expect(screen.getByText(/Aba detectada: Eventos/)).toBeTruthy();
+  expect(screen.queryByText('Evento Anônimo')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+  expect(screen.getByLabelText('Temática da linha 2').disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
+  expect(screen.getByLabelText('Temática da linha 2').disabled).toBe(false);
+  expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
 });

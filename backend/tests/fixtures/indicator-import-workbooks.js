@@ -5,12 +5,12 @@ const asBuffer = async (workbook) => Buffer.from(await workbook.xlsx.writeBuffer
 
 export async function eventWorkbookFixture() {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Flugo Inc.');
-  sheet.addRow(['Agendamento', 'Horário Agendamento Início', 'Horário Agendamento Fim', 'Nome Cliente', 'Quantidade de pessoas ']);
-  sheet.addRow(['Auditório', '15/03/2026 09:00:00', '15/03/2026 12:00:00', 'Evento Anônimo X - Evento', 20]);
-  sheet.addRow(['Rooftop 02', '15/03/2026 09:00:00', '15/03/2026 12:00:00', 'Evento Anônimo X - Evento', null]);
-  sheet.addRow(['Sala 01', new Date('2026-04-10T13:00:00Z'), new Date('2026-04-10T14:00:00Z'), 'Reunião interna', null]);
-  sheet.addRow(['Sala 02', 'data inválida', '', 'Reserva inválida', 5]);
+  const sheet = workbook.addWorksheet('Eventos');
+  sheet.addRow(['Lista', 'Data', 'Local', 'Temática', 'Modo', 'Tipo de Evento', 'Nº de Participantes', 'Nº de Empresas Participantes']);
+  sheet.addRow(['Evento Anônimo X', '15/03/2026 09:00:00', 'Auditório', '', 'Presencial', '', 20, '3']);
+  sheet.addRow(['Evento Anônimo X', '15/03/2026 09:00:00', 'Rooftop 02', '', '', '', null, null]);
+  sheet.addRow(['Reunião interna', new Date('2026-04-10T13:00:00Z'), 'Sala 01', '', 'Online', 'Reunião', '15', '2']);
+  sheet.addRow(['Reserva inválida', 'data inválida', 'Sala 02', '', '', '', 5]);
   return asBuffer(workbook);
 }
 

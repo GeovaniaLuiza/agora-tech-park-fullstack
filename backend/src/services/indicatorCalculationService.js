@@ -45,7 +45,7 @@ function automaticValues(records, center, year, month) {
     ENTIDADES_ATENDIDAS: stocks('ENTITY').filter((item) => item.served).length,
     GRANDES_EMPRESAS_REGIAO: stocks('LARGE_COMPANY').filter((item) => item.in_region).length,
     GRANDES_EMPRESAS_ATENDIDAS: stocks('LARGE_COMPANY').filter((item) => item.served).length,
-    EMPRESAS_RESIDENTES: stocks('RESIDENT_COMPANY').length,
+    EMPRESAS_RESIDENTES: new Set(stocks('RESIDENT_COMPANY').map((item) => item.extra?.documentHash || item.extra?.document || item.id || item)).size,
     GRANDES_EMPRESAS_APOIADAS: new Set(openInnovation.map((item) => item.name.trim().toLocaleLowerCase('pt-BR'))).size,
   };
   Object.entries(codeByStage).forEach(([stage, code]) => {
@@ -109,18 +109,27 @@ export function calculateIndicatorRows({ definitions, applicability = new Map(),
   return rows;
 }
 
-export async function recompute(centerId, year, userId) {
-  const [center, definitions, records, manualValues] = await Promise.all([
-    repository.findCenter(centerId), repository.allDefinitions(), repository.recordsForCalculation(centerId, year),
-    repository.manualValuesForCalculation(centerId, year),
-  ]);
+export async function recompute(centerId, year, userId, client, indicatorCodes = null) {
+  const reads = [
+    () => repository.findCenter(centerId, client), () => repository.allDefinitions(client),
+    () => repository.recordsForCalculation(centerId, year, client),
+    () => repository.manualValuesForCalculation(centerId, year, client),
+  ];
+  // A transaction uses one connection; do not queue concurrent queries on it.
+  const results = [];
+  if (client) { for (const read of reads) results.push(await read()); }
+  else results.push(...await Promise.all(reads.map((read) => read())));
+  const [center, definitions, records, manualValues] = results;
   if (!center) return [];
-  const configured = await repository.listDefinitions(centerId);
+  const configured = await repository.listDefinitions(centerId, client);
   const applicability = new Map(configured.map((item) => [item.id, item.applicable]));
-  const rows = calculateIndicatorRows({ definitions, applicability, records, manualValues, center, year });
-  await repository.withTransaction(async (client) => {
-    await repository.clearSystemValues(centerId, year, userId, client);
-    for (const row of rows) await repository.upsertValue({ ...row, centerId }, userId, client);
-  });
+  const selected = indicatorCodes ? definitions.filter((item) => indicatorCodes.includes(item.code)) : definitions;
+  const rows = calculateIndicatorRows({ definitions: selected, applicability, records, manualValues, center, year });
+  const persist = async (transaction) => {
+    await repository.clearSystemValues(centerId, year, userId, transaction, indicatorCodes ? selected.map((item) => item.id) : null);
+    for (const row of rows) await repository.upsertValue({ ...row, centerId }, userId, transaction);
+  };
+  if (client) await persist(client);
+  else await repository.withTransaction(persist);
   return rows;
 }

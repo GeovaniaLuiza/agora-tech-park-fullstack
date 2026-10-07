@@ -237,24 +237,34 @@ function Create() {
 function Indicators() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
+  const [centers, setCenters] = useState([]);
+  const [centerId, setCenterId] = useState('');
   const [periods, setPeriods] = useState([]);
   const [period, setPeriod] = useState('');
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
+  useEffect(() => { getInnovationCenters().then((rows) => { setCenters(rows); setCenterId(rows[0]?.id || ''); }).catch((reason) => setError(reason.message)); }, []);
   useEffect(() => { getIndicatorHistory().then(setPeriods).catch((reason) => setError(reason.message)); }, []);
-  useEffect(() => { getIndicators({ ...(period ? { period } : {}), ...(search ? { name: search } : {}) }).then((rows) => setItems(rows.map((row) => ({ ...row, source: indicatorSourceLabels[row.source] || row.source })))).catch((reason) => setError(reason.message)); }, [period, search]);
+  useEffect(() => {
+    if (!centerId) return;
+    let cancelled = false;
+    getIndicators({ centerId, ...(period ? { period } : {}), ...(search ? { name: search } : {}) })
+      .then((rows) => { if (!cancelled) setItems(rows.map((row) => ({ ...row, source: indicatorSourceLabels[row.source] || row.source }))); })
+      .catch((reason) => { if (!cancelled) setError(reason.message); });
+    return () => { cancelled = true; };
+  }, [period, search, centerId]);
   const currentYear = String(new Date().getFullYear());
   const availableYears = [...new Set(periods.map(String))].filter((value) => value !== currentYear);
   const download = async (format) => {
     try {
-      const report = await downloadIndicatorReport(format, period ? { period } : {});
+      const report = await downloadIndicatorReport(format, { ...(period ? { period } : {}), ...(centerId ? { centerId } : {}) });
       const url = URL.createObjectURL(report.blob);
       const anchor = document.createElement('a'); anchor.href = url; anchor.download = report.filename; anchor.click();
       URL.revokeObjectURL(url);
     } catch (reason) { setError(reason.message); }
   };
   const canExport = user.role !== 'RESIDENTE';
-  return <div className="content indicators-page"><div className="source-notice"><strong>Fonte consolidada dos Centros de Inovação</strong><span>Respostas de formulários alimentam automaticamente estes indicadores e o dashboard.</span></div><div className="toolbar"><label className="field-search"><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar indicador ou código..." /></label><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="">{currentYear}</option>{availableYears.map((value) => <option key={value}>{value}</option>)}</select>{canExport && <><Button variant="secondary" className="push" onClick={() => download('pdf')}><Download />PDF</Button><Button variant="secondary" onClick={() => download('excel')}><Download />Excel</Button><Button variant="secondary" onClick={() => download('csv')}><Download />CSV</Button></>}</div><ErrorMessage message={error} /><section className="metric-grid">{items.map((item) => <article className="panel metric indicator-card" key={item.id}><div><span>{item.category}</span><code>{item.code}</code></div><h3>{item.name}</h3><h2>{item.json_value ? `${item.json_value.length} organizações` : formatIndicatorValue(item.value ?? item.text_value, item.value_type, item.unit)}</h2><p>{item.description}</p>{Array.isArray(item.json_value) && <div className="indicator-details" aria-label={`Detalhamento de ${item.name}`}>{item.json_value.map((detail) => <div key={detail.organization}><strong>{detail.organization}</strong><span>Desafios: {detail.challenges} · Soluções: {detail.solutions} · Negócios: {detail.deals}</span></div>)}</div>}<footer><em>{item.period}</em><small>{item.source}</small></footer></article>)}</section>{!items.length && !error && <article className="panel empty-state">Nenhum indicador encontrado para os filtros.</article>}</div>;
+  return <div className="content indicators-page"><div className="source-notice"><strong>Fonte consolidada dos Centros de Inovação</strong><span>Respostas de formulários alimentam automaticamente estes indicadores e o dashboard.</span></div><div className="toolbar"><label>Centro<select value={centerId} onChange={(event) => setCenterId(event.target.value)}>{centers.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}</select></label><label className="field-search"><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar indicador ou código..." /></label><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="">{currentYear}</option>{availableYears.map((value) => <option key={value}>{value}</option>)}</select>{canExport && <><Button variant="secondary" className="push" onClick={() => download('pdf')}><Download />PDF</Button><Button variant="secondary" onClick={() => download('excel')}><Download />Excel</Button><Button variant="secondary" onClick={() => download('csv')}><Download />CSV</Button></>}</div><ErrorMessage message={error} /><section className="metric-grid">{items.map((item) => <article className="panel metric indicator-card" key={item.id}><div><span>{item.category}</span><code>{item.code}</code></div><h3>{item.name}</h3><h2>{item.json_value ? `${item.json_value.length} organizações` : formatIndicatorValue(item.value ?? item.text_value, item.value_type, item.unit)}</h2><p>{item.description}</p>{Array.isArray(item.json_value) && <div className="indicator-details" aria-label={`Detalhamento de ${item.name}`}>{item.json_value.map((detail) => <div key={detail.organization}><strong>{detail.organization}</strong><span>Desafios: {detail.challenges} · Soluções: {detail.solutions} · Negócios: {detail.deals}</span></div>)}</div>}<footer><em>{item.period}</em><small>{item.source}</small></footer></article>)}</section>{!items.length && !error && <article className="panel empty-state">Nenhum indicador encontrado para os filtros.</article>}</div>;
 }
 
 function Residents() {

@@ -1,4 +1,5 @@
 import { pool, query } from '../db/pool.js';
+import { serviceError } from '../utils/validation.js';
 
 export async function findCenter(id) {
   const { rows } = await query('SELECT id,code,name FROM innovation_centers WHERE id=$1 AND active', [id]);
@@ -61,10 +62,18 @@ export async function saveDraft(id, { draft, summary, warnings, status }) {
   return rows[0];
 }
 
-export async function replaceBatchRecords(batch, records, userId) {
+export async function replaceBatchRecords(batch, records, userId, finalize) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Serialize imports for the same center, including different batches.
+    await client.query('SELECT id FROM innovation_centers WHERE id=$1 FOR UPDATE', [batch.innovation_center_id]);
+    const locked = await client.query('SELECT status,updated_at FROM indicator_import_batches WHERE id=$1 FOR UPDATE', [batch.id]);
+    if (locked.rows[0]?.status === 'IMPORTED') throw serviceError(409, 'Esta importação já foi confirmada.', 'IMPORT_ALREADY_CONFIRMED');
+    if (!locked.rows[0] || !['REVIEW_PENDING', 'WITH_WARNINGS', 'VALIDATED'].includes(locked.rows[0].status)
+      || new Date(locked.rows[0].updated_at).getTime() !== new Date(batch.updated_at).getTime()) {
+      throw serviceError(409, 'A revisão foi alterada. Recarregue a importação antes de confirmar.', 'IMPORT_NOT_CONFIRMABLE');
+    }
     await client.query(
       `UPDATE indicator_records r SET active=FALSE,deleted_at=NOW(),updated_at=NOW(),updated_by=$5
        FROM indicator_import_batches b
@@ -77,7 +86,7 @@ export async function replaceBatchRecords(batch, records, userId) {
         await client.query(
           `UPDATE indicator_records SET active=FALSE,deleted_at=NOW(),updated_at=NOW(),updated_by=$3
            WHERE innovation_center_id=$1 AND record_type='RESIDENT_COMPANY' AND active AND deleted_at IS NULL
-             AND extra->>'documentHash'=$2`,
+             AND import_batch_id IS NOT NULL AND extra->>'documentHash'=$2`,
           [batch.innovation_center_id, record.extra.documentHash, userId],
         );
       }
@@ -96,15 +105,17 @@ export async function replaceBatchRecords(batch, records, userId) {
           JSON.stringify(record.extra || {}), batch.id, record.sourceRows, userId],
       );
     }
+    const result = finalize ? await finalize(client) : undefined;
     await client.query('COMMIT');
+    return result;
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   } finally { client.release(); }
 }
 
-export async function markImported(id, { imported, ignored, summary, userId }) {
-  const { rows } = await query(
+export async function markImported(id, { imported, ignored, summary, userId }, client = { query }) {
+  const { rows } = await client.query(
     `UPDATE indicator_import_batches SET status='IMPORTED',total_imported=$2,total_ignored=$3,
        summary=$4::jsonb,confirmed_by=$5,confirmed_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING *`,
     [id, imported, ignored, JSON.stringify(summary), userId],

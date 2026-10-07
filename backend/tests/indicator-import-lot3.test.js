@@ -11,7 +11,8 @@ import * as service from '../src/services/indicatorImportService.js';
 
 const admin = { sub: 'admin-1', role: 'ADMIN' };
 const eventBatch = (items, status = 'WITH_WARNINGS') => ({ id: 'batch-1', import_type: 'EVENTS', innovation_center_id: 'center-1', center_name: 'Centro', year: 2026, status, file_hash: 'HASH', warnings: [], summary: {}, draft: { items } });
-beforeEach(() => { vi.clearAllMocks(); mocks.findPrevious.mockReset(); mocks.findCenter.mockResolvedValue({ id: 'center-1', name: 'Centro' }); mocks.record.mockResolvedValue(); mocks.recompute.mockResolvedValue(); });
+beforeEach(() => { vi.clearAllMocks();
+  mocks.replaceBatchRecords.mockImplementation(async (_batch, _records, _user, finalize) => finalize(undefined)); mocks.findPrevious.mockReset(); mocks.findCenter.mockResolvedValue({ id: 'center-1', name: 'Centro' }); mocks.record.mockResolvedValue(); mocks.recompute.mockResolvedValue(); });
 
 describe('importação de indicadores (RF-009)', () => {
   it('gera preview válido de eventos com aviso e persiste o rascunho', async () => {
@@ -62,8 +63,8 @@ describe('importação de indicadores (RF-009)', () => {
     const item = { id: 'e1', name: 'Evento', location: 'Auditório', startAt: '2026-04-01T10:00:00.000Z', sourceRows: [2], included: true, mode: 'NOT_INFORMED', grouped: false };
     const batch = eventBatch([item], 'VALIDATED'); mocks.findBatch.mockResolvedValue(batch); mocks.markImported.mockResolvedValue({ ...batch, status: 'IMPORTED' });
     await expect(service.confirm('batch-1', admin)).resolves.toMatchObject({ status: 'IMPORTED' });
-    expect(mocks.replaceBatchRecords).toHaveBeenCalledWith(batch, [expect.objectContaining({ recordType: 'EVENT', mode: null })], 'admin-1');
-    expect(mocks.recompute).toHaveBeenCalledWith('center-1', 2026, 'admin-1');
+    expect(mocks.replaceBatchRecords).toHaveBeenCalledWith(batch, [expect.objectContaining({ recordType: 'EVENT', mode: null })], 'admin-1', expect.any(Function));
+    expect(mocks.recompute).toHaveBeenCalledWith('center-1', 2026, 'admin-1', undefined, ['EVENTOS_REALIZADOS']);
   });
   it('bloqueia confirmação repetida, estado inválido e lote sem alterações incluídas', async () => {
     mocks.findBatch.mockResolvedValueOnce(eventBatch([], 'IMPORTED'));
@@ -124,7 +125,7 @@ describe('importação de indicadores (RF-009)', () => {
     mocks.findBatch.mockResolvedValue(ready);
     mocks.markImported.mockResolvedValue({ ...ready, status: 'IMPORTED' });
     await service.confirm('batch-1', admin);
-    expect(mocks.replaceBatchRecords).toHaveBeenCalledWith(ready, [expect.objectContaining({ theme: 'Tecnologia revisada', participatingCompanies: 3 })], admin.sub);
+    expect(mocks.replaceBatchRecords).toHaveBeenCalledWith(ready, [expect.objectContaining({ theme: 'Tecnologia revisada', participatingCompanies: 3 })], admin.sub, expect.any(Function));
     expect(mocks.recompute).toHaveBeenCalledTimes(1);
   });
 
@@ -156,7 +157,7 @@ describe('importação de indicadores (RF-009)', () => {
     expect(record.extra).toMatchObject({ document: '11222333000181', totalArea: 110.8 });
     expect(record.extra.contracts).toHaveLength(2);
     expect(mocks.replaceBatchRecords.mock.calls[0][1]).toHaveLength(1);
-    expect(mocks.markImported).toHaveBeenCalledWith('batch-1', expect.objectContaining({ imported: 1, ignored: 6 }));
+    expect(mocks.markImported).toHaveBeenCalledWith('batch-1', expect.objectContaining({ imported: 1, ignored: 6 }), undefined);
   });
 
   it('CNPJ ausente ou inválido permanece bloqueado até correção ou exclusão', async () => {

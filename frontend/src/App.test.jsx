@@ -10,6 +10,9 @@ const auth = vi.hoisted(() => ({
 }));
 const api = vi.hoisted(() => ({
   getAccessRequests: vi.fn(),
+  getIndicators: vi.fn(),
+  getIndicatorHistory: vi.fn(),
+  getInnovationCenters: vi.fn(),
   getOrganizations: vi.fn(),
   getUsers: vi.fn(),
   getEligibleFormRecipients: vi.fn(),
@@ -23,6 +26,9 @@ vi.mock('./contexts/AuthContext.jsx', () => ({ useAuth: () => auth.value }));
 vi.mock('./services/api', async (original) => ({
   ...(await original()),
   getAccessRequests: api.getAccessRequests,
+  getIndicators: api.getIndicators,
+  getIndicatorHistory: api.getIndicatorHistory,
+  getInnovationCenters: api.getInnovationCenters,
   getOrganizations: api.getOrganizations,
   getUsers: api.getUsers,
   getEligibleFormRecipients: api.getEligibleFormRecipients,
@@ -35,6 +41,9 @@ import App from './App';
 
 beforeEach(() => {
   api.getAccessRequests.mockResolvedValue([]);
+  api.getIndicators.mockResolvedValue([]);
+  api.getIndicatorHistory.mockResolvedValue([]);
+  api.getInnovationCenters.mockResolvedValue([]);
   api.getOrganizations.mockResolvedValue([]);
   api.getUsers.mockResolvedValue([]);
   api.getEligibleFormRecipients.mockResolvedValue([]);
@@ -50,6 +59,23 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('roteamento principal', () => {
+  it('consulta a fonte consolidada do centro selecionado em Indicadores', async () => {
+    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }, { id: 'center-b', name: 'Centro B' }]);
+    api.getIndicatorHistory.mockResolvedValue(['2026']);
+    api.getIndicators.mockImplementation(async ({ centerId }) => [{
+      id: centerId, code: 'EVENTOS_REALIZADOS', name: `Eventos ${centerId}`,
+      value: centerId === 'center-a' ? 1 : 2, value_type: 'INTEGER', unit: 'UNIDADE',
+      category: 'Eventos', period: '2026', source: 'SYSTEM_CALCULATION',
+    }]);
+    window.history.replaceState({}, '', '/indicators');
+    render(<App />);
+    expect(await screen.findByText('Eventos center-a')).toBeTruthy();
+    expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-a' });
+    fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'center-b' } });
+    expect(await screen.findByText('Eventos center-b')).toBeTruthy();
+    expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-b' });
+  });
+
   it('renderiza layout, menu e painel do ADMIN em /admin', async () => {
     window.history.replaceState({}, '', '/admin');
 

@@ -16,8 +16,8 @@ export async function listCenters({ includeInactive = false } = {}) {
   return rows;
 }
 
-export async function findCenter(id) {
-  const { rows } = await query('SELECT * FROM innovation_centers WHERE id=$1', [id]);
+export async function findCenter(id, client = { query }) {
+  const { rows } = await client.query('SELECT * FROM innovation_centers WHERE id=$1', [id]);
   return rows[0];
 }
 
@@ -41,8 +41,8 @@ export async function updateCenter(id, data, userId) {
   return rows[0];
 }
 
-export async function listDefinitions(centerId) {
-  const { rows } = await query(
+export async function listDefinitions(centerId, client = { query }) {
+  const { rows } = await client.query(
     `SELECT d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.periodicity,
        d.calculation_type,d.annual_aggregation,d.sort_order,d.source_entity,d.formula,
        d.not_applicable_allowed,d.active,COALESCE(a.applicable,TRUE) AS applicable,a.notes AS applicability_notes
@@ -258,8 +258,8 @@ export async function deleteRecord(id, userId) {
   return rows[0];
 }
 
-export async function recordsForCalculation(centerId, year) {
-  const { rows } = await query(
+export async function recordsForCalculation(centerId, year, client = { query }) {
+  const { rows } = await client.query(
     `SELECT * FROM indicator_records WHERE innovation_center_id=$1 AND deleted_at IS NULL
        AND ((year IS NULL AND event_at IS NULL AND start_date IS NULL) OR year=$2::int OR EXTRACT(YEAR FROM event_at)=$2::int
          OR (start_date<=make_date($2::int,12,31) AND (end_date IS NULL OR end_date>=make_date($2::int,1,1))))`,
@@ -268,8 +268,8 @@ export async function recordsForCalculation(centerId, year) {
   return rows;
 }
 
-export async function manualValuesForCalculation(centerId, year) {
-  const { rows } = await query(
+export async function manualValuesForCalculation(centerId, year, client = { query }) {
+  const { rows } = await client.query(
     `SELECT v.*,d.code,d.value_type,d.annual_aggregation FROM indicator_values v
      JOIN indicator_definitions d ON d.id=v.indicator_id
      WHERE v.innovation_center_id=$1 AND v.year=$2
@@ -280,18 +280,19 @@ export async function manualValuesForCalculation(centerId, year) {
   return rows;
 }
 
-export async function allDefinitions() {
-  const { rows } = await query(
+export async function allDefinitions(client = { query }) {
+  const { rows } = await client.query(
     `SELECT * FROM indicator_definitions WHERE active`,
   );
   return rows;
 }
 
-export async function clearSystemValues(centerId, year, userId, client = { query }) {
+export async function clearSystemValues(centerId, year, userId, client = { query }, indicatorIds = null) {
   await client.query(
     `UPDATE indicator_values SET deleted_at=NOW(),updated_by=$3,updated_at=NOW()
      WHERE innovation_center_id=$1 AND year=$2
-       AND source_type='SYSTEM_CALCULATION' AND deleted_at IS NULL`,
-    [centerId, year, userId],
+       AND source_type='SYSTEM_CALCULATION' AND deleted_at IS NULL
+       AND ($4::uuid[] IS NULL OR indicator_id=ANY($4::uuid[]))`,
+    [centerId, year, userId, indicatorIds],
   );
 }

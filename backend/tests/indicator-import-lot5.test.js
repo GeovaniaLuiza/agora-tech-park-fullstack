@@ -3,7 +3,7 @@ import { residentWorkbookFixture } from './fixtures/indicator-import-workbooks.j
 import { XLSX_MIME } from '../src/domain/indicatorImportCatalog.js';
 
 const mocks = vi.hoisted(() => ({
-  repo: { findCenter: vi.fn(), findPrevious: vi.fn(), createBatch: vi.fn(), findBatch: vi.fn(), latestDraft: vi.fn(), saveDraft: vi.fn(), replaceBatchRecords: vi.fn(), markImported: vi.fn() },
+  repo: { findCenter: vi.fn(), findPrevious: vi.fn(), createBatch: vi.fn(), findBatch: vi.fn(), latestDraft: vi.fn(), saveDraft: vi.fn(), withLockedBatch: vi.fn(), replaceBatchRecords: vi.fn(), markImported: vi.fn() },
   audit: vi.fn(), recompute: vi.fn(),
 }));
 vi.mock('../src/repositories/indicatorImportRepository.js', () => mocks.repo);
@@ -19,7 +19,7 @@ const batch = (items = [], overrides = {}) => ({
 });
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.clearAllMocks(); mocks.repo.withLockedBatch.mockImplementation(async (id, callback) => callback(await mocks.repo.findBatch(id), undefined));
   mocks.repo.saveDraft.mockReset();
   mocks.repo.findCenter.mockResolvedValue({ id: 'center-1', name: 'Centro' });
   mocks.audit.mockResolvedValue();
@@ -106,12 +106,12 @@ describe('indicatorImportService lote 5', () => {
 
   it('confirma residentes convertendo campos opcionais e ignorando excluidos', async () => {
     const included = { id: 'r1', name: 'Empresa', included: true, location: 'HUB', rooms: ['101'], contractType: '', startDate: '2026-01-01', endDate: null, sourceRows: [2], contracts: [], discontinuous: false };
-    const excluded = { ...included, id: 'r2', included: false };
+    const excluded = { ...included, id: 'r2', sourceRows: [3], included: false, reviewStatus: 'EXCLUDED' };
     const residentBatch = batch([included, excluded], { import_type: 'RESIDENTS', status: 'VALIDATED' });
     mocks.repo.findBatch.mockResolvedValue(residentBatch);
     mocks.repo.markImported.mockResolvedValue({ ...residentBatch, status: 'IMPORTED' });
     await service.confirm('batch-1', admin);
-    expect(mocks.repo.replaceBatchRecords).toHaveBeenCalledWith(residentBatch, [expect.objectContaining({ recordType: 'RESIDENT_COMPANY', location: 'HUB - Salas 101', subtype: null })], 'admin-1');
-    expect(mocks.repo.markImported).toHaveBeenCalledWith('batch-1', expect.objectContaining({ imported: 1, ignored: 1 }));
+    expect(mocks.repo.replaceBatchRecords).toHaveBeenCalledWith(residentBatch, [expect.objectContaining({ recordType: 'RESIDENT_COMPANY', location: 'HUB - Salas 101', subtype: null })], 'admin-1', undefined);
+    expect(mocks.repo.markImported).toHaveBeenCalledWith('batch-1', expect.objectContaining({ imported: 1, ignored: 1 }), undefined);
   });
 });

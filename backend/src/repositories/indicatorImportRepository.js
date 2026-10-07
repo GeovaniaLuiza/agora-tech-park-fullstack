@@ -61,10 +61,26 @@ export async function saveDraft(id, { draft, summary, warnings, status }) {
   return rows[0];
 }
 
-export async function replaceBatchRecords(batch, records, userId) {
+export async function withLockedBatch(id, callback) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const { rows } = await client.query(`SELECT b.*,c.name AS center_name FROM indicator_import_batches b
+      JOIN innovation_centers c ON c.id=b.innovation_center_id WHERE b.id=$1 FOR UPDATE OF b`, [id]);
+    if (rows[0]) await client.query('SELECT id FROM innovation_centers WHERE id=$1 FOR UPDATE', [rows[0].innovation_center_id]);
+    const result = await callback(rows[0], client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
+}
+
+export async function replaceBatchRecords(batch, records, userId, transaction = null) {
+  const client = transaction || await pool.connect();
+  try {
+    if (!transaction) await client.query('BEGIN');
     await client.query(
       `UPDATE indicator_records r SET active=FALSE,deleted_at=NOW(),updated_at=NOW(),updated_by=$5
        FROM indicator_import_batches b
@@ -96,15 +112,15 @@ export async function replaceBatchRecords(batch, records, userId) {
           JSON.stringify(record.extra || {}), batch.id, record.sourceRows, userId],
       );
     }
-    await client.query('COMMIT');
+    if (!transaction) await client.query('COMMIT');
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transaction) await client.query('ROLLBACK');
     throw error;
-  } finally { client.release(); }
+  } finally { if (!transaction) client.release(); }
 }
 
-export async function markImported(id, { imported, ignored, summary, userId }) {
-  const { rows } = await query(
+export async function markImported(id, { imported, ignored, summary, userId }, client = { query }) {
+  const { rows } = await client.query(
     `UPDATE indicator_import_batches SET status='IMPORTED',total_imported=$2,total_ignored=$3,
        summary=$4::jsonb,confirmed_by=$5,confirmed_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING *`,
     [id, imported, ignored, JSON.stringify(summary), userId],

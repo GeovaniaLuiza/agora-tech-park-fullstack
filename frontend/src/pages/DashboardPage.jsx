@@ -7,7 +7,7 @@ import DashboardChart from '../components/dashboard/DashboardChart.jsx';
 import OperationalSummary from '../components/dashboard/OperationalSummary.jsx';
 import CapacitationChart from '../components/dashboard/CapacitationChart.jsx';
 import { EmptyState, ErrorState, LoadingState } from '../components/dashboard/DashboardStates.jsx';
-import { formatDate } from '../utils/formatters.js';
+import { formatDate, formatNumber } from '../utils/formatters.js';
 import {
   downloadDashboardSpreadsheet, getDashboardCompanies, getDashboardEngagement,
   getDashboardFinancial, getDashboardProjects, getInstitutionalDashboard,
@@ -89,6 +89,8 @@ export default function DashboardPage() {
   const financial = sections.financial.data?.series || [];
   const projects = sections.projects.data?.series || [];
   const engagement = sections.engagement.data?.series || [];
+  const occupationMetrics = sections.companies.data?.metrics;
+  const eventMetrics = sections.engagement.data?.metrics;
   return <div className="content executive-dashboard">
     <div className="dashboard-page-head"><div><span>PAINEL EXECUTIVO</span><h2>{centers.find((center) => center.id === filters.centerId)?.name || 'Centro de Inovação'}</h2><p>Resultados institucionais consolidados e operação da plataforma.</p></div><div className="dashboard-head-actions"><small>Última atualização: {formatDate(sections.institutional.data?.lastUpdate)}</small><button className="button secondary" disabled={exporting} onClick={exportReport}><Download />{exporting ? 'Exportando...' : 'Exportar relatório'}</button></div></div>
     <DashboardFilters filters={filters} centers={centers} categories={sections.institutional.data?.categories || []} onChange={setFilters} onClear={clearFilters} />
@@ -102,10 +104,10 @@ export default function DashboardPage() {
 
     <section aria-labelledby="charts-title"><div className="section-heading"><div><span>SÉRIES MENSAIS</span><h2 id="charts-title">Evolução dos indicadores</h2></div></div>
       <div className="dashboard-chart-grid">
-        {sections.companies.loading ? <LoadingState cards={3} /> : sections.companies.error ? <ErrorState message={sections.companies.error} onRetry={loadCompanies} /> : <><DashboardChart title="Evolução das empresas ativas" series={companies.filter((item) => item.code === 'EMPRESAS_ATIVAS_TOTAL')} /><DashboardChart title="Novas empresas por mês" type="bar" series={companies.filter((item) => item.code === 'NOVAS_EMPRESAS_ATIVAS')} /><DashboardChart title="Empresas residentes por mês" type="bar" series={companies.filter((item) => item.code === 'EMPRESAS_RESIDENTES')} /></>}
+        {sections.companies.loading ? <LoadingState cards={3} /> : sections.companies.error ? <ErrorState message={sections.companies.error} onRetry={loadCompanies} /> : <><DashboardChart title="Evolução das empresas ativas" series={companies.filter((item) => item.code === 'EMPRESAS_ATIVAS_TOTAL')} /><DashboardChart title="Novas empresas por mês" type="bar" series={companies.filter((item) => item.code === 'NOVAS_EMPRESAS_ATIVAS')} /><DashboardChart title="Empresas residentes por mês" subtitle={occupationMetrics && `Ocupações no período: ${formatNumber(occupationMetrics.occupations)} · Área: ${formatNumber(occupationMetrics.area)} m²`} type="bar" series={companies.filter((item) => item.code === 'EMPRESAS_RESIDENTES')} /></>}
         {sections.projects.loading ? <LoadingState cards={1} /> : sections.projects.error ? <ErrorState message={sections.projects.error} onRetry={loadProjects} /> : <DashboardChart title="Projetos submetidos e ganhos" type="bar" series={projects.filter((item) => ['PROJETOS_SUBMETIDOS', 'PROJETOS_GANHOS'].includes(item.code))} />}
         {sections.financial.loading ? <LoadingState cards={1} /> : sections.financial.error ? <ErrorState message={sections.financial.error} onRetry={loadFinancial} /> : <DashboardChart title="Receita, despesas e resultado" series={financial} />}
-        {sections.engagement.loading ? <LoadingState cards={3} /> : sections.engagement.error ? <ErrorState message={sections.engagement.error} onRetry={loadEngagement} /> : <><DashboardChart title="Visitantes por mês" type="bar" series={engagement.filter((item) => item.code === 'VISITANTES_CENTRO')} /><DashboardChart title="Eventos realizados por mês" type="bar" series={engagement.filter((item) => item.code === 'EVENTOS_REALIZADOS')} /><CapacitationChart series={engagement.filter((item) => ['CAPACITACOES_REALIZADAS', 'EMPRESAS_CAPACITADAS', 'PESSOAS_CAPACITADAS'].includes(item.code))} /></>}
+        {sections.engagement.loading ? <LoadingState cards={3} /> : sections.engagement.error ? <ErrorState message={sections.engagement.error} onRetry={loadEngagement} /> : <><DashboardChart title="Visitantes por mês" type="bar" series={engagement.filter((item) => item.code === 'VISITANTES_CENTRO')} /><DashboardChart title="Eventos realizados por mês" subtitle={eventMetrics && `Participantes: ${formatNumber(eventMetrics.participants)} · Empresas participantes: ${formatNumber(eventMetrics.participatingCompanies)}`} type="bar" series={engagement.filter((item) => item.code === 'EVENTOS_REALIZADOS')} /><CapacitationChart series={engagement.filter((item) => ['CAPACITACOES_REALIZADAS', 'EMPRESAS_CAPACITADAS', 'PESSOAS_CAPACITADAS'].includes(item.code))} /></>}
       </div>
     </section>
     <div className="dashboard-footer-link"><button className="button secondary" onClick={() => navigate('/indicators')}>Ver todos os indicadores</button></div>

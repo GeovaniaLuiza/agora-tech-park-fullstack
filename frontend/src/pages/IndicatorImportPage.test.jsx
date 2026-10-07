@@ -100,7 +100,7 @@ describe('telas de importação de indicadores', () => {
 
     selection = screen.getAllByRole('checkbox').filter((element) => !element.closest('label'));
     fireEvent.click(selection[0]); fireEvent.click(selection[1]);
-    fireEvent.click(screen.getByRole('button', { name: /Restaurar/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar' }));
     selection = screen.getAllByRole('checkbox').filter((element) => !element.closest('label'));
     fireEvent.click(selection[0]); fireEvent.click(selection[1]);
     fireEvent.change(screen.getByDisplayValue('Participantes: informar manualmente'), { target: { value: 'MAX' } });
@@ -245,4 +245,84 @@ it('mostra resumo de empresas e ocupações antes da confirmação de residentes
   await screen.findByText('Importação concluída');
   expect(api.confirmIndicatorImport).toHaveBeenCalledWith('batch-2');
   expect(screen.getByText(/Registros processados: 1/)).toBeTruthy();
+});
+
+it('salva automaticamente as correções e preserva o draft ao voltar ao Preview e avançar para Confirmar', async () => {
+  const original = { ...eventItems[0], included: true, validationStatus: 'VALID', original: { ...eventItems[0] } };
+  const draft = { ...eventBatch, draft: { items: [original] } };
+  api.uploadIndicatorImport.mockResolvedValueOnce(draft);
+  api.saveIndicatorImportReview.mockImplementation(async (_id, items) => ({ ...draft, draft: { items } }));
+  api.confirmIndicatorImport.mockResolvedValueOnce({ ...draft, status: 'IMPORTED' });
+  render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+  await screen.findByRole('option', { name: 'Centro de Inovação' });
+  fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['x'], 'Eventos.xlsx')] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+  await openReview();
+  fireEvent.change(screen.getByLabelText('Participantes da linha 2'), { target: { value: '42' } });
+  await waitFor(() => expect(api.saveIndicatorImportReview).toHaveBeenCalledWith('batch-1', [expect.objectContaining({ participants: '42' })]), { timeout: 2500 });
+  fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+  await waitFor(() => expect(screen.getByLabelText('Participantes da linha 2').disabled).toBe(true));
+  expect(screen.getByLabelText('Participantes da linha 2').value).toBe('42');
+  fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
+  await waitFor(() => expect(screen.getByLabelText('Participantes da linha 2').disabled).toBe(false));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+  await screen.findByText('Resumo final');
+  expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+  await screen.findByText('Importação concluída');
+  expect(api.confirmIndicatorImport).toHaveBeenCalledTimes(1);
+});
+
+it('permite corrigir o residente com valores originais, ignorar e restaurar a pendência', async () => {
+  const item = { ...residentItems[0], document: '', sourceRows: [3], validationStatus: 'REVIEW_REQUIRED',
+    contracts: [{ sourceRow: 3, block: 'HUB', unit: 'HUB 1', legend: 'Locada', eligibleBlock: true, areaInput: '20', startInput: '2026-01-01', endInput: '30/04/20257' }],
+    issues: [{ field: 'document', message: 'CNPJ ausente na linha 3' }, { field: 'endInput', message: 'Data inválida (Fim) na linha 3' }] };
+  item.original = structuredClone(item);
+  const draft = { ...residentBatch, draft: { items: [item] } };
+  api.uploadIndicatorImport.mockResolvedValueOnce(draft);
+  api.saveIndicatorImportReview.mockImplementation(async (_id, items) => ({ ...draft, draft: { items: items.map((current) => ({
+    ...current, validationStatus: current.reviewStatus === 'EXCLUDED' ? 'IGNORED' : current.document && current.contracts[0].endInput === '30/04/2026' ? 'VALID' : 'REVIEW_REQUIRED',
+  })) } }));
+  render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+  await screen.findByRole('option', { name: 'Centro de Inovação' });
+  fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['x'], 'Clientes.xlsx')] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+  await openReview();
+  expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Ignorar registro' }));
+  fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+  await screen.findByRole('button', { name: 'Restaurar registro' });
+  fireEvent.click(screen.getByRole('button', { name: 'Restaurar registro' }));
+  fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(true));
+  fireEvent.click(screen.getByRole('button', { name: 'Corrigir' }));
+  expect(screen.getByText('Valor original: 30/04/20257')).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('CNPJ'), { target: { value: '73192648000199' } });
+  fireEvent.change(screen.getByLabelText('endInput da linha 3'), { target: { value: '30/04/2026' } });
+  fireEvent.change(screen.getByLabelText('sector da linha 3'), { target: { value: 'Pesquisa sintética' } });
+  fireEvent.change(screen.getByLabelText('nationality da linha 3'), { target: { value: 'Sintética' } });
+  fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(false));
+  expect(screen.getByText('Valor original: 30/04/20257')).toBeTruthy();
+  expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith('batch-2', [expect.objectContaining({
+    document: '73192648000199', sector: 'Pesquisa sintética', nationality: 'Sintética',
+    contracts: [expect.objectContaining({ endInput: '30/04/2026' })],
+  })]);
+});
+
+it('falha ao salvar mantém a revisão aberta e impede confirmação', async () => {
+  const draft = { ...eventBatch, draft: { items: [{ ...eventItems[0], included: true }] } };
+  api.uploadIndicatorImport.mockResolvedValueOnce(draft);
+  api.saveIndicatorImportReview.mockRejectedValue(new Error('Não foi possível salvar o draft'));
+  render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+  await screen.findByRole('option', { name: 'Centro de Inovação' });
+  fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['x'], 'Eventos.xlsx')] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+  await openReview();
+  fireEvent.change(screen.getByLabelText('Local da linha 2'), { target: { value: 'HUB corrigido' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+  await screen.findByRole('alert');
+  expect(screen.queryByText('Resumo final')).toBeNull();
+  expect(screen.getByLabelText('Local da linha 2').value).toBe('HUB corrigido');
+  expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
 });

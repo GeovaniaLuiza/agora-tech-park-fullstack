@@ -1,5 +1,7 @@
 import { pool, query } from '../db/pool.js';
 
+const defaultClient = { query };
+
 export async function findCenter(id) {
   const { rows } = await query('SELECT id,code,name FROM innovation_centers WHERE id=$1 AND active', [id]);
   return rows[0];
@@ -119,7 +121,7 @@ export async function replaceBatchRecords(batch, records, userId, transaction = 
   } finally { if (!transaction) client.release(); }
 }
 
-export async function markImported(id, { imported, ignored, summary, userId }, client = { query }) {
+export async function markImported(id, { imported, ignored, summary, userId }, client = defaultClient) {
   const { rows } = await client.query(
     `UPDATE indicator_import_batches SET status='IMPORTED',total_imported=$2,total_ignored=$3,
        summary=$4::jsonb,confirmed_by=$5,confirmed_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING *`,

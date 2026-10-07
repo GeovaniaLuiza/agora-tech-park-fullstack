@@ -1,5 +1,7 @@
 import { pool, query } from '../db/pool.js';
 
+const defaultClient = { query };
+
 const valueProjection = `SELECT v.id,v.indicator_id,v.innovation_center_id,v.year,v.month,v.numeric_value,
   v.text_value,v.json_value,v.notes,v.source_type,v.created_at,v.updated_at,
   creator.name AS created_by_name,updater.name AS updated_by_name,
@@ -16,7 +18,7 @@ export async function listCenters({ includeInactive = false } = {}) {
   return rows;
 }
 
-export async function findCenter(id, client = { query }) {
+export async function findCenter(id, client = defaultClient) {
   const { rows } = await client.query('SELECT * FROM innovation_centers WHERE id=$1', [id]);
   return rows[0];
 }
@@ -41,7 +43,7 @@ export async function updateCenter(id, data, userId) {
   return rows[0];
 }
 
-export async function listDefinitions(centerId, client = { query }) {
+export async function listDefinitions(centerId, client = defaultClient) {
   const { rows } = await client.query(
     `SELECT d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.periodicity,
        d.calculation_type,d.annual_aggregation,d.sort_order,d.source_entity,d.formula,
@@ -258,7 +260,7 @@ export async function deleteRecord(id, userId) {
   return rows[0];
 }
 
-export async function recordsForCalculation(centerId, year, client = { query }) {
+export async function recordsForCalculation(centerId, year, client = defaultClient) {
   const { rows } = await client.query(
     `SELECT * FROM indicator_records WHERE innovation_center_id=$1 AND deleted_at IS NULL
        AND ((year IS NULL AND event_at IS NULL AND start_date IS NULL) OR year=$2::int OR EXTRACT(YEAR FROM event_at AT TIME ZONE 'UTC')=$2::int
@@ -268,7 +270,7 @@ export async function recordsForCalculation(centerId, year, client = { query }) 
   return rows;
 }
 
-export async function manualValuesForCalculation(centerId, year, client = { query }) {
+export async function manualValuesForCalculation(centerId, year, client = defaultClient) {
   const { rows } = await client.query(
     `SELECT v.*,d.code,d.value_type,d.annual_aggregation FROM indicator_values v
      JOIN indicator_definitions d ON d.id=v.indicator_id
@@ -280,7 +282,7 @@ export async function manualValuesForCalculation(centerId, year, client = { quer
   return rows;
 }
 
-export async function allDefinitions(client = { query }) {
+export async function allDefinitions(client = defaultClient) {
   const { rows } = await client.query(
     `SELECT * FROM indicator_definitions WHERE active`,
   );

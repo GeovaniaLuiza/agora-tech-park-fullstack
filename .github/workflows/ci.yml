@@ -65,7 +65,8 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci --prefix backend
       - run: npm run migrate --prefix backend
-      - run: npm run test:coverage --prefix backend
+      - name: Generate combined unit and PostgreSQL integration coverage
+        run: npm run test:coverage --prefix backend
       - uses: actions/upload-artifact@v7
         with:
           name: backend-coverage

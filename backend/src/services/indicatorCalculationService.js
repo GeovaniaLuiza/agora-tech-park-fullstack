@@ -15,9 +15,14 @@ const monthBounds = (year, month) => ({
 const datePart = (value) => value ? new Date(value).toISOString().slice(0, 10) : null;
 const monthOf = (value) => value ? new Date(value).getUTCMonth() + 1 : null;
 const yearOf = (value) => value ? new Date(value).getUTCFullYear() : null;
-const isStockActive = (record, start, end) => record.active
-  && (!record.start_date || datePart(record.start_date) <= end)
-  && (!record.end_date || datePart(record.end_date) >= start);
+const isStockActive = (record, start, end) => {
+  if (!record.active) return false;
+  if (record.record_type === 'RESIDENT_COMPANY' && record.extra?.contracts?.length && !record.extra.manualPeriodOverride) {
+    return record.extra.contracts.some((contract) => (contract.eligibleBlock || record.extra.manualBlockOverride)
+      && (!contract.startDate || contract.startDate <= end) && (!contract.endDate || contract.endDate >= start));
+  }
+  return (!record.start_date || datePart(record.start_date) <= end) && (!record.end_date || datePart(record.end_date) >= start);
+};
 
 function automaticValues(records, center, year, month) {
   const { start, end } = monthBounds(year, month);

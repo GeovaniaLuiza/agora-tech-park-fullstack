@@ -64,3 +64,15 @@ describe('serviço central de cálculo de indicadores', () => {
     expect(value(rows, 'EMPRESAS_RESIDENTES', 4)).toBe(1);
   });
 });
+
+it('conta a empresa uma vez por mês e respeita intervalos entre ocupações', () => {
+  const rows = calculate([definition('EMPRESAS_RESIDENTES')], [{
+    record_type: 'RESIDENT_COMPANY', active: true, start_date: '2026-01-01', end_date: '2026-08-31',
+    extra: { contracts: [
+      { eligibleBlock: true, startDate: '2026-01-01', endDate: '2026-02-28' },
+      { eligibleBlock: true, startDate: '2026-01-01', endDate: '2026-01-31' },
+      { eligibleBlock: true, startDate: '2026-07-01', endDate: '2026-08-31' },
+    ] },
+  }]);
+  expect([1, 2, 3, 6, 7, 8, 9].map((month) => value(rows, 'EMPRESAS_RESIDENTES', month))).toEqual([1, 1, 0, 0, 1, 1, 0]);
+});

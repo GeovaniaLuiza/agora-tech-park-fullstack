@@ -119,6 +119,18 @@ function writeResidents(worksheet, records, strategy) {
     return count;
   });
   monthly.forEach((value, index) => { worksheet.getCell(1516, index + 2).value = value; });
+  // Imported companies can have gaps between occupations. The official stock
+  // must use the same contract periods as the dashboard, counted once per CNPJ.
+  monthly.forEach((value, index) => {
+    const { start, end } = monthBounds(IMPORT_YEAR, index + 1);
+    const adjustment = records.reduce((sum, record) => {
+      if (!record.extra?.contracts?.length || record.extra.manualPeriodOverride) return sum;
+      const aggregate = overlaps(record.start_date ? new Date(record.start_date).toISOString().slice(0, 10) : null, record.end_date ? new Date(record.end_date).toISOString().slice(0, 10) : null, start, end);
+      const occupied = record.extra.contracts.some((contract) => (contract.eligibleBlock || record.extra.manualBlockOverride) && overlaps(contract.startDate, contract.endDate, start, end));
+      return sum + Number(occupied) - Number(aggregate);
+    }, 0);
+    worksheet.getCell(1516, index + 2).value = value + adjustment;
+  });
 }
 
 export async function generateOfficialWorkbook({ centerId, year = IMPORT_YEAR, strategy = 'CANCEL' }, user) {
@@ -131,6 +143,24 @@ export async function generateOfficialWorkbook({ centerId, year = IMPORT_YEAR, s
   const records = await repository.recordsForOfficialWorkbook(centerId, Number(year));
   writeEvents(worksheet, records.filter((row) => row.record_type === 'EVENT'), strategy);
   writeResidents(worksheet, records.filter((row) => row.record_type === 'RESIDENT_COMPANY'), strategy);
+  // This is an export of confirmed occupations, using the existing official
+  // workbook; no new input template is introduced.
+  const oldOccupations = workbook.getWorksheet('Ocupações confirmadas');
+  if (oldOccupations) workbook.removeWorksheet(oldOccupations.id);
+  const occupations = workbook.addWorksheet('Ocupações confirmadas');
+  occupations.addRow(['EMPRESA', 'CNPJ', 'Legenda', 'Locador', 'Bloco', 'Bloco e Modúlo', 'Área', 'Vigência', 'Fim', 'Atividades', 'Nacionalidade']);
+  records.filter((row) => row.record_type === 'RESIDENT_COMPANY').forEach((record) => {
+    (record.extra?.contracts || []).forEach((contract) => occupations.addRow([
+      valueText(record.name), valueText(record.extra.documentFormatted || record.extra.documentMasked),
+      valueText(contract.type), valueText(contract.landlord), valueText(contract.block), valueText(contract.unit),
+      contract.area ?? null, excelDate(contract.startDate), excelDate(contract.endDate), valueText(contract.sector), valueText(contract.nationality),
+    ]));
+  });
+  occupations.columns.forEach((column) => { column.width = 24; });
+  occupations.getRow(1).font = { bold: true };
+  occupations.getColumn(7).numFmt = '0.00';
+  occupations.getColumn(8).numFmt = 'dd/mm/yyyy';
+  occupations.getColumn(9).numFmt = 'dd/mm/yyyy';
   if (worksheet.getCell(TEMPLATE_BLOCKS.EVENTS.annualFormulaCell).formula !== 'SUM(B87:M87)') throw serviceError(422, 'A fórmula anual de eventos foi alterada inesperadamente.', 'EVENT_FORMULA_CHANGED');
   if (worksheet.getCell(TEMPLATE_BLOCKS.RESIDENTS.annualFormulaCell).formula !== originalResidentFormula) throw serviceError(422, 'A fórmula anual de residentes foi alterada inesperadamente.', 'RESIDENT_FORMULA_CHANGED');
   const body = Buffer.from(await workbook.xlsx.writeBuffer());

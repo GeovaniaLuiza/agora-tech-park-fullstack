@@ -87,3 +87,28 @@ it('exporta os campos de eventos confirmados após revisão', async () => {
   expect(sheet.getCell('G89').value).toBe(35);
   expect(sheet.getCell('H89').value).toBe(3);
 });
+
+it('exporta todas as ocupações e o estoque mensal de residentes confirmados', async () => {
+  mocks.records.mockResolvedValue([
+    resident({ start_date: '2026-01-01', end_date: '2026-08-31', extra: {
+      documentFormatted: '11.222.333/0001-81',
+      contracts: [
+        { sourceRow: 3, type: 'Locada', landlord: 'Locador', block: 'HUB', unit: 'Sala 201', area: 55.4, startDate: '2026-01-01', endDate: '2026-02-28', eligibleBlock: true, sector: 'Tecnologia', nationality: 'Brasil' },
+        { sourceRow: 4, type: 'Comodato', landlord: 'Locador', block: 'UNI', unit: 'Sala 103', area: 70, startDate: '2026-07-01', endDate: '2026-08-31', eligibleBlock: true },
+      ],
+    } }),
+  ]);
+  const report = await generateOfficialWorkbook({ centerId: 'center-1', year: 2026, strategy: 'REPLACE' }, { sub: 'user-1' });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(report.body);
+  const sheet = workbook.getWorksheet('CI JOINVILLE');
+  expect(sheet.getCell('B1516').value).toBe(1);
+  expect(sheet.getCell('D1516').value).toBe(0);
+  expect(sheet.getCell('H1516').value).toBe(1);
+  const occupations = workbook.getWorksheet('Ocupações confirmadas');
+  expect(occupations.rowCount).toBe(3);
+  expect(occupations.getCell('B2').value).toBe('11.222.333/0001-81');
+  expect(occupations.getCell('G2').value).toBe(55.4);
+  expect(occupations.getCell('E3').value).toBe('UNI');
+  expect(sheet.getCell('N1516').formula).toBe('SUM(B1516:D1516)');
+});

@@ -53,9 +53,10 @@ describe('telas de importação de indicadores', () => {
     const file = new File(['xlsx'], 'residentes.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
     expect(await screen.findByText('Empresa Anônima')).toBeTruthy();
     expect(screen.getByText('11.***.***/0001-81')).toBeTruthy();
-    expect(screen.getByLabelText('Somente HUB / MOB / UNI').checked).toBe(true);
+    expect(screen.getByLabelText('Somente HUB / MOB / UNI').checked).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: /Ver contratos de Empresa Anônima/ }));
     expect(screen.getByText(/Linha 4/)).toBeTruthy();
     expect(screen.getByText('Preview mensal')).toBeTruthy();
@@ -70,6 +71,7 @@ describe('telas de importação de indicadores', () => {
     await screen.findByRole('option', { name: 'Centro de Inovação' });
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['x'], 'residentes.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
     expect(await screen.findByText('Empresa 01')).toBeTruthy();
     expect(screen.queryByText('Empresa 21')).toBeNull();
     expect(screen.getByText('Exibindo 1–20 de 21')).toBeTruthy();
@@ -155,6 +157,7 @@ describe('telas de importação de indicadores', () => {
     await screen.findByRole('option', { name: 'Centro de Inovação' });
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['x'], 'residentes.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
     await screen.findByText('Empresa Anônima');
     fireEvent.click(screen.getByRole('button', { name: /Ver contratos/ }));
     fireEvent.change(screen.getByLabelText('Saída'), { target: { value: '2026-02-15' } });
@@ -191,4 +194,55 @@ it('mostra orientação exata e percorre validação, preview e revisão sem con
   fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
   expect(screen.getByLabelText('Temática da linha 2').disabled).toBe(false);
   expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+});
+it('mostra preview consolidado, áreas, revisão por ocupação e ignorados', async () => {
+  const occupations = [
+    { sourceRow: 3, block: 'HUB', unit: 'Sala 201', area: 55.4, areaInput: '55,40', eligibleBlock: true, startInput: '2026-01-01', endInput: '30/04/20257', startDate: '2026-01-01', endDate: null },
+    { sourceRow: 4, block: 'HUB', unit: 'Sala 202', area: 60, areaInput: '60', eligibleBlock: true },
+    { sourceRow: 5, block: 'UNI', unit: 'Sala 103', area: 70, areaInput: '70', eligibleBlock: true },
+  ];
+  const company = { ...residentItems[0], document: '', documentFormatted: 'Não informado', totalArea: 185.4, contracts: occupations, sourceRows: [3, 4, 5], validationStatus: 'REVIEW_REQUIRED', issues: [{ message: 'CNPJ ausente na linha 3' }, { message: 'Data inválida (Fim) na linha 3' }] };
+  const ignored = { ...residentItems[0], id: 'ignored-6', name: 'Disponível', included: false, ignored: true, validationStatus: 'IGNORED', reviewStatus: 'EXCLUDED', sourceRows: [6] };
+  const loaded = { ...residentBatch, sheetName: 'Clientes', year: 2026, summary: { rowsRead: 4, companies: 1, uniqueCnpjs: 0, occupations: 3, ignored: 1 }, draft: { items: [company, ignored] } };
+  api.uploadIndicatorImport.mockResolvedValueOnce(loaded);
+  api.saveIndicatorImportReview.mockImplementationOnce(async (_id, items) => ({ ...loaded, draft: { items } }));
+  render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+  expect(screen.getByText(/Cabeçalho: linha 2/)).toBeTruthy();
+  expect(screen.getByText(/Bloco e Modúlo/)).toBeTruthy();
+  expect(screen.getByText(/Múltiplas salas\/módulos serão preservadas/)).toBeTruthy();
+  await screen.findByRole('option', { name: 'Centro de Inovação' });
+  fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [new File(['xlsx'], 'Clientes.xlsx')] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+  await openReview();
+  expect(screen.getByText('3 ocupações · Área total: 185,40 m²')).toBeTruthy();
+  expect(screen.getByText('CNPJ ausente na linha 3')).toBeTruthy();
+  expect(screen.getByText('Data inválida (Fim) na linha 3')).toBeTruthy();
+  expect(screen.getAllByText('Ignorado').length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByRole('button', { name: /Ver contratos de Empresa Anônima/ }));
+  expect(screen.getByText(/HUB — Sala 201 — 55,40 m²/)).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('CNPJ'), { target: { value: '11.222.333/0001-81' } });
+  fireEvent.change(screen.getByLabelText('endInput da linha 3'), { target: { value: '30/04/2027' } });
+  fireEvent.change(screen.getByLabelText('areaInput da linha 3'), { target: { value: '56,40' } });
+  fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
+  await waitFor(() => expect(api.saveIndicatorImportReview).toHaveBeenCalledWith('batch-2', [
+    expect.objectContaining({ document: '11.222.333/0001-81', contracts: expect.arrayContaining([expect.objectContaining({ endInput: '30/04/2027', areaInput: '56,40' })]) }),
+    expect.objectContaining({ ignored: true, included: false }),
+  ]));
+  expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+});
+
+it('mostra resumo de empresas e ocupações antes da confirmação de residentes', async () => {
+  const draft = { ...residentBatch, year: 2026, summary: { records: 1, included: 1, excluded: 0, processed: 1 } };
+  api.getIndicatorImportDraft.mockResolvedValueOnce(draft);
+  api.confirmIndicatorImport.mockResolvedValueOnce({ ...draft, status: 'IMPORTED' });
+  vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+  render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+  await screen.findByText('Empresa Anônima');
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+  expect(screen.getByText(/1 empresas serão importadas\/atualizadas · 1 ocupações serão vinculadas · 0 registros serão ignorados/)).toBeTruthy();
+  expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+  await screen.findByText('Importação concluída');
+  expect(api.confirmIndicatorImport).toHaveBeenCalledWith('batch-2');
+  expect(screen.getByText(/Registros processados: 1/)).toBeTruthy();
 });

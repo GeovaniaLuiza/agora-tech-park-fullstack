@@ -78,6 +78,7 @@ describe('importação de indicadores (RF-009)', () => {
 
   it.each([
     ['EVENTS', 'Eventos.xlsx', 'Eventos', { records: 4 }, eventWorkbookFixture],
+    ['RESIDENTS', 'Clientes.xlsx', 'Clientes', { rowsRead: 8, companies: 5, occupations: 6, ignored: 2 }, residentWorkbookFixture],
   ])('gera apenas draft do formato %s usando XLSX sintético', async (type, fileName, sheetName, summary, fixture) => {
     const buffer = await fixture();
     mocks.createBatch.mockImplementation(async (data) => ({
@@ -138,4 +139,72 @@ describe('importação de indicadores (RF-009)', () => {
     mocks.findBatch.mockResolvedValue(eventBatch(saved.draft.items));
     await expect(service.confirm('batch-1', admin)).rejects.toMatchObject({ code: 'REVIEW_REQUIRED', message: expect.stringContaining('linha 5') });
     expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
+  });
+  it('corrige CNPJ e ocupações e mantém ignorados fora da persistência', async () => {
+    const { parseResidentWorkbook } = await import('../src/services/residentImportParser.js');
+    const parsed = await parseResidentWorkbook(await residentWorkbookFixture());
+    const original = { ...eventBatch(parsed.items), import_type: 'RESIDENTS' };
+    mocks.findBatch.mockResolvedValue(original);
+    mocks.saveDraft.mockImplementation(async (_id, data) => ({ ...original, ...data }));
+    const submitted = parsed.items.map((item) => ({ ...item, included: item.name === 'Empresa Anônima A', reviewStatus: item.name === 'Empresa Anônima A' ? 'VALIDATED' : 'EXCLUDED', contracts: item.contracts.map((contract) => ({ ...contract, areaInput: item.name === 'Empresa Anônima A' ? '55,40' : contract.areaInput })) }));
+    const saved = await service.saveReview('batch-1', { items: submitted }, admin);
+    const ready = { ...original, draft: saved.draft, summary: saved.summary };
+    mocks.findBatch.mockResolvedValue(ready);
+    mocks.markImported.mockResolvedValue({ ...ready, status: 'IMPORTED' });
+    await service.confirm('batch-1', admin);
+    const record = mocks.replaceBatchRecords.mock.calls[0][1][0];
+    expect(record.extra).toMatchObject({ document: '11222333000181', totalArea: 110.8 });
+    expect(record.extra.contracts).toHaveLength(2);
+    expect(mocks.replaceBatchRecords.mock.calls[0][1]).toHaveLength(1);
+    expect(mocks.markImported).toHaveBeenCalledWith('batch-1', expect.objectContaining({ imported: 1, ignored: 6 }));
+  });
+
+  it('CNPJ ausente ou inválido permanece bloqueado até correção ou exclusão', async () => {
+    const { parseResidentWorkbook } = await import('../src/services/residentImportParser.js');
+    const parsed = await parseResidentWorkbook(await residentWorkbookFixture());
+    mocks.findBatch.mockResolvedValue({ ...eventBatch(parsed.items), import_type: 'RESIDENTS' });
+    await expect(service.confirm('batch-1', admin)).rejects.toMatchObject({ code: 'REVIEW_REQUIRED' });
+    expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
+  });
+
+it('reconsolida após corrigir o CNPJ e preserva cada ocupação original', async () => {
+  const { parseResidentWorkbook } = await import('../src/services/residentImportParser.js');
+  const parsed = await parseResidentWorkbook(await residentWorkbookFixture());
+  const original = { ...eventBatch(parsed.items), import_type: 'RESIDENTS' };
+  mocks.findBatch.mockResolvedValue(original);
+  mocks.saveDraft.mockImplementation(async (_id, data) => ({ ...original, ...data }));
+  const submitted = parsed.items.map((item) => item.name === 'Empresa Sem Documento'
+    ? { ...item, document: '11.222.333/0001-81' }
+    : item);
+  const saved = await service.saveReview('batch-1', { items: submitted }, admin);
+  const company = saved.draft.items.find((item) => item.document === '11222333000181');
+  expect(company.sourceRows).toEqual([3, 4, 7, 8]);
+  expect(company.contracts).toHaveLength(4);
+  expect(company.totalArea).toBe(200);
+  expect(company.validationStatus).toBe('VALID');
+  expect(saved.summary.occupations).toBe(6);
+  expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
+});
+
+it('preserva Disponível e Áreas Comuns como ignorados mesmo se a revisão tentar incluí-los', async () => {
+  const { parseResidentWorkbook } = await import('../src/services/residentImportParser.js');
+  const parsed = await parseResidentWorkbook(await residentWorkbookFixture());
+  const original = { ...eventBatch(parsed.items), import_type: 'RESIDENTS' };
+  mocks.findBatch.mockResolvedValue(original);
+  mocks.saveDraft.mockImplementation(async (_id, data) => ({ ...original, ...data }));
+  const saved = await service.saveReview('batch-1', { items: parsed.items.map((item) => ({ ...item, included: true, ignored: false, reviewStatus: 'VALIDATED' })) }, admin);
+  const ignored = saved.draft.items.filter((item) => item.ignored);
+  expect(ignored).toHaveLength(2);
+  expect(ignored.every((item) => !item.included && item.validationStatus === 'IGNORED')).toBe(true);
+});
+
+  it.each([
+    ['RESIDENTS', 'Eventos.xlsx', 'Clientes', eventWorkbookFixture],
+  ])('rejeita a planilha do outro fluxo em %s antes de criar o draft', async (type, fileName, sheetName, fixture) => {
+    const buffer = await fixture();
+    await expect(service.preview({ type, fileName, mimeType: XLSX_MIME, buffer, centerId: 'center-1' }, admin))
+      .rejects.toMatchObject({ code: 'SHEET_NOT_FOUND', message: `Aba "${sheetName}" não encontrada.` });
+    expect(mocks.createBatch).not.toHaveBeenCalled();
+    expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
+    expect(mocks.recompute).not.toHaveBeenCalled();
   });

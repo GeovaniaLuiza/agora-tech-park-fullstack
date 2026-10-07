@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ institutionalCards: vi.fn(), categories: vi.fn(), latestImport: vi.fn(), series: vi.fn(), record: vi.fn() }));
-vi.mock('../src/repositories/dashboardRepository.js', () => ({ ...mocks, operationalSummary: vi.fn(), indicatorReportRows: vi.fn() }));
+vi.mock('../src/repositories/dashboardRepository.js', () => ({ ...mocks, recordMetrics: vi.fn().mockResolvedValue({}), operationalSummary: vi.fn(), indicatorReportRows: vi.fn() }));
 vi.mock('../src/repositories/auditRepository.js', () => ({ record: mocks.record }));
 import { companies, institutionalSummary, normalizeFilters } from '../src/services/dashboardService.js';
 beforeEach(() => { vi.clearAllMocks(); mocks.categories.mockResolvedValue(['Financeiro']); mocks.latestImport.mockResolvedValue(null); });

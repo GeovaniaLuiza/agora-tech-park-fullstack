@@ -45,7 +45,7 @@ function automaticValues(records, center, year, month) {
     ENTIDADES_ATENDIDAS: stocks('ENTITY').filter((item) => item.served).length,
     GRANDES_EMPRESAS_REGIAO: stocks('LARGE_COMPANY').filter((item) => item.in_region).length,
     GRANDES_EMPRESAS_ATENDIDAS: stocks('LARGE_COMPANY').filter((item) => item.served).length,
-    EMPRESAS_RESIDENTES: stocks('RESIDENT_COMPANY').length,
+    EMPRESAS_RESIDENTES: new Set(stocks('RESIDENT_COMPANY').map((item) => item.extra?.documentHash || item.id || item)).size,
     GRANDES_EMPRESAS_APOIADAS: new Set(openInnovation.map((item) => item.name.trim().toLocaleLowerCase('pt-BR'))).size,
   };
   Object.entries(codeByStage).forEach(([stage, code]) => {
@@ -109,18 +109,31 @@ export function calculateIndicatorRows({ definitions, applicability = new Map(),
   return rows;
 }
 
-export async function recompute(centerId, year, userId) {
-  const [center, definitions, records, manualValues] = await Promise.all([
-    repository.findCenter(centerId), repository.allDefinitions(), repository.recordsForCalculation(centerId, year),
-    repository.manualValuesForCalculation(centerId, year),
-  ]);
+export async function recompute(centerId, year, userId, transaction = null) {
+  const args = transaction ? [transaction] : [];
+  const requests = [() => repository.findCenter(centerId, ...args), () => repository.allDefinitions(...args),
+    () => repository.recordsForCalculation(centerId, year, ...args), () => repository.manualValuesForCalculation(centerId, year, ...args)];
+  const loaded = [];
+  if (transaction) { for (const request of requests) loaded.push(await request()); }
+  else loaded.push(...await Promise.all(requests.map((request) => request())));
+  const [center, definitions, records, manualValues] = loaded;
   if (!center) return [];
-  const configured = await repository.listDefinitions(centerId);
+  const configured = await repository.listDefinitions(centerId, ...args);
   const applicability = new Map(configured.map((item) => [item.id, item.applicable]));
   const rows = calculateIndicatorRows({ definitions, applicability, records, manualValues, center, year });
-  await repository.withTransaction(async (client) => {
+  const persist = async (client) => {
     await repository.clearSystemValues(centerId, year, userId, client);
     for (const row of rows) await repository.upsertValue({ ...row, centerId }, userId, client);
-  });
+    const importedRecords = records.filter((item) => item.import_batch_id);
+    const importedCodes = new Set(importedRecords.map((item) => ({ EVENT: 'EVENTOS_REALIZADOS', RESIDENT_COMPANY: 'EMPRESAS_RESIDENTES' })[item.record_type]));
+    const importDefinitions = definitions.filter((item) => importedCodes.has(item.code));
+    await repository.clearImportedValues(centerId, year, client);
+    if (importedRecords.length) {
+      const importedRows = calculateIndicatorRows({ definitions: importDefinitions, applicability, records: importedRecords, manualValues: [], center, year });
+      for (const row of importedRows) await repository.upsertValue({ ...row, centerId, sourceType: 'SPREADSHEET_IMPORT', notes: 'Calculado a partir dos registros importados de XLSX' }, userId, client);
+    }
+  };
+  if (transaction) await persist(transaction);
+  else await repository.withTransaction(persist);
   return rows;
 }

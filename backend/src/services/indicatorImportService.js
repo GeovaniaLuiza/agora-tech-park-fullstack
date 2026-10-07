@@ -68,7 +68,7 @@ export async function preview({ type, fileName, mimeType, buffer, centerId, repr
     sheetName: parsed.sheetName, centerId, year: parsed.year, status,
     totalRecords: parsed.summary.records || 0, totalIgnored: parsed.summary.excluded || 0,
     totalWarnings: parsed.warnings.length, summary: parsed.summary, warnings: parsed.warnings,
-    draft: { items: parsed.items.map((item) => ({ ...item, original: structuredClone(item) })), filters: importType === IMPORT_TYPES.RESIDENTS ? { onlyInnovationBlocks: true } : {} }, userId: user.sub,
+    draft: { items: parsed.items, filters: importType === IMPORT_TYPES.RESIDENTS ? { onlyInnovationBlocks: true } : {} }, userId: user.sub,
   });
   await audit({ userId: user.sub, action: 'INDICATOR_IMPORT_PREVIEWED', entity: 'indicator_import_batch', entityId: batch.id, details: { importType, fileName: batch.file_name, fileHash, records: parsed.summary.records } });
   return presentBatch({ ...batch, center_name: center.name });
@@ -113,19 +113,19 @@ function reviewedResidents(original, submitted) {
     const discontinuous = source.discontinuous && !manualPeriodOverride;
     const contracts = (source.contracts || []).map((contract) => {
       const edited = item.contracts?.find((candidate) => candidate.sourceRow === contract.sourceRow) || contract;
-      return { ...contract, ...Object.fromEntries(['block', 'unit', 'areaInput', 'startInput', 'endInput', 'sector', 'nationality'].map((field) => [field, text(edited[field] ?? contract[field])])) };
+      return { ...contract, ...Object.fromEntries(['block', 'unit', 'areaInput', 'startInput', 'endInput'].map((field) => [field, edited[field] ?? contract[field]])) };
     });
     const reviewed = { ...source, name: text(item.name), document: item.document === undefined ? source.document : text(item.document), contracts, included, manualBlockOverride: Boolean(item.manualBlockOverride),
       manualPeriodOverride, manualRoomsOverride: Boolean(item.manualRoomsOverride), discontinuous, location: text(item.location),
       rooms: Array.isArray(item.rooms) ? item.rooms.map((value) => text(value)).filter(Boolean) : source.rooms,
-      contractType: text(item.contractType, 100), startDate, endDate, sector: text(item.sector, 160), nationality: text(item.nationality, 160),
+      contractType: text(item.contractType, 100), startDate, endDate, sector: text(item.sector, 160),
       result: text(item.result, 1000), programName: text(item.programName, 180),
       collaboratorsEntry: integerOrNull(item.collaboratorsEntry, 'Colaboradores na entrada'),
       collaboratorsExit: integerOrNull(item.collaboratorsExit, 'Colaboradores na saída'),
       intellectualProperty: text(item.intellectualProperty, 1000), fundsRaised: decimalOrNull(item.fundsRaised, 'Captação de recursos'),
       annualRevenue: decimalOrNull(item.annualRevenue, 'Faturamento anual'),
       internationalRelationships: text(item.internationalRelationships, 1000),
-      reviewStatus: !included && item.reviewStatus === 'EXCLUDED' ? 'EXCLUDED' : discontinuous ? 'WITH_WARNINGS' : 'VALIDATED' };
+      reviewStatus: !included ? 'EXCLUDED' : discontinuous ? 'WITH_WARNINGS' : 'VALIDATED' };
     reviewed.manuallyCorrected = source.manuallyCorrected || ['name', 'document', 'startDate', 'endDate', 'location', 'rooms', 'contractType', 'sector', 'result', 'programName', 'collaboratorsEntry', 'collaboratorsExit', 'intellectualProperty', 'fundsRaised', 'annualRevenue', 'internationalRelationships'].some((field) => cleanText(source[field]) !== cleanText(reviewed[field])) || JSON.stringify(source.contracts || []) !== JSON.stringify(contracts);
     // Older drafts retain their original review behavior; new drafts are fully
     // validated from the editable CNPJ and individual occupations.
@@ -196,33 +196,26 @@ function residentRecord(item) {
 }
 
 export async function confirm(id, user) {
-  ensureManager(user);
-  return repository.withLockedBatch(id, async (batch, client) => {
-    if (!batch) throw serviceError(404, 'Importação não encontrada.', 'IMPORT_NOT_FOUND');
-    if (batch.status === IMPORT_STATUS.IMPORTED) return presentBatch(batch);
-    if (![IMPORT_STATUS.REVIEW_PENDING, IMPORT_STATUS.WITH_WARNINGS, IMPORT_STATUS.VALIDATED].includes(batch.status)) throw serviceError(409, 'Importação indisponível para confirmação.', 'IMPORT_NOT_CONFIRMABLE');
-    const items = batch.import_type === IMPORT_TYPES.EVENTS
-      ? reviewedEvents(batch.draft.items || [], batch.draft.items || [])
-      : consolidateResidents(reviewedResidents(batch.draft.items || [], batch.draft.items || []));
-    const included = items.filter((item) => item.included && !item.ignored && item.reviewStatus !== 'EXCLUDED');
-    if (!included.length) throw serviceError(422, 'Selecione ao menos um registro antes de confirmar.', 'NO_INCLUDED_RECORDS');
-    const unresolved = items.filter((item) => !item.ignored && item.reviewStatus !== 'EXCLUDED').flatMap((item) => batch.import_type === IMPORT_TYPES.EVENTS ? validateEvent(item) : item.document === undefined ? [] : normalizeResident(item).issues);
-    if (unresolved.length) throw serviceError(422, unresolved[0].message + '. Corrija ou ignore o registro antes de confirmar.', 'REVIEW_REQUIRED', { issues: unresolved });
-    const records = included.map(batch.import_type === IMPORT_TYPES.EVENTS ? eventRecord : residentRecord);
-    await repository.replaceBatchRecords(batch, records, user.sub, client);
-    const years = new Set([batch.year, ...included.filter((item) => item.startAt).map((item) => new Date(item.startAt).getUTCFullYear())]);
-    for (const year of years) await recompute(batch.innovation_center_id, year, user.sub, client);
-    const summary = batch.import_type === IMPORT_TYPES.EVENTS ? summarizeEvents(items, batch.year) : summarizeResidents(items, batch.year);
-    summary.processed = records.length;
-    summary.indicatorsUpdated = true;
-    const ignored = batch.import_type === IMPORT_TYPES.RESIDENTS ? summary.excluded : (batch.draft.items || []).length - records.length;
-    summary.ignored = ignored;
-    summary.excluded = ignored;
-    const saved = await repository.markImported(id, { imported: records.length, ignored, summary, userId: user.sub }, client);
-    await audit({ userId: user.sub, action: 'INDICATOR_IMPORT_CONFIRMED', entity: 'indicator_import_batch', entityId: id,
-      details: { importType: batch.import_type, imported: records.length, ignored, fileHash: batch.file_hash } }, client);
-    return presentBatch({ ...saved, center_name: batch.center_name });
-  });
+  ensureManager(user); const batch = await ensureBatch(id);
+  if (batch.status === IMPORT_STATUS.IMPORTED) throw serviceError(409, 'Esta importação já foi confirmada.', 'IMPORT_ALREADY_CONFIRMED');
+  if (![IMPORT_STATUS.REVIEW_PENDING, IMPORT_STATUS.WITH_WARNINGS, IMPORT_STATUS.VALIDATED].includes(batch.status)) throw serviceError(409, 'Importação indisponível para confirmação.', 'IMPORT_NOT_CONFIRMABLE');
+  const included = (batch.draft.items || []).filter((item) => item.included && !item.ignored);
+  if (!included.length) throw serviceError(422, 'Selecione ao menos um registro antes de confirmar.', 'NO_INCLUDED_RECORDS');
+  const unresolved = included.flatMap((item) => batch.import_type === IMPORT_TYPES.EVENTS ? validateEvent(item) : item.document === undefined ? [] : normalizeResident(item).issues);
+  if (unresolved.length) throw serviceError(422, unresolved[0].message + '. Corrija ou ignore o registro antes de confirmar.', 'REVIEW_REQUIRED', { issues: unresolved });
+  const records = included.map(batch.import_type === IMPORT_TYPES.EVENTS ? eventRecord : residentRecord);
+  await repository.replaceBatchRecords(batch, records, user.sub);
+  await recompute(batch.innovation_center_id, batch.year, user.sub);
+  const summary = batch.import_type === IMPORT_TYPES.EVENTS ? summarizeEvents(batch.draft.items, batch.year) : summarizeResidents(batch.draft.items, batch.year);
+  summary.processed = records.length;
+  summary.indicatorsUpdated = true;
+  const ignored = batch.import_type === IMPORT_TYPES.RESIDENTS ? summary.excluded : (batch.draft.items || []).length - records.length;
+  summary.ignored = ignored;
+  summary.excluded = ignored;
+  const saved = await repository.markImported(id, { imported: records.length, ignored, summary, userId: user.sub });
+  await audit({ userId: user.sub, action: 'INDICATOR_IMPORT_CONFIRMED', entity: 'indicator_import_batch', entityId: id,
+    details: { importType: batch.import_type, imported: records.length, ignored, fileHash: batch.file_hash } });
+  return presentBatch({ ...saved, center_name: batch.center_name });
 }
 
 export const importOptions = () => ({ eventModes: EVENT_MODES, eventTypes: EVENT_TYPES, year: IMPORT_YEAR, mimeType: XLSX_MIME, maxBytes: MAX_IMPORT_BYTES });

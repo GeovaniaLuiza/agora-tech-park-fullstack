@@ -1,31 +1,5 @@
 import { query } from '../db/pool.js';
 
-// Complementary record totals, not new indicator definitions.
-export async function recordMetrics(type, { year, month, centerId, sourceType, category, startDate, endDate }) {
-  const { rows } = await query(`WITH selected AS (
-    SELECT r.* FROM indicator_records r
-    WHERE r.innovation_center_id=COALESCE($1::uuid,(SELECT id FROM innovation_centers WHERE active ORDER BY name LIMIT 1))
-    AND r.record_type=$2 AND r.active AND r.deleted_at IS NULL
-    AND ($3 IN ('LIVE','SYSTEM_CALCULATION') OR ($3='SPREADSHEET_IMPORT' AND r.import_batch_id IS NOT NULL))
-    AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM indicator_definitions d WHERE d.active AND d.category=$4
-      AND d.code=CASE WHEN $2='EVENT' THEN 'EVENTOS_REALIZADOS' ELSE 'EMPRESAS_RESIDENTES' END))
-    AND ($2<>'EVENT' OR (EXTRACT(YEAR FROM r.event_at AT TIME ZONE 'UTC')=$5::int AND ($6::int IS NULL OR EXTRACT(MONTH FROM r.event_at AT TIME ZONE 'UTC')=$6)
-      AND ($7::date IS NULL OR (r.event_at AT TIME ZONE 'UTC')::date >= $7) AND ($8::date IS NULL OR (r.event_at AT TIME ZONE 'UTC')::date <= $8)))
-  ), occupations AS (
-    SELECT r.id,c.value FROM selected r CROSS JOIN LATERAL jsonb_array_elements(COALESCE(r.extra->'contracts','[]'::jsonb)) c
-    WHERE COALESCE((c.value->>'eligibleBlock')::boolean,FALSE)
-    AND (NULLIF(c.value->>'startDate','') IS NULL OR (c.value->>'startDate')::date<=COALESCE($8::date,
-      CASE WHEN $6::int IS NULL THEN make_date($5,12,31) ELSE (make_date($5,$6,1)+INTERVAL '1 month - 1 day')::date END))
-    AND (NULLIF(c.value->>'endDate','') IS NULL OR (c.value->>'endDate')::date>=COALESCE($7::date,make_date($5,COALESCE($6,1),1)))
-  ) SELECT COUNT(*)::int AS events,COALESCE(SUM(participants),0)::int AS participants,
-    COALESCE(SUM(participating_companies),0)::int AS participating_companies,
-    (SELECT COUNT(*)::int FROM occupations) AS occupations,
-    (SELECT COALESCE(SUM((value->>'area')::numeric),0) FROM occupations) AS area
-    FROM selected WHERE $2='EVENT'`, [centerId, type, sourceType, category, year, month, startDate, endDate]);
-  const row = rows[0];
-  return { events: row.events, participants: row.participants, participatingCompanies: row.participating_companies, occupations: row.occupations, area: Number(row.area) };
-}
-
 export async function operationalSummary() {
   const { rows } = await query(
     `WITH active_organizations AS (

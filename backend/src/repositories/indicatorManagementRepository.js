@@ -1,7 +1,5 @@
 import { pool, query } from '../db/pool.js';
 
-const defaultClient = { query };
-
 const valueProjection = `SELECT v.id,v.indicator_id,v.innovation_center_id,v.year,v.month,v.numeric_value,
   v.text_value,v.json_value,v.notes,v.source_type,v.created_at,v.updated_at,
   creator.name AS created_by_name,updater.name AS updated_by_name,
@@ -18,8 +16,8 @@ export async function listCenters({ includeInactive = false } = {}) {
   return rows;
 }
 
-export async function findCenter(id, client = defaultClient) {
-  const { rows } = await client.query('SELECT * FROM innovation_centers WHERE id=$1', [id]);
+export async function findCenter(id) {
+  const { rows } = await query('SELECT * FROM innovation_centers WHERE id=$1', [id]);
   return rows[0];
 }
 
@@ -43,8 +41,8 @@ export async function updateCenter(id, data, userId) {
   return rows[0];
 }
 
-export async function listDefinitions(centerId, client = defaultClient) {
-  const { rows } = await client.query(
+export async function listDefinitions(centerId) {
+  const { rows } = await query(
     `SELECT d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.periodicity,
        d.calculation_type,d.annual_aggregation,d.sort_order,d.source_entity,d.formula,
        d.not_applicable_allowed,d.active,COALESCE(a.applicable,TRUE) AS applicable,a.notes AS applicability_notes
@@ -260,18 +258,18 @@ export async function deleteRecord(id, userId) {
   return rows[0];
 }
 
-export async function recordsForCalculation(centerId, year, client = defaultClient) {
-  const { rows } = await client.query(
+export async function recordsForCalculation(centerId, year) {
+  const { rows } = await query(
     `SELECT * FROM indicator_records WHERE innovation_center_id=$1 AND deleted_at IS NULL
-       AND ((year IS NULL AND event_at IS NULL AND start_date IS NULL) OR year=$2::int OR EXTRACT(YEAR FROM event_at AT TIME ZONE 'UTC')=$2::int
-         OR (event_at IS NULL AND (start_date IS NULL OR start_date<=make_date($2::int,12,31)) AND (end_date IS NULL OR end_date>=make_date($2::int,1,1))))`,
+       AND ((year IS NULL AND event_at IS NULL AND start_date IS NULL) OR year=$2::int OR EXTRACT(YEAR FROM event_at)=$2::int
+         OR (start_date<=make_date($2::int,12,31) AND (end_date IS NULL OR end_date>=make_date($2::int,1,1))))`,
     [centerId, year],
   );
   return rows;
 }
 
-export async function manualValuesForCalculation(centerId, year, client = defaultClient) {
-  const { rows } = await client.query(
+export async function manualValuesForCalculation(centerId, year) {
+  const { rows } = await query(
     `SELECT v.*,d.code,d.value_type,d.annual_aggregation FROM indicator_values v
      JOIN indicator_definitions d ON d.id=v.indicator_id
      WHERE v.innovation_center_id=$1 AND v.year=$2
@@ -282,8 +280,8 @@ export async function manualValuesForCalculation(centerId, year, client = defaul
   return rows;
 }
 
-export async function allDefinitions(client = defaultClient) {
-  const { rows } = await client.query(
+export async function allDefinitions() {
+  const { rows } = await query(
     `SELECT * FROM indicator_definitions WHERE active`,
   );
   return rows;
@@ -296,12 +294,4 @@ export async function clearSystemValues(centerId, year, userId, client = { query
        AND source_type='SYSTEM_CALCULATION' AND deleted_at IS NULL`,
     [centerId, year, userId],
   );
-}
-
-export async function clearImportedValues(centerId, year, client) {
-  await client.query(`UPDATE indicator_values v SET deleted_at=NOW(),updated_at=NOW()
-    FROM indicator_definitions d WHERE v.indicator_id=d.id AND v.innovation_center_id=$1 AND v.year=$2
-    AND v.source_type='SPREADSHEET_IMPORT' AND v.deleted_at IS NULL
-    AND v.notes='Calculado a partir dos registros importados de XLSX'
-    AND d.code IN ('EVENTOS_REALIZADOS','EMPRESAS_RESIDENTES')`, [centerId, year]);
 }

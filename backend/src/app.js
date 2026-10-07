@@ -27,7 +27,6 @@ app.use(metricsMiddleware);
 app.get('/metrics', metricsHandler);
 app.use(createRateLimiter(RATE_LIMIT_CONFIG.global));
 app.use('/api/auth/me/avatar', express.json({ limit: '3mb' }));
-app.use('/api/indicator-imports/batches', express.json({ limit: '10mb' }));
 app.use(express.json({ limit:'100kb' }));
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);

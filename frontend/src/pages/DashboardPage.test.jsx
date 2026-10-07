@@ -29,21 +29,6 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe('DashboardPage', () => {
-  it('mostra participantes, empresas participantes e ocupações no período sem criar indicadores', async () => {
-    api.getDashboardEngagement.mockResolvedValueOnce({
-      series: [series('EVENTOS_REALIZADOS', 'Eventos realizados', [2])],
-      metrics: { events: 2, participants: 32, participatingCompanies: 7 },
-    });
-    api.getDashboardCompanies.mockResolvedValueOnce({
-      series: [series('EMPRESAS_RESIDENTES', 'Empresas residentes', [1])],
-      metrics: { occupations: 2, area: 80 },
-    });
-    render(<MemoryRouter><DashboardPage /></MemoryRouter>);
-    expect(await screen.findByText('Participantes: 32 · Empresas participantes: 7')).toBeTruthy();
-    expect(await screen.findByText('Ocupações no período: 2 · Área: 80 m²')).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Período'), { target: { value: '4' } });
-    await waitFor(() => expect(api.getDashboardEngagement).toHaveBeenLastCalledWith(expect.objectContaining({ month: '4', centerId: 'center-1' })));
-  });
   it('combina resumo operacional, KPIs oficiais e séries mensais', async () => {
     render(<MemoryRouter><DashboardPage /></MemoryRouter>);
     expect(await screen.findByText('Residentes ativos')).toBeTruthy();

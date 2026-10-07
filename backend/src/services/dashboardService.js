@@ -73,9 +73,7 @@ async function section(name, rawFilters) {
   const [cards, rows] = await Promise.all([
     repository.institutionalCards(filters), repository.series(codes, filters),
   ]);
-  const metrics = ['engagement', 'companies'].includes(name)
-    ? await repository.recordMetrics(name === 'engagement' ? 'EVENT' : 'RESIDENT_COMPANY', filters) : undefined;
-  return { filters, cards: cards.filter((row) => codes.includes(row.code)).map(toCard), series: groupSeries(rows), metrics };
+  return { filters, cards: cards.filter((row) => codes.includes(row.code)).map(toCard), series: groupSeries(rows) };
 }
 
 export const companies = (filters) => section('companies', filters);

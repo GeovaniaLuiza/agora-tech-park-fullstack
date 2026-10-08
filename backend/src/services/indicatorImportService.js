@@ -108,7 +108,7 @@ function reviewedResidents(original, submitted) {
     if (!source) throw serviceError(422, 'A revisão contém uma empresa desconhecida.', 'INVALID_REVIEW_ITEM');
     const startDate = parseDateValue(item.startDate)?.toISOString().slice(0, 10) || source.startDate;
     const endDate = item.endDate ? parseDateValue(item.endDate)?.toISOString().slice(0, 10) : null;
-    if (startDate && endDate && endDate < startDate) throw serviceError(422, 'Data de saída anterior à entrada.', 'INVALID_DATE_RANGE');
+    if (item.included && startDate && endDate && endDate < startDate) throw serviceError(422, 'Data de saída anterior à entrada.', 'INVALID_DATE_RANGE');
     const included = Boolean(item.included);
     const manualPeriodOverride = Boolean(item.manualPeriodOverride);
     const discontinuous = source.discontinuous && !manualPeriodOverride;
@@ -143,7 +143,7 @@ export async function saveReview(id, payload, user) {
     ? reviewedEvents(batch.draft.items || [], payload.items)
     : consolidateResidents(reviewedResidents(batch.draft.items || [], payload.items));
   const summary = batch.import_type === IMPORT_TYPES.EVENTS ? summarizeEvents(items, batch.year) : summarizeResidents(items, batch.year);
-  const warnings = items.flatMap((item) => (item.issues || []).map((issue) => ({ ...issue, code: 'REVIEW_REQUIRED' })));
+  const warnings = items.filter((item) => !item.ignored && item.reviewStatus !== 'EXCLUDED').flatMap((item) => (item.issues || []).map((issue) => ({ ...issue, code: 'REVIEW_REQUIRED' })));
   const saved = await repository.saveDraft(id, { draft: { ...batch.draft, items }, summary, warnings, status: warnings.length ? IMPORT_STATUS.WITH_WARNINGS : IMPORT_STATUS.VALIDATED });
   if (!saved) throw serviceError(409, 'Esta importação não pode mais ser revisada.', 'IMPORT_NOT_EDITABLE');
   return presentBatch({ ...saved, center_name: batch.center_name });

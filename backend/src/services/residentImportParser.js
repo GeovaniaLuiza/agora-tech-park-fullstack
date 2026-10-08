@@ -80,7 +80,7 @@ export function normalizeResident(company) {
 export function consolidateResidents(items) {
   const groups = new Map();
   for (const item of items) {
-    const key = !item.ignored && item.document ? 'doc:' + documentDigits(item.document) : 'row:' + item.sourceRows[0];
+    const key = !item.ignored && item.reviewStatus !== 'EXCLUDED' && item.document ? 'doc:' + documentDigits(item.document) : 'row:' + item.sourceRows[0];
     if (!groups.has(key)) groups.set(key, item);
     else {
       const group = groups.get(key);

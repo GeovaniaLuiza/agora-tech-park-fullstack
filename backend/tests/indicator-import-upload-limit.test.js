@@ -43,7 +43,7 @@ beforeEach(() => {
 });
 
 describe.each(['EVENTS', 'RESIDENTS'])('limite de upload de %s', (type) => {
-  it.each([MAX_IMPORT_BYTES - 1, MAX_IMPORT_BYTES])('aceita %i bytes via middleware e serviço', async (size) => {
+  it.each([15_759, MAX_IMPORT_BYTES - 1, MAX_IMPORT_BYTES])('aceita %i bytes via middleware e serviço', async (size) => {
     expect(MAX_IMPORT_BYTES).toBe(50 * 1024 * 1024);
     const buffer = Buffer.alloc(size);
     buffer.set([0x50, 0x4b, 0x03, 0x04]);

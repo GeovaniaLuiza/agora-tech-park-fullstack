@@ -61,6 +61,45 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('roteamento principal', () => {
+  it('shows the catalog at /indicadores with FORM, IMPORT and a definition without values', async () => {
+    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }]);
+    api.getIndicators.mockResolvedValue([
+      { id: 'form', code: 'FORM', name: 'Projetos', category: 'Projetos', unit: 'UNIDADE', value: 5, source: 'FORM_RESPONSE', updated_at: '2026-01-01T00:00:00Z', monthly_values: [{ month: 1, value: 5, source: 'FORM_RESPONSE' }] },
+      { id: 'import', code: 'IMPORT', name: 'Eventos realizados', category: 'Eventos', unit: 'UNIDADE', value: 3, source: 'SPREADSHEET_IMPORT' },
+      { id: 'empty', code: 'EMPTY', name: 'Sem valores', category: 'Projetos', unit: 'UNIDADE', value: null },
+    ]);
+    window.history.replaceState({}, '', '/indicadores');
+    render(<App />);
+    expect(await screen.findByText('Sem valores')).toBeTruthy();
+    expect(screen.getAllByText('Sem dados para o período').length).toBeGreaterThan(0);
+    expect(screen.getByText('Formulário', { selector: 'footer small' })).toBeTruthy();
+    expect(screen.getByText('Planilha', { selector: 'footer small' })).toBeTruthy();
+    expect(screen.getByText('Jan')).toBeTruthy();
+    expect(screen.getByText('Dez')).toBeTruthy();
+    expect(screen.queryByText('Nenhum indicador encontrado para os filtros.')).toBeNull();
+    expect(window.location.pathname).toBe('/indicators');
+  });
+
+  it('queries category, source and search filters and exports the same selection', async () => {
+    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }]);
+    api.getIndicators.mockResolvedValue([{ id: 'manual', code: 'MANUAL', name: 'Receita', category: 'Financeiro', unit: 'BRL', value: 0, source: 'MANUAL_ENTRY' }]);
+    window.history.replaceState({}, '', '/indicators');
+    render(<App />);
+    await screen.findByRole('option', { name: 'Financeiro' });
+    expect(screen.getByText('Lançamento manual', { selector: 'footer small' })).toBeTruthy();
+    expect(screen.queryByText('Sem dados para o período')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Financeiro' } });
+    fireEvent.change(screen.getByLabelText('Origem'), { target: { value: 'MANUAL_ENTRY' } });
+    fireEvent.change(screen.getByLabelText('Busca'), { target: { value: 'MANUAL' } });
+    await waitFor(() => expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-a', category: 'Financeiro', sourceType: 'MANUAL_ENTRY', name: 'MANUAL' }));
+    api.downloadIndicatorReport.mockRejectedValueOnce(new Error('Export checked'));
+    fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+    await screen.findByText('Export checked');
+    expect(api.downloadIndicatorReport).toHaveBeenLastCalledWith('csv', { centerId: 'center-a', category: 'Financeiro', sourceType: 'MANUAL_ENTRY', name: 'MANUAL' });
+    fireEvent.change(screen.getByLabelText('Origem'), { target: { value: 'LIVE' } });
+    await waitFor(() => expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-a', category: 'Financeiro', name: 'MANUAL' }));
+  });
+
   it('exibe a falha ao carregar centros sem consultar indicadores', async () => {
     api.getInnovationCenters.mockRejectedValueOnce(new Error('Falha nos centros'));
     const calls = api.getIndicators.mock.calls.length;

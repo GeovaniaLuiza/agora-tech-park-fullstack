@@ -23,6 +23,8 @@ export async function summary({ period = null, year: requestedYear = null, name 
          ) END
      )
      SELECT d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.periodicity,d.annual_aggregation,d.aggregation_type,
+       (SELECT center.name FROM innovation_centers center WHERE center.id=COALESCE($6::uuid,
+         (SELECT id FROM innovation_centers WHERE active ORDER BY name LIMIT 1))) AS center_name,
        CASE WHEN $7::boolean AND $2::int IS NULL AND COUNT(v.month)=0 AND COUNT(v.id)>0 THEN 'RECORDED_ANNUAL'
          ELSE COALESCE(d.annual_aggregation,d.aggregation_type) END AS consolidation_basis,
        CASE WHEN $2::int IS NOT NULL THEN MAX(v.numeric_value)

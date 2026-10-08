@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({ getIndicators: vi.fn(), getIndicatorHistory: vi.
 vi.mock('../services/api', () => api);
 vi.mock('../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ user: { role: 'ADMIN' } }) }));
 import IndicatorsPage from './IndicatorsPage.jsx';
+import { indicatorBlocks } from '../config/officialIndicators.js';
 
 // Test fixtures exercise rendering and filters; no fixture is shipped to the UI.
 const rows = [
@@ -138,5 +139,34 @@ describe('dashboard de indicadores oficiais', () => {
     api.getIndicators.mockRejectedValue(new Error('Falha nos indicadores'));
     mount(); expect((await screen.findByRole('alert')).textContent).toBe('Falha nos indicadores');
     expect(screen.queryByRole('article', { name: 'Nº de Novas Startups' })).toBeNull();
+  });
+
+  it('exporta PDF com todos os códigos do recorte, centro, ano, período, categoria e origem', async () => {
+    const codes = indicatorBlocks.flatMap((block) => block.codes);
+    api.getIndicators.mockResolvedValue(codes.map((code) => ({ ...rows[0], code, name: `Teste ${code}`, periodicity: 'ANNUAL', monthly_values: [] })));
+    api.downloadIndicatorReport.mockResolvedValue({ blob: new Blob(['pdf']), filename: 'indicadores.pdf' });
+    const create = vi.fn(() => 'blob:pdf'); const revoke = vi.fn();
+    vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL: create, revokeObjectURL: revoke }));
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    mount(); await screen.findByRole('article', { name: `Teste ${codes[0]}` });
+    fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'b' } });
+    fireEvent.change(screen.getByLabelText('Ano'), { target: { value: '2025' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' }).disabled).toBe(false));
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    await waitFor(() => expect(api.downloadIndicatorReport).toHaveBeenCalledWith('pdf', { centerId: 'b', year: '2025', period: '2025', ...filters, codes: codes.join(','), categoryLabel: 'Todas' }));
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:pdf'));
+    expect(click).toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Financeiro' } });
+    fireEvent.change(screen.getByLabelText('Período'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    await waitFor(() => expect(api.downloadIndicatorReport).toHaveBeenLastCalledWith('pdf', { centerId: 'b', year: '2025', period: '2025-03', ...filters, codes: indicatorBlocks.find((block) => block.name === 'Financeiro').codes.join(','), categoryLabel: 'Financeiro' }));
+  });
+
+  it('exibe erro de exportação PDF e permite tentar novamente', async () => {
+    api.downloadIndicatorReport.mockRejectedValue(new Error('Falha ao gerar PDF'));
+    mount(); await screen.findByRole('article', { name: 'Nº de Novas Startups' });
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Falha ao gerar PDF');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' }).disabled).toBe(false));
   });
 });

@@ -82,6 +82,7 @@ export default function IndicatorsPage() {
     setExporting(true); setExportError('');
     try {
       const filters = { centerId, year, period: month ? `${year}-${String(month).padStart(2, '0')}` : year, ...officialFilters, codes: items.map((item) => item.code).join(',') };
+      if (format === 'pdf') filters.categoryLabel = category || 'Todas';
       const report = await downloadIndicatorReport(format, filters);
       const url = URL.createObjectURL(report.blob);
       try { const anchor = document.createElement('a'); anchor.href = url; anchor.download = report.filename; anchor.click(); }

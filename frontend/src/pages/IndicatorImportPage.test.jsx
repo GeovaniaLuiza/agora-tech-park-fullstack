@@ -79,6 +79,54 @@ describe('telas de importação de indicadores', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('O lote de importação possui dados inválidos.');
   });
 
+  it('exibe erro de tamanho da recuperação sem arquivo selecionado', async () => {
+    let rejectDraft;
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectDraft = reject; }));
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('EVENTS', 'center-1'));
+    await act(async () => rejectDraft(new Error('A planilha excede o limite de 50 MB.')));
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 50 MB.');
+
+    expect(screen.getByRole('button', { name: 'Validar' }).disabled).toBe(true);
+    expect(api.uploadIndicatorImport).not.toHaveBeenCalled();
+  });
+
+  it('descarta erro da recuperação quando o centro anterior já está inativo', async () => {
+    let rejectDraft;
+    api.getInnovationCenters.mockResolvedValueOnce([{ id: 'center-1', name: 'Centro A' }, { id: 'center-2', name: 'Centro B' }]);
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectDraft = reject; }));
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('EVENTS', 'center-1'));
+    fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'center-2' } });
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('EVENTS', 'center-2'));
+
+    await act(async () => rejectDraft(new Error('Falha ao recuperar o rascunho do centro anterior.')));
+    expect(screen.getByLabelText('Centro').value).toBe('center-2');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('Falha ao recuperar o rascunho do centro anterior.')).toBeNull();
+  });
+
+  it.each(['sucesso', 'erro'])('descarta upload com %s após sair do fluxo de importação', async (outcome) => {
+    let resolveUpload, rejectUpload;
+    api.uploadIndicatorImport.mockReturnValueOnce(new Promise((resolve, reject) => { resolveUpload = resolve; rejectUpload = reject; }));
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('EVENTS', 'center-1'));
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'Eventos.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await waitFor(() => expect(api.uploadIndicatorImport).toHaveBeenCalledOnce());
+    view.rerender(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+    await screen.findByRole('heading', { name: 'Importar Empresas Residentes' });
+
+    await act(async () => {
+      if (outcome === 'sucesso') resolveUpload(eventBatch);
+      else rejectUpload(new Error('Falha no upload anterior.'));
+    });
+    expect(screen.queryByText('Evento Anônimo')).toBeNull();
+    expect(screen.queryByText('Arquivo validado. Revise os registros antes de confirmar.')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Validar' }).textContent).toBe('Validar');
+  });
+
   it.each(['EVENTS', 'RESIDENTS'])('exibe falha real ao revalidar %s sem manter sucesso anterior', async (type) => {
     api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch)
       .mockRejectedValueOnce(new Error('A planilha possui colunas inválidas.'));

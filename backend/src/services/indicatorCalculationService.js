@@ -15,7 +15,8 @@ const monthBounds = (year, month) => ({
 const datePart = (value) => value ? new Date(value).toISOString().slice(0, 10) : null;
 const monthOf = (value) => value ? new Date(value).getUTCMonth() + 1 : null;
 const yearOf = (value) => value ? new Date(value).getUTCFullYear() : null;
-const isStockActive = (record, start, end) => {
+const residentIdentity = (record) => String(record.extra?.document || '').replace(/\D/g, '') || record.extra?.documentHash || record.extra?.document || record.id || record;
+export const isStockActive = (record, start, end) => {
   if (!record.active) return false;
   if (record.record_type === 'RESIDENT_COMPANY' && record.extra?.contracts?.length && !record.extra.manualPeriodOverride) {
     return record.extra.contracts.some((contract) => (contract.eligibleBlock || record.extra.manualBlockOverride)
@@ -45,7 +46,7 @@ function automaticValues(records, center, year, month) {
     ENTIDADES_ATENDIDAS: stocks('ENTITY').filter((item) => item.served).length,
     GRANDES_EMPRESAS_REGIAO: stocks('LARGE_COMPANY').filter((item) => item.in_region).length,
     GRANDES_EMPRESAS_ATENDIDAS: stocks('LARGE_COMPANY').filter((item) => item.served).length,
-    EMPRESAS_RESIDENTES: new Set(stocks('RESIDENT_COMPANY').map((item) => item.extra?.documentHash || item.extra?.document || item.id || item)).size,
+    EMPRESAS_RESIDENTES: new Set(stocks('RESIDENT_COMPANY').map(residentIdentity)).size,
     GRANDES_EMPRESAS_APOIADAS: new Set(openInnovation.map((item) => item.name.trim().toLocaleLowerCase('pt-BR'))).size,
   };
   Object.entries(codeByStage).forEach(([stage, code]) => {

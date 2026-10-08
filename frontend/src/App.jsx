@@ -28,6 +28,7 @@ import DashboardPage from './pages/DashboardPage';
 import IndicatorCatalogPage from './pages/IndicatorCatalogPage.jsx';
 import AdminUsersPage from './pages/AdminUsersPage.jsx';
 import IndicatorImportPage from './pages/IndicatorImportPage.jsx';
+import ImportedIndicatorsPage from './pages/ImportedIndicatorsPage.jsx';
 import { homeForRole } from './config/access';
 import { formatIndicatorValue } from './utils/formatters.js';
 
@@ -39,6 +40,8 @@ const pageMeta = {
   '/indicators/catalog': ['Cadastro de indicadores', 'Administre o catálogo usado pelos formulários e dashboards'],
   '/indicadores/importar-eventos': ['Importar eventos', 'Revise reservas antes de atualizar os indicadores'],
   '/indicadores/importar-residentes': ['Importar empresas residentes', 'Consolide contratos do HUB, MOB e UNI'],
+  '/indicadores/eventos': ['Indicadores de Eventos', 'Eventos confirmados por centro e ano'],
+  '/indicadores/residentes': ['Indicadores de Residentes', 'Empresas e ocupações confirmadas por centro e ano'],
   '/organizations': ['Organizações', 'Empresas e centros cadastrados no Ágora Tech Park'],
   '/admin': ['Aprovações', 'Valide novos usuários e vínculos'],
   '/admin/solicitacoes': ['Solicitações', 'Valide novos usuários, perfis e vínculos'],
@@ -432,7 +435,7 @@ export default function App() {
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/pesquisa" element={<Navigate to="/forms" replace />} /><Route path="/forms" element={<Forms />} /><Route path="/forms/new" element={<Create />} /><Route path="/forms/:formId/edit" element={<Create />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/indicators" element={<Indicators />} /><Route path="/indicadores" element={<Navigate to="/indicators" replace />} /></Route><Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR']} />}><Route path="/organizations" element={<Residents />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicators/catalog" element={<IndicatorCatalogPage />} /></Route>
-        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicadores/importar-eventos" element={<IndicatorImportPage type="EVENTS" />} /><Route path="/indicadores/importar-residentes" element={<IndicatorImportPage type="RESIDENTS" />} /></Route>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicadores/importar-eventos" element={<IndicatorImportPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/importar-residentes" element={<IndicatorImportPage key="RESIDENTS" type="RESIDENTS" />} /><Route path="/indicadores/eventos" element={<ImportedIndicatorsPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/residentes" element={<ImportedIndicatorsPage key="RESIDENTS" type="RESIDENTS" />} /></Route>
         <Route path="/perfil" element={<ProfilePage />} />
         <Route element={<ProtectedRoute roles={['ADMIN']} />}><Route path="/admin" element={<AdminRequestsPage />} /><Route path="/admin/solicitacoes" element={<AdminRequestsPage />} /><Route path="/admin/usuarios" element={<AdminUsersPage />} /><Route path="/admin/auditoria" element={<Audit />} /><Route path="/admin/requests" element={<Navigate to="/admin/solicitacoes" replace />} /></Route>
         <Route element={<ProtectedRoute roles={['RESIDENTE']} />}><Route path="/residente" element={<Forms resident />} /><Route path="/resident/forms" element={<Forms resident />} /><Route path="/resident/forms/:formId/respond" element={<Respond />} /><Route path="/resident/history" element={<History />} /></Route>

@@ -60,6 +60,25 @@ describe('telas de importação de indicadores', () => {
     expect(api.uploadIndicatorImport).toHaveBeenCalledWith(type, 'center-1', file, false);
   });
 
+  it('exibe erro se o reprocessamento autorizado falha sem repetir a confirmação', async () => {
+    const duplicate = Object.assign(new Error('Este arquivo já foi processado.'), { code: 'IMPORT_ALREADY_EXISTS' });
+    api.uploadIndicatorImport.mockRejectedValueOnce(duplicate).mockRejectedValueOnce(duplicate);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    const file = new File(['xlsx'], 'eventos.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(duplicate.message);
+    expect(api.uploadIndicatorImport).toHaveBeenCalledTimes(2);
+    expect(api.uploadIndicatorImport).toHaveBeenNthCalledWith(1, 'EVENTS', 'center-1', file, false);
+    expect(api.uploadIndicatorImport).toHaveBeenNthCalledWith(2, 'EVENTS', 'center-1', file, true);
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Validar' }).disabled).toBe(false);
+    expect(screen.queryByText('Arquivo validado. Revise os registros antes de confirmar.')).toBeNull();
+    expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+  });
+
   it('isola o estado ao trocar de Eventos para Residentes com um batch aberto', async () => {
     // Eventos reais não possuem contracts; a reutilização do estado causava
     // TypeError em contracts.some/length no render de Residentes.

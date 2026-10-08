@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { RECORD_TYPES } from '../domain/indicatorManagementCatalog.js';
-import { EVENT_MODES, EVENT_TYPES, IMPORT_STATUS, IMPORT_TYPES, IMPORT_TYPE_VALUES, IMPORT_YEAR, MAX_IMPORT_BYTES, XLSX_MIME } from '../domain/indicatorImportCatalog.js';
+import { EVENT_MODES, EVENT_TYPES, IMPORT_STATUS, IMPORT_TYPES, IMPORT_TYPE_VALUES, IMPORT_YEAR, MAX_IMPORT_BYTES, IMPORT_FILE_TOO_LARGE_MESSAGE, XLSX_MIME } from '../domain/indicatorImportCatalog.js';
 import * as repository from '../repositories/indicatorImportRepository.js';
 import { record as audit } from '../repositories/auditRepository.js';
 import { recompute } from './indicatorCalculationService.js';
@@ -39,7 +39,7 @@ function validateFile({ fileName, mimeType, buffer }) {
   if (!String(fileName || '').toLowerCase().endsWith('.xlsx')) throw serviceError(422, 'Selecione um arquivo com extensão .xlsx.', 'INVALID_FILE_EXTENSION');
   if (mimeType !== XLSX_MIME) throw serviceError(422, 'O tipo MIME do arquivo não corresponde a uma planilha XLSX.', 'INVALID_FILE_TYPE');
   if (!Buffer.isBuffer(buffer) || !buffer.length) throw serviceError(422, 'O arquivo enviado está vazio.', 'EMPTY_FILE');
-  if (buffer.length > MAX_IMPORT_BYTES) throw serviceError(413, 'A planilha excede o limite de 10 MB.', 'PAYLOAD_TOO_LARGE');
+  if (buffer.length > MAX_IMPORT_BYTES) throw serviceError(413, IMPORT_FILE_TOO_LARGE_MESSAGE, 'PAYLOAD_TOO_LARGE');
   if (buffer[0] !== 0x50 || buffer[1] !== 0x4B || buffer[2] !== 0x03 || buffer[3] !== 0x04) throw serviceError(422, 'O conteúdo do arquivo não é um XLSX válido.', 'INVALID_XLSX_SIGNATURE');
 }
 

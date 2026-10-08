@@ -1,9 +1,10 @@
 import { logger } from '../observability/logger.js';
+import { IMPORT_FILE_TOO_LARGE_MESSAGE } from '../domain/indicatorImportCatalog.js';
 
 export function errorHandler(error, req, res, _next) {
   if (error?.type === 'entity.too.large' || error?.status === 413) {
     const spreadsheet = req.originalUrl?.includes('/indicator-imports/');
-    return res.status(413).json({ message: spreadsheet ? 'A planilha excede o limite de 10 MB.' : 'A imagem é muito grande. Envie uma foto JPG, PNG ou WebP de até 2 MB.', code: 'PAYLOAD_TOO_LARGE' });
+    return res.status(413).json({ message: spreadsheet ? IMPORT_FILE_TOO_LARGE_MESSAGE : 'A imagem é muito grande. Envie uma foto JPG, PNG ou WebP de até 2 MB.', code: 'PAYLOAD_TOO_LARGE' });
   }
   // Detect database connection failures (pg Pool AggregateError or direct ECONNREFUSED)
   try {

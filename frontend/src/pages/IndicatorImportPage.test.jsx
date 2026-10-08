@@ -1,3 +1,4 @@
+import { MAX_IMPORT_BYTES } from '../config/indicatorImport.js';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,7 +19,7 @@ const residentBatch = { id: 'batch-2', importType: 'RESIDENTS', status: 'REVIEW_
 beforeEach(() => {
   vi.clearAllMocks();
   api.getInnovationCenters.mockResolvedValue([{ id: 'center-1', name: 'Centro de Inovação' }]);
-  api.getIndicatorImportOptions.mockResolvedValue({ eventModes: ['PRESENTIAL', 'HYBRID', 'ONLINE', 'NOT_INFORMED'], eventTypes: ['Evento', 'Workshop'], maxBytes: 10485760 });
+  api.getIndicatorImportOptions.mockResolvedValue({ eventModes: ['PRESENTIAL', 'HYBRID', 'ONLINE', 'NOT_INFORMED'], eventTypes: ['Evento', 'Workshop'], maxBytes: MAX_IMPORT_BYTES });
   api.getIndicatorImportDraft.mockResolvedValue(null);
   api.uploadIndicatorImport.mockResolvedValue(eventBatch);
   api.saveIndicatorImportReview.mockImplementation(async (_id, items) => ({ ...eventBatch, draft: { items } }));
@@ -31,6 +32,53 @@ const openReview = async () => {
 };
 
 describe('telas de importação de indicadores', () => {
+  it.each(['EVENTS', 'RESIDENTS'])('mostra 50 MB e bloqueia arquivo acima do limite antes do upload de %s', async (type) => {
+    const { container } = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    expect(screen.getByText(/Formato: XLSX · Limite: 50 MB/)).toBeTruthy();
+    expect(screen.getByText(/Somente XLSX · limite de 50 MB/)).toBeTruthy();
+    const file = new File(['xlsx'], 'planilha.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    Object.defineProperty(file, 'size', { value: MAX_IMPORT_BYTES + 1 });
+    fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 50 MB.');
+    expect(api.uploadIndicatorImport).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['EVENTS', MAX_IMPORT_BYTES - 1], ['EVENTS', MAX_IMPORT_BYTES],
+    ['RESIDENTS', MAX_IMPORT_BYTES - 1], ['RESIDENTS', MAX_IMPORT_BYTES],
+  ])('permite validar arquivo de %s com %i bytes', async (type, size) => {
+    api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
+    const { container } = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    const file = new File(['xlsx'], 'planilha.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    Object.defineProperty(file, 'size', { value: size });
+    fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+    expect(api.uploadIndicatorImport).toHaveBeenCalledWith(type, 'center-1', file, false);
+  });
+
+  it('exibe erro se o reprocessamento autorizado falha sem repetir a confirmação', async () => {
+    const duplicate = Object.assign(new Error('Este arquivo já foi processado.'), { code: 'IMPORT_ALREADY_EXISTS' });
+    api.uploadIndicatorImport.mockRejectedValueOnce(duplicate).mockRejectedValueOnce(duplicate);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    const file = new File(['xlsx'], 'eventos.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/i), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(duplicate.message);
+    expect(api.uploadIndicatorImport).toHaveBeenCalledTimes(2);
+    expect(api.uploadIndicatorImport).toHaveBeenNthCalledWith(1, 'EVENTS', 'center-1', file, false);
+    expect(api.uploadIndicatorImport).toHaveBeenNthCalledWith(2, 'EVENTS', 'center-1', file, true);
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Validar' }).disabled).toBe(false);
+    expect(screen.queryByText('Arquivo validado. Revise os registros antes de confirmar.')).toBeNull();
+    expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+  });
+
   it('isola o estado ao trocar de Eventos para Residentes com um batch aberto', async () => {
     // Eventos reais não possuem contracts; a reutilização do estado causava
     // TypeError em contracts.some/length no render de Residentes.

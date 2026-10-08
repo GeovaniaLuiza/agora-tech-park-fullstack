@@ -1,6 +1,7 @@
 import { query } from '../db/pool.js';
 
-export async function summary({ period = null, year: requestedYear = null, name = null, category = null, sourceType = 'LIVE', centerId = null } = {}, client = { query }) {
+export async function summary({ period = null, year: requestedYear = null, name = null, category = null, sourceType = 'LIVE', centerId = null, officialDashboard = false, codes = null } = {}, client = { query }) {
+  const official = (officialDashboard === true || officialDashboard === 'true') && sourceType === 'SPREADSHEET_IMPORT';
   const year = requestedYear ? Number(requestedYear) : /^\d{4}/.test(period || '') ? Number(String(period).slice(0, 4)) : new Date().getFullYear();
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(period || '') ? Number(String(period).slice(5, 7)) : null;
   const { rows } = await client.query(
@@ -14,12 +15,16 @@ export async function summary({ period = null, year: requestedYear = null, name 
      ), selected AS (SELECT * FROM ranked WHERE rn=1), effective AS (
        SELECT v.* FROM selected v JOIN indicator_definitions definition ON definition.id=v.indicator_id
        WHERE $2::int IS NOT NULL OR CASE
+         WHEN $7::boolean AND EXISTS (SELECT 1 FROM selected annual WHERE annual.indicator_id=v.indicator_id
+           AND annual.month IS NULL AND (annual.numeric_value IS NOT NULL OR annual.text_value IS NOT NULL OR annual.json_value IS NOT NULL)) THEN v.month IS NULL
          WHEN COALESCE(definition.annual_aggregation,definition.aggregation_type) IN ('DERIVED','CALCULATED') THEN v.month IS NULL
          ELSE v.month IS NOT NULL OR NOT EXISTS (
            SELECT 1 FROM selected monthly WHERE monthly.indicator_id=v.indicator_id AND monthly.month IS NOT NULL
          ) END
      )
-     SELECT d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.annual_aggregation,d.aggregation_type,
+     SELECT d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.periodicity,d.annual_aggregation,d.aggregation_type,
+       CASE WHEN $7::boolean AND $2::int IS NULL AND COUNT(v.month)=0 AND COUNT(v.id)>0 THEN 'RECORDED_ANNUAL'
+         ELSE COALESCE(d.annual_aggregation,d.aggregation_type) END AS consolidation_basis,
        CASE WHEN $2::int IS NOT NULL THEN MAX(v.numeric_value)
          WHEN COUNT(v.month)=0 THEN MAX(v.numeric_value)
          WHEN COALESCE(d.annual_aggregation,d.aggregation_type)='AVERAGE' THEN AVG(v.numeric_value)
@@ -38,12 +43,13 @@ export async function summary({ period = null, year: requestedYear = null, name 
        MAX(GREATEST(v.updated_at,v.consolidated_at)) AS updated_at
      FROM indicator_definitions d LEFT JOIN effective v ON d.id=v.indicator_id
      WHERE d.active
-       AND ($5='LIVE' OR EXISTS (SELECT 1 FROM selected matching WHERE matching.indicator_id=d.id))
+       AND ($7::boolean OR $5='LIVE' OR EXISTS (SELECT 1 FROM selected matching WHERE matching.indicator_id=d.id))
        AND ($3::text IS NULL OR d.name ILIKE '%' || $3 || '%' OR d.code ILIKE '%' || $3 || '%')
        AND ($4::text IS NULL OR d.category=$4)
-     GROUP BY d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.annual_aggregation,d.aggregation_type,d.sort_order
+       AND ($8::text[] IS NULL OR d.code=ANY($8::text[]))
+     GROUP BY d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.periodicity,d.annual_aggregation,d.aggregation_type,d.sort_order
      ORDER BY d.category,d.sort_order,d.name`,
-    [year, month, name, category, sourceType, centerId],
+    [year, month, name, category, sourceType, centerId, official, official && typeof codes === 'string' ? codes.split(',').filter(Boolean) : null],
   );
   return rows;
 }

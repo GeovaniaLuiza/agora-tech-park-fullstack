@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-  Building2, Check, CheckSquare, Download, Edit3, Hash, List, Plus, Search, Trash2, Type, X,
+  Building2, Check, CheckSquare, Edit3, Hash, List, Plus, Search, Trash2, Type, X,
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -10,8 +10,8 @@ import FormCard from './components/FormCard';
 import { useForms } from './hooks/useForms';
 import {
   addFormQuestion, addQuestionOption, archiveForm, clearAudit,
-  createForm, downloadIndicatorReport, duplicateForm, getAudit, getEligibleFormRecipients, getForm,
-  getFormQuestions, getFormResponse, getFormIndicatorDefinitions, getIndicatorHistory, getIndicators, getInnovationCenters, getOrganizations, getQuestionOptions,
+  createForm, duplicateForm, getAudit, getEligibleFormRecipients, getForm,
+  getFormQuestions, getFormResponse, getFormIndicatorDefinitions, getInnovationCenters, getOrganizations, getQuestionOptions,
   getResponseHistory, getFormRespondents, publishForm, saveFormAudience, saveResponseDraft, submitResponse,
   createOrganization, updateOrganization, inactivateOrganization, updateForm, updateFormQuestion,
 } from './services/api';
@@ -30,7 +30,7 @@ import AdminUsersPage from './pages/AdminUsersPage.jsx';
 import IndicatorImportPage from './pages/IndicatorImportPage.jsx';
 import ImportedIndicatorsPage from './pages/ImportedIndicatorsPage.jsx';
 import { homeForRole } from './config/access';
-import { formatIndicatorValue } from './utils/formatters.js';
+import IndicatorsPage from './pages/IndicatorsPage.jsx';
 
 const pageMeta = {
   '/dashboard': ['Dashboard', 'Visão geral dos indicadores do ecossistema'],
@@ -86,7 +86,6 @@ function Forms({ resident = false }) {
 
 const questionTypes = [[Type, 'Texto', 'TEXT'], [Hash, 'Número', 'NUMBER'], [List, 'Escolha', 'OPTION'], [CheckSquare, 'Decimal', 'DECIMAL']];
 const emptyQuestion = (type = 'TEXT') => ({ label: '', type, required: true, options: '', indicatorId: '' });
-const indicatorSourceLabels = { FORM_RESPONSE: 'Formulário', SPREADSHEET_IMPORT: 'Planilha', MANUAL_ENTRY: 'Lançamento manual', SYSTEM_CALCULATION: 'Cálculo do sistema' };
 
 function Create() {
   const { formId } = useParams();
@@ -237,74 +236,6 @@ function Create() {
   </div>;
 }
 
-function Indicators() {
-  const { user } = useAuth();
-  const [items, setItems] = useState([]);
-  const [centers, setCenters] = useState([]);
-  const [centerId, setCenterId] = useState('');
-  const [periods, setPeriods] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [category, setCategory] = useState('');
-  const [sourceType, setSourceType] = useState('LIVE');
-  const [period, setPeriod] = useState('');
-  const [search, setSearch] = useState('');
-  const [error, setError] = useState('');
-  useEffect(() => { getInnovationCenters().then((rows) => { setCenters(rows); setCenterId(rows[0]?.id || ''); }).catch((reason) => setError(reason.message)); }, []);
-  useEffect(() => { getIndicatorHistory().then(setPeriods).catch((reason) => setError(reason.message)); }, []);
-  useEffect(() => {
-    if (!centerId) return;
-    let cancelled = false;
-    getIndicators({ centerId, ...(period ? { period } : {}), ...(search ? { name: search } : {}), ...(category ? { category } : {}), ...(sourceType !== 'LIVE' ? { sourceType } : {}) })
-      .then((rows) => { if (!cancelled) {
-        setItems(rows);
-        if (!category && !search && sourceType === 'LIVE') setCategories([...new Set(rows.map((row) => row.category).filter(Boolean))]);
-        setError('');
-      } })
-      .catch((reason) => { if (!cancelled) setError(reason.message); });
-    return () => { cancelled = true; };
-  }, [period, search, centerId, category, sourceType]);
-  const currentYear = String(new Date().getFullYear());
-  const availableYears = [...new Set(periods.map(String))].filter((value) => value !== currentYear);
-  const download = async (format) => {
-    try {
-      const report = await downloadIndicatorReport(format, { ...(period ? { period } : {}), ...(centerId ? { centerId } : {}), ...(search ? { name: search } : {}), ...(category ? { category } : {}), ...(sourceType !== 'LIVE' ? { sourceType } : {}) });
-      const url = URL.createObjectURL(report.blob);
-      const anchor = document.createElement('a'); anchor.href = url; anchor.download = report.filename; anchor.click();
-      URL.revokeObjectURL(url);
-    } catch (reason) { setError(reason.message); }
-  };
-  const canExport = user.role !== 'RESIDENTE';
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const groups = [...new Set(items.map((item) => item.category))];
-  return <div className="content indicators-page">
-    <div className="source-notice"><strong>Catálogo institucional dos Centros de Inovação</strong><span>Valores consolidados de formulários, importações, lançamentos manuais e cálculos do sistema.</span></div>
-    <div className="toolbar">
-      <label>Centro<select value={centerId} onChange={(event) => setCenterId(event.target.value)}>{centers.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}</select></label>
-      <label className="field-search"><Search /><input aria-label="Busca" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar indicador ou código..." /></label>
-      <label>Ano<select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="">{currentYear}</option>{availableYears.map((value) => <option key={value}>{value}</option>)}</select></label>
-      <label>Categoria<select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">Todas</option>{categories.map((value) => <option key={value}>{value}</option>)}</select></label>
-      <label>Origem<select value={sourceType} onChange={(event) => setSourceType(event.target.value)}><option value="LIVE">Todas</option>{Object.entries(indicatorSourceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-      {canExport && <><Button variant="secondary" className="push" onClick={() => download('pdf')}><Download />PDF</Button><Button variant="secondary" onClick={() => download('excel')}><Download />Excel</Button><Button variant="secondary" onClick={() => download('csv')}><Download />CSV</Button></>}
-    </div>
-    <ErrorMessage message={error} />
-    {groups.map((group) => <section key={group || 'uncategorized'} aria-label={group || 'Sem categoria'}><h2>{group || 'Sem categoria'}</h2><div className="metric-grid">
-      {items.filter((item) => item.category === group).map((item) => <article className="panel metric indicator-card" key={item.id || item.code}>
-        <div><span>{item.category}</span><code>{item.code}</code></div><h3>{item.name}</h3><small>Unidade: {item.unit}</small>
-        <h2>{item.value == null && item.text_value == null && item.json_value == null ? (item.monthly_values?.length ? 'Consolidação anual indisponível' : 'Sem dados para o período') : Array.isArray(item.json_value) ? `${item.json_value.length} organizações` : formatIndicatorValue(item.value ?? item.text_value, item.value_type, item.unit)}</h2>
-        <p>{item.description}</p>
-        {Array.isArray(item.json_value) && <div className="indicator-details" aria-label={`Detalhamento de ${item.name}`}>{item.json_value.map((detail) => <div key={detail.organization}><strong>{detail.organization}</strong><span>Desafios: {detail.challenges} · Soluções: {detail.solutions} · Negócios: {detail.deals}</span></div>)}</div>}
-        {item.monthly_values?.length > 0 && <details><summary>Valores mensais</summary><dl>{months.map((label, index) => {
-          const monthly = item.monthly_values.find((value) => value.month === index + 1);
-          return <div key={label}><dt>{label}</dt><dd>{monthly ? formatIndicatorValue(monthly.value ?? monthly.text_value, item.value_type, item.unit) : 'Sem dados para o período'}{monthly && <small> · {indicatorSourceLabels[monthly.source] || monthly.source}</small>}</dd></div>;
-        })}</dl></details>}
-        <footer><em>{item.period}</em><small>{(item.sources?.length ? item.sources : [item.source]).filter(Boolean).map((source) => indicatorSourceLabels[source] || source).join(', ') || 'Sem origem no período'}</small></footer>
-        <small>Última atualização: {item.updated_at ? new Date(item.updated_at).toLocaleString('pt-BR') : 'Sem atualização no período'}</small>
-      </article>)}
-    </div></section>)}
-    {!items.length && !error && <article className="panel empty-state">Nenhum indicador encontrado para os filtros.</article>}
-  </div>;
-}
-
 function Residents() {
   const { user } = useAuth();
   const [organizations, setOrganizations] = useState([]);
@@ -433,7 +364,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/dashboard" element={<DashboardPage />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/pesquisa" element={<Navigate to="/forms" replace />} /><Route path="/forms" element={<Forms />} /><Route path="/forms/new" element={<Create />} /><Route path="/forms/:formId/edit" element={<Create />} /></Route>
-        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/indicators" element={<Indicators />} /><Route path="/indicadores" element={<Navigate to="/indicators" replace />} /></Route><Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR']} />}><Route path="/organizations" element={<Residents />} /></Route>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/indicators" element={<IndicatorsPage />} /><Route path="/indicadores" element={<Navigate to="/indicators" replace />} /></Route><Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR']} />}><Route path="/organizations" element={<Residents />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicators/catalog" element={<IndicatorCatalogPage />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicadores/importar-eventos" element={<IndicatorImportPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/importar-residentes" element={<IndicatorImportPage key="RESIDENTS" type="RESIDENTS" />} /><Route path="/indicadores/eventos" element={<ImportedIndicatorsPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/residentes" element={<ImportedIndicatorsPage key="RESIDENTS" type="RESIDENTS" />} /></Route>
         <Route path="/perfil" element={<ProfilePage />} />

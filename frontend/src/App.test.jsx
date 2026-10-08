@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const auth = vi.hoisted(() => ({
@@ -61,118 +61,16 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('roteamento principal', () => {
-  it('shows the catalog at /indicadores with FORM, IMPORT and a definition without values', async () => {
+  it.each(['/indicadores', '/indicators'])('abre o dashboard oficial em %s', async (path) => {
     api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }]);
-    api.getIndicators.mockResolvedValue([
-      { id: 'form', code: 'FORM', name: 'Projetos', category: 'Projetos', unit: 'UNIDADE', value: 5, source: 'FORM_RESPONSE', updated_at: '2026-01-01T00:00:00Z', monthly_values: [{ month: 1, value: 5, source: 'FORM_RESPONSE' }] },
-      { id: 'import', code: 'IMPORT', name: 'Eventos realizados', category: 'Eventos', unit: 'UNIDADE', value: 3, source: 'SPREADSHEET_IMPORT' },
-      { id: 'empty', code: 'EMPTY', name: 'Sem valores', category: 'Projetos', unit: 'UNIDADE', value: null },
-    ]);
-    window.history.replaceState({}, '', '/indicadores');
+    api.getIndicators.mockResolvedValue([{ code: 'EVENTOS_REALIZADOS', name: 'Nº de Eventos Realizados', value: null, monthly_values: [] }]);
+    window.history.replaceState({}, '', path);
     render(<App />);
-    expect(await screen.findByText('Sem valores')).toBeTruthy();
-    expect(screen.getAllByText('Sem dados para o período').length).toBeGreaterThan(0);
-    expect(screen.getByText('Formulário', { selector: 'footer small' })).toBeTruthy();
-    expect(screen.getByText('Planilha', { selector: 'footer small' })).toBeTruthy();
-    expect(screen.getByText('Jan')).toBeTruthy();
-    expect(screen.getByText('Dez')).toBeTruthy();
-    expect(screen.queryByText('Nenhum indicador encontrado para os filtros.')).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeTruthy();
+    expect(screen.getAllByText('Sem dados').length).toBeGreaterThan(0);
     expect(window.location.pathname).toBe('/indicators');
+    expect(api.getIndicators).toHaveBeenCalledWith(expect.objectContaining({ centerId: 'center-a', sourceType: 'SPREADSHEET_IMPORT', officialDashboard: 'true' }));
   });
-
-  it('queries category, source and search filters and exports the same selection', async () => {
-    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }]);
-    api.getIndicators.mockResolvedValue([{ id: 'manual', code: 'MANUAL', name: 'Receita', category: 'Financeiro', unit: 'BRL', value: 0, source: 'MANUAL_ENTRY' }]);
-    window.history.replaceState({}, '', '/indicators');
-    render(<App />);
-    await screen.findByRole('option', { name: 'Financeiro' });
-    expect(screen.getByText('Lançamento manual', { selector: 'footer small' })).toBeTruthy();
-    expect(screen.queryByText('Sem dados para o período')).toBeNull();
-    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Financeiro' } });
-    fireEvent.change(screen.getByLabelText('Origem'), { target: { value: 'MANUAL_ENTRY' } });
-    fireEvent.change(screen.getByLabelText('Busca'), { target: { value: 'MANUAL' } });
-    await waitFor(() => expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-a', category: 'Financeiro', sourceType: 'MANUAL_ENTRY', name: 'MANUAL' }));
-    api.downloadIndicatorReport.mockRejectedValueOnce(new Error('Export checked'));
-    fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
-    await screen.findByText('Export checked');
-    expect(api.downloadIndicatorReport).toHaveBeenLastCalledWith('csv', { centerId: 'center-a', category: 'Financeiro', sourceType: 'MANUAL_ENTRY', name: 'MANUAL' });
-    fireEvent.change(screen.getByLabelText('Origem'), { target: { value: 'LIVE' } });
-    await waitFor(() => expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-a', category: 'Financeiro', name: 'MANUAL' }));
-  });
-
-  it('exibe a falha ao carregar centros sem consultar indicadores', async () => {
-    api.getInnovationCenters.mockRejectedValueOnce(new Error('Falha nos centros'));
-    const calls = api.getIndicators.mock.calls.length;
-    window.history.replaceState({}, '', '/indicators');
-    render(<App />);
-    expect(await screen.findByText('Falha nos centros')).toBeTruthy();
-    expect(api.getIndicators.mock.calls).toHaveLength(calls);
-  });
-
-  it('exibe a rejeição da consulta de indicadores do centro', async () => {
-    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }]);
-    api.getIndicators.mockRejectedValueOnce(new Error('Falha nos indicadores'));
-    window.history.replaceState({}, '', '/indicators');
-    render(<App />);
-    expect(await screen.findByText('Falha nos indicadores')).toBeTruthy();
-  });
-
-  it('ignora a resposta tardia do centro anterior', async () => {
-    let resolvePrevious;
-    const previous = new Promise((resolve) => { resolvePrevious = resolve; });
-    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }, { id: 'center-b', name: 'Centro B' }]);
-    api.getIndicators.mockImplementation(({ centerId }) => centerId === 'center-a' ? previous : Promise.resolve([
-      { id: 'b', name: 'Indicador atual', value: 2, source: 'SYSTEM_CALCULATION' },
-    ]));
-    window.history.replaceState({}, '', '/indicators');
-    render(<App />);
-    await waitFor(() => expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-a' }));
-    fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'center-b' } });
-    expect(await screen.findByText('Indicador atual')).toBeTruthy();
-    await act(async () => { resolvePrevious([{ id: 'a', name: 'Indicador antigo', value: 1 }]); await previous; });
-    expect(screen.queryByText('Indicador antigo')).toBeNull();
-    expect(screen.getByText('Indicador atual')).toBeTruthy();
-  });
-
-  it('exporta os indicadores com o centro e o período selecionados', async () => {
-    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }]);
-    api.getIndicatorHistory.mockResolvedValue(['2025']);
-    api.downloadIndicatorReport.mockResolvedValue({ blob: new Blob(['report']), filename: 'indicadores.csv' });
-    const createObjectURL = vi.fn(() => 'blob:report');
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL }));
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    window.history.replaceState({}, '', '/indicators');
-    render(<App />);
-    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-a'));
-    const period = (await screen.findByRole('option', { name: '2025' })).parentElement;
-    fireEvent.change(period, { target: { value: '2025' } });
-    await waitFor(() => expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-a', period: '2025' }));
-    fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
-    await waitFor(() => expect(api.downloadIndicatorReport).toHaveBeenLastCalledWith('csv', { centerId: 'center-a', period: '2025' }));
-    await waitFor(() => expect(click).toHaveBeenCalledOnce());
-    expect(createObjectURL).toHaveBeenCalledOnce();
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:report');
-    expect(click.mock.instances[0].download).toBe('indicadores.csv');
-  });
-
-  it('consulta a fonte consolidada do centro selecionado em Indicadores', async () => {
-    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }, { id: 'center-b', name: 'Centro B' }]);
-    api.getIndicatorHistory.mockResolvedValue(['2026']);
-    api.getIndicators.mockImplementation(async ({ centerId }) => [{
-      id: centerId, code: 'EVENTOS_REALIZADOS', name: `Eventos ${centerId}`,
-      value: centerId === 'center-a' ? 1 : 2, value_type: 'INTEGER', unit: 'UNIDADE',
-      category: 'Eventos', period: '2026', source: 'SYSTEM_CALCULATION',
-    }]);
-    window.history.replaceState({}, '', '/indicators');
-    render(<App />);
-    expect(await screen.findByText('Eventos center-a')).toBeTruthy();
-    expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-a' });
-    fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'center-b' } });
-    expect(await screen.findByText('Eventos center-b')).toBeTruthy();
-    expect(api.getIndicators).toHaveBeenLastCalledWith({ centerId: 'center-b' });
-  });
-
   it('renderiza layout, menu e painel do ADMIN em /admin', async () => {
     window.history.replaceState({}, '', '/admin');
 

@@ -32,6 +32,84 @@ const openReview = async () => {
 };
 
 describe('telas de importação de indicadores', () => {
+  it.each([
+    ['EVENTS', 'durante'], ['EVENTS', 'depois'], ['RESIDENTS', 'durante'], ['RESIDENTS', 'depois'],
+  ])('descarta erro de tamanho da recuperação %s que chega %s da validação', async (type, timing) => {
+    let rejectDraft, resolveUpload;
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectDraft = reject; }));
+    api.uploadIndicatorImport.mockReturnValueOnce(new Promise((resolve) => { resolveUpload = resolve; }));
+    const original = type === 'EVENTS' ? eventBatch : residentBatch;
+    const issue = { message: type === 'EVENTS' ? 'Data inválida na linha 2' : 'CNPJ ausente na linha 4' };
+    const loaded = { ...original, draft: { items: original.draft.items.map((item) => ({ ...item, issues: [issue], validationStatus: 'REVIEW_REQUIRED' })) } };
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith(type, 'center-1'));
+    const oversized = new File(['xlsx'], 'grande.xlsx');
+    Object.defineProperty(oversized, 'size', { value: MAX_IMPORT_BYTES + 1 });
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [oversized] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 50 MB.');
+    const file = new File([new Uint8Array(15_759)], type === 'EVENTS' ? 'Eventos.xlsx' : 'Clientes.xlsx');
+    expect(file.size).toBe(15_759);
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [file] } });
+    expect(screen.getByText(/Tamanho: 15,4 KB/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    const rejectRecovery = () => act(async () => rejectDraft(new Error('A planilha excede o limite de 50 MB.')));
+    if (timing === 'durante') await rejectRecovery();
+    await act(async () => resolveUpload(loaded));
+    await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+    if (timing === 'depois') await rejectRecovery();
+    expect(screen.queryByText('A planilha excede o limite de 50 MB.')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(api.uploadIndicatorImport).toHaveBeenCalledWith(type, 'center-1', file, false);
+    await openReview();
+    expect(screen.getByText(issue.message)).toBeTruthy();
+    expect(within(screen.getByText(issue.message).closest('tr')).getByText('Revisão necessária')).toBeTruthy();
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('preserva erro funcional de recuperação tardia em %s', async (type) => {
+    let rejectDraft;
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectDraft = reject; }));
+    api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File([new Uint8Array(15_759)], 'planilha.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+    await act(async () => rejectDraft(new Error('O lote de importação possui dados inválidos.')));
+    expect((await screen.findByRole('alert')).textContent).toBe('O lote de importação possui dados inválidos.');
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('exibe falha real ao revalidar %s sem manter sucesso anterior', async (type) => {
+    api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch)
+      .mockRejectedValueOnce(new Error('A planilha possui colunas inválidas.'));
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File([new Uint8Array(15_759)], 'planilha.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Validar' }).disabled).toBe(false));
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha possui colunas inválidas.');
+    expect(screen.queryByText('Arquivo validado. Revise os registros antes de confirmar.')).toBeNull();
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('remove sucesso anterior quando novo arquivo de %s excede o limite', async (type) => {
+    api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'planilha.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Validar' }).disabled).toBe(false));
+    const oversized = new File(['xlsx'], 'grande.xlsx');
+    Object.defineProperty(oversized, 'size', { value: MAX_IMPORT_BYTES + 1 });
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [oversized] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 50 MB.');
+    expect(screen.queryByText('Arquivo validado. Revise os registros antes de confirmar.')).toBeNull();
+    expect(api.uploadIndicatorImport).toHaveBeenCalledOnce();
+  });
+
   it.each(['EVENTS', 'RESIDENTS'])('limpa o erro de tamanho anterior ao selecionar 15759 bytes em %s', async (type) => {
     api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);

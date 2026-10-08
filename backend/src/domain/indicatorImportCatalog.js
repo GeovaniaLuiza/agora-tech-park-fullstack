@@ -6,9 +6,7 @@ export const IMPORT_STATUS = Object.freeze({
 });
 
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-export const MAX_IMPORT_FILE_SIZE_MB = 50;
-export const MAX_IMPORT_BYTES = MAX_IMPORT_FILE_SIZE_MB * 1024 * 1024;
-export const IMPORT_FILE_TOO_LARGE_MESSAGE = `A planilha excede o limite de ${MAX_IMPORT_FILE_SIZE_MB} MB.`;
+export { MAX_IMPORT_FILE_SIZE_MB, MAX_IMPORT_BYTES, IMPORT_FILE_TOO_LARGE_MESSAGE } from './indicatorImportUpload.js';
 export const IMPORT_YEAR = 2026;
 export const EVENT_SHEET = 'Eventos';
 export const EVENT_HEADERS = Object.freeze(['Lista', 'Data', 'Local', 'Temática', 'Modo', 'Tipo de Evento', 'Nº de Participantes', 'Nº de Empresas Participantes']);

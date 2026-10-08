@@ -34,7 +34,7 @@ describe('contrato HTTP de erros', () => {
   });
 
   it.each([
-    ['/indicator-imports/upload', { type: 'entity.too.large' }, '50 MB'],
+    ['/indicator-imports/upload', { type: 'entity.too.large' }, '100 MB'],
     ['/profile/avatar', { status: 413 }, '2 MB'],
   ])('informa o limite correto no upload %s', async (route, error, limit) => {
     const response = await failingRequest(error, route);

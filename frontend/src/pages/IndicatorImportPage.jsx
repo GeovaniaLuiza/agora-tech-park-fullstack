@@ -24,7 +24,7 @@ function Stepper({ active }) {
 }
 function SummaryCards({ type, summary = {} }) {
   const entries = type === 'EVENTS'
-    ? [['Registros encontrados', summary.records], ['Válidos', summary.valid], ['Com aviso', summary.warnings], ['Revisão necessária', summary.needsReview]]
+    ? [['Registros encontrados', summary.records], ['Válidos', summary.valid], ['Com aviso', summary.warnings], ['Revisão necessária', summary.needsReview], ['Ignorados', summary.ignored]]
     : [['Linhas lidas', summary.rowsRead], ['Empresas identificadas', summary.companies], ['CNPJs únicos', summary.uniqueCnpjs], ['Ocupações', summary.occupations], ['Válidos', summary.valid], ['Avisos', summary.warnings], ['Revisão necessária', summary.needsReview], ['Ignorados', summary.ignored]];
   return <section className="import-summary">{entries.map(([label, value]) => <article className="panel" key={label}><small>{label}</small><strong>{value ?? 0}</strong></article>)}</section>;
 }
@@ -63,6 +63,32 @@ function IgnoreRecord({ item, setItems, disabled }) {
   if (item.ignored) return null;
   const excluded = item.reviewStatus === 'EXCLUDED';
   return <button className="button secondary" disabled={disabled} onClick={() => setItems((current) => current.map((record) => record.id === item.id ? reviewDecision(record, excluded) : record))}>{excluded ? 'Restaurar' : 'Ignorar registro'}</button>;
+}
+
+function IgnoreIncompleteDialog({ count, onCancel, onIgnore, disabled }) {
+  const dialog = useRef(null);
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    dialog.current.querySelector('button').focus();
+    return () => previousFocus?.focus();
+  }, []);
+  const onKeyDown = (event) => {
+    if (event.key === 'Escape') onCancel();
+    if (event.key !== 'Tab') return;
+    const buttons = [...dialog.current.querySelectorAll('button:not(:disabled)')];
+    const target = event.shiftKey ? buttons.at(-1) : buttons[0];
+    if (document.activeElement === (event.shiftKey ? buttons[0] : buttons.at(-1))) {
+      event.preventDefault();
+      target.focus();
+    }
+  };
+  return <div ref={dialog} className="management-modal" role="dialog" aria-modal="true" aria-labelledby="ignore-incomplete-title" aria-describedby="ignore-incomplete-description" onKeyDown={onKeyDown}>
+    <section className="panel export-dialog">
+      <h2 id="ignore-incomplete-title">Ignorar {count} registros incompletos?</h2>
+      <p id="ignore-incomplete-description">Esses registros não serão considerados na atualização dos indicadores. Eles poderão ser restaurados antes da confirmação da importação.</p>
+      <footer><button className="button secondary" onClick={onCancel}>Cancelar</button><button className="button danger" disabled={disabled || !count} onClick={onIgnore}>Ignorar registros</button></footer>
+    </section>
+  </div>;
 }
 
 function Pagination({ page, totalItems, onChange }) {
@@ -156,6 +182,7 @@ function ImportFlow({ type }) {
   const [exportDialog, setExportDialog] = useState(null), [generating, setGenerating] = useState(false);
   const [page, setPage] = useState(1);
   const [stage, setStage] = useState(1);
+  const [ignoreDialog, setIgnoreDialog] = useState(false);
   const mounted = useRef(false);
   const fileSelected = useRef(false);
 
@@ -189,6 +216,12 @@ function ImportFlow({ type }) {
   const activeStep = realFormatFlow ? (exported ? steps.length + 1 : stage) : (exported ? steps.length + 1 : batch?.status === 'IMPORTED' ? 7 : batch ? (dirty ? 4 : 3) : processing || file ? 2 : 1);
   const editable = batch && batch.status !== 'IMPORTED';
   const busy = processing || saving || confirming;
+  const incompleteItems = items.filter((item) => validationOf(item) === 'REVIEW_REQUIRED');
+  const ignoreIncomplete = () => {
+    const ids = new Set(incompleteItems.map((item) => item.id));
+    setReviewedItems((current) => current.map((item) => ids.has(item.id) ? reviewDecision(item, false) : item));
+    setIgnoreDialog(false);
+  };
   const summary = useMemo(() => {
     if (!batch) return {};
     const counts = { valid: items.filter((item) => validationOf(item) === 'VALID').length, warnings: items.filter((item) => validationOf(item) === 'WARNING').length, needsReview: items.filter((item) => validationOf(item) === 'REVIEW_REQUIRED').length, ignored: items.filter((item) => validationOf(item) === 'IGNORED').reduce((sum, item) => sum + item.sourceRows.length, 0), corrected: items.filter((item) => item.manuallyCorrected).length };
@@ -200,7 +233,7 @@ function ImportFlow({ type }) {
   const currentPage = Math.min(page, totalPages);
   const paginatedItems = useMemo(() => visibleItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [visibleItems, currentPage]);
 
-  const validate = async (reprocess = false) => { setError(''); if (!file) { setError('Selecione uma planilha XLSX.'); return; } if (file.size > MAX_IMPORT_BYTES) { setError(IMPORT_FILE_TOO_LARGE_MESSAGE); return; } setStage(realFormatFlow ? 2 : 4); setProcessing(true); setMessage(''); try { const loaded = await uploadIndicatorImport(type, centerId, file, reprocess); if (!mounted.current) return; const loadedItems = readItems(loaded, type); setBatch(loaded); setItems(loadedItems); setDirty(false); setSelected(new Set()); setPage(1); setMessage('Arquivo validado. Revise os registros antes de confirmar.'); } catch (reason) { if (!mounted.current) return; if (reason.code === 'IMPORT_ALREADY_EXISTS' && !reprocess && window.confirm('Este arquivo já foi processado. Deseja reprocessar conscientemente?')) return validate(true); if (mounted.current) setError(reason.message); } finally { if (mounted.current) setProcessing(false); } };
+  const validate = async (reprocess = false) => { setError(''); if (!file) { setError('Selecione uma planilha XLSX.'); return; } if (file.size > MAX_IMPORT_BYTES) { setError(IMPORT_FILE_TOO_LARGE_MESSAGE); return; } setStage(realFormatFlow ? 2 : 4); setProcessing(true); setMessage(''); try { const loaded = await uploadIndicatorImport(type, centerId, file, reprocess); if (!mounted.current) return; const loadedItems = readItems(loaded, type); setBatch(loaded); setItems(loadedItems); setDirty(false); setSelected(new Set()); setPage(1); setMessage('Arquivo validado. Revise os registros antes de confirmar.'); } catch (reason) { if (!mounted.current) return; if (reason.code === 'IMPORT_ALREADY_EXISTS' && !reprocess && window.confirm('Este arquivo já foi processado. Deseja reprocessar conscientemente?')) return validate(true); if (mounted.current) setError(reason.code === 'PAYLOAD_TOO_LARGE' ? IMPORT_FILE_TOO_LARGE_MESSAGE : reason.message); } finally { if (mounted.current) setProcessing(false); } };
   const save = async () => { setSaving(true); setError(''); try { const loaded = await saveIndicatorImportReview(batch.id, items); if (!mounted.current) return; const loadedItems = readItems(loaded, type); setBatch(loaded); setItems(loadedItems); setDirty(false); setMessage('Revisão salva com sucesso.'); return loaded; } catch (reason) { if (mounted.current) setError(reason.message); } finally { if (mounted.current) setSaving(false); } };
   const confirm = async () => { if (realFormatFlow && stage !== 5) { if (dirty && !await save()) return; setStage(5); return; } setConfirming(true); setError(''); try { if (dirty) await saveIndicatorImportReview(batch.id, items); if (!mounted.current) return; const loaded = await confirmIndicatorImport(batch.id); if (!mounted.current) return; const loadedItems = readItems(loaded, type); setBatch(loaded); setItems(loadedItems); setDirty(false); setStage(6); setMessage('Importação confirmada e indicadores atualizados.'); } catch (reason) { if (mounted.current) setError(reason.message); } finally { if (mounted.current) setConfirming(false); } };
   const toggleSelected = (id) => setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -208,11 +241,12 @@ function ImportFlow({ type }) {
     setReviewedItems((current) => current.map((item) => {
       if (!selected.has(item.id) || item.ignored) return item;
       if (type === 'EVENTS') return {
-        ...item, included: restore, reviewStatus: restore ? 'VALIDATED' : 'EXCLUDED',
+        ...item, included: restore, reviewStatus: restore ? (item.issues?.length ? 'PENDING' : 'VALIDATED') : 'EXCLUDED',
         validationStatus: restore ? (item.issues?.length ? 'REVIEW_REQUIRED' : item.duplicateGroup ? 'WARNING' : 'VALID') : 'IGNORED',
       };
-      return { ...item, included: restore ? item.contracts.some((contract) => contract.eligibleBlock) : false,
-        reviewStatus: restore ? (item.discontinuous ? 'WITH_WARNINGS' : 'VALIDATED') : 'EXCLUDED' };
+      return { ...item, included: restore && ((item.validationStatus === 'IGNORED' && Boolean(item.issues?.length)) || item.contracts.some((contract) => contract.eligibleBlock)),
+        reviewStatus: restore ? (item.discontinuous ? 'WITH_WARNINGS' : 'VALIDATED') : 'EXCLUDED',
+        ...(restore && item.validationStatus === 'IGNORED' ? { reviewStatus: item.issues?.length ? 'PENDING' : item.discontinuous ? 'WITH_WARNINGS' : 'VALIDATED', validationStatus: item.issues?.length ? 'REVIEW_REQUIRED' : item.discontinuous ? 'WARNING' : 'VALID' } : {}) };
     }));
     setSelected(new Set());
   };
@@ -226,12 +260,12 @@ function ImportFlow({ type }) {
     <FormatGuide type={type} maxBytes={MAX_IMPORT_BYTES} />
     <section className="panel import-upload"><div><FileSpreadsheet /><div><strong>{file?.name || batch?.fileName || 'Nenhum arquivo selecionado'}</strong><small>Somente XLSX · limite de {Math.round(MAX_IMPORT_BYTES / 1024 / 1024)} MB · os dados não serão importados antes da confirmação</small>{realFormatFlow && (file || batch) && <small>Tamanho: {((file?.size ?? batch?.fileSize ?? 0) / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} KB · Aba detectada: {batch?.sheetName || 'aguardando validação'} · Linhas: {batch?.summary?.rowsRead ?? 'aguardando validação'}</small>}</div></div><label>Centro<select value={centerId} onChange={(event) => { setCenterId(event.target.value); if (realFormatFlow) { setBatch(null); setItems([]); } }} disabled={busy || (realFormatFlow && Boolean(batch))}>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label><label className="button secondary file-button"><Upload />Selecionar arquivo<input disabled={busy} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { fileSelected.current = true; const nextFile = event.target.files?.[0] || null; setFile(nextFile); if (nextFile && nextFile.size <= MAX_IMPORT_BYTES) setError((current) => current === IMPORT_FILE_TOO_LARGE_MESSAGE ? '' : current); if (realFormatFlow) { setBatch(null); setItems([]); setStage(1); setDirty(false); setExported(false); } }} /></label><button className="button primary" disabled={!file || !centerId || busy} onClick={() => validate(false)}>{processing ? 'Processando...' : 'Validar'}</button></section>
     {batch && <>{editable && realFormatFlow && <nav className="import-actions" aria-label="Etapas da importação">{[2, 3, 4, 5].map((step) => <button key={step} disabled={busy} className={stage === step ? 'button primary' : 'button secondary'} onClick={() => step === 5 ? (stage !== 5 && confirm()) : setStage(step)}>{steps[step - 1]}</button>)}</nav>}<SummaryCards type={type} summary={summary} />{(!realFormatFlow || (stage >= 3 && stage <= 4)) && <>{type === 'EVENTS' ? <EventFilters filters={eventFilters} setFilters={updateEventFilters} /> : <ResidentFilters filters={residentFilters} setFilters={updateResidentFilters} />}
-      {editable && (!realFormatFlow || stage === 4) && <div className="import-actions"><span>{selected.size} selecionado(s)</span>{type === 'EVENTS' ? <><select value={groupStrategy} onChange={(event) => setGroupStrategy(event.target.value)}><option value="MANUAL">Participantes: informar manualmente</option><option value="MAX">Participantes: maior valor</option><option value="SUM">Participantes: somar valores</option></select>{groupStrategy === 'MANUAL' && <input type="number" min="0" value={groupParticipants} onChange={(event) => setGroupParticipants(event.target.value)} placeholder="Participantes" />}<button className="button secondary" disabled={selected.size < 2} onClick={group}>Agrupar selecionados</button></> : <button className="button secondary" onClick={() => setMessage('Empresas já consolidadas por CNPJ; todas as ocupações são preservadas. CNPJ ausente ou inválido exige revisão.')}>Consolidar duplicidades</button>}<button className="button danger" disabled={!selected.size} onClick={() => bulk(false)}>Excluir dos indicadores</button><button aria-label="Restaurar selecionados" className="button secondary" disabled={!selected.size} onClick={() => bulk(true)}><RotateCcw />Restaurar</button></div>}
+      {editable && (!realFormatFlow || stage === 4) && <div className="import-actions"><span>{selected.size} selecionado(s)</span>{type === 'EVENTS' ? <><select value={groupStrategy} onChange={(event) => setGroupStrategy(event.target.value)}><option value="MANUAL">Participantes: informar manualmente</option><option value="MAX">Participantes: maior valor</option><option value="SUM">Participantes: somar valores</option></select>{groupStrategy === 'MANUAL' && <input type="number" min="0" value={groupParticipants} onChange={(event) => setGroupParticipants(event.target.value)} placeholder="Participantes" />}<button className="button secondary" disabled={selected.size < 2} onClick={group}>Agrupar selecionados</button></> : <button className="button secondary" onClick={() => setMessage('Empresas já consolidadas por CNPJ; todas as ocupações são preservadas. CNPJ ausente ou inválido exige revisão.')}>Consolidar duplicidades</button>}<button className="button secondary" disabled={busy || !incompleteItems.length} onClick={() => setIgnoreDialog(true)}>Ignorar incompletos</button><button className="button danger" disabled={!selected.size} onClick={() => bulk(false)}>Excluir dos indicadores</button><button aria-label="Restaurar selecionados" className="button secondary" disabled={!selected.size} onClick={() => bulk(true)}><RotateCcw />Restaurar</button></div>}
       {type === 'EVENTS' ? <EventTable items={paginatedItems} setItems={setReviewedItems} selected={selected} toggleSelected={toggleSelected} modes={options.eventModes} eventTypes={options.eventTypes} disabled={busy || !editable || (realFormatFlow && stage !== 4)} /> : <ResidentTable items={paginatedItems} setItems={setReviewedItems} selected={selected} toggleSelected={toggleSelected} expanded={expanded} toggleExpanded={toggleExpanded} disabled={busy || !editable || (realFormatFlow && stage !== 4)} />}
       <Pagination page={currentPage} totalItems={visibleItems.length} onChange={setPage} />
       <MonthlyPreview values={summary.monthly} resident={type === 'RESIDENTS'} /></>}
       {realFormatFlow && stage === 5 && editable && <section className="panel import-confirm-summary"><h3>Resumo final</h3><p>{type === 'RESIDENTS' ? <>{summary.included} empresas serão importadas/atualizadas · {items.filter((item) => item.included && !item.ignored).reduce((sum, item) => sum + item.contracts.length, 0)} ocupações serão vinculadas · {summary.ignored} registros serão ignorados</> : <>{summary.included} registros serão importados · {items.length - summary.included} serão ignorados · {summary.reviewed} foram revisados</>}</p><p>Confira as decisões antes de confirmar. Registros incluídos com problemas devem ser corrigidos.</p></section>}
       {realFormatFlow && batch.status === 'IMPORTED' && <section className="panel import-confirm-summary"><h3>Importação concluída</h3><Link className="button primary" to={`/indicadores/${type === 'EVENTS' ? 'eventos' : 'residentes'}?${new URLSearchParams({ centerId, year: batch.year || 2026 })}`}>Ver indicadores de {type === 'EVENTS' ? 'eventos' : 'residentes'}</Link><p>Registros processados: {batch.summary?.processed ?? summary.included} · Indicadores atualizados · Ignorados: {batch.summary?.excluded ?? summary.ignored} · Corrigidos manualmente: {summary.corrected}</p></section>}
       <footer className="import-footer">{editable && (!realFormatFlow || stage >= 4) && <><button className="button secondary" disabled={busy} onClick={save}><Save />{saving ? 'Salvando...' : 'Salvar revisão'}</button><button className="button primary" disabled={busy || !summary.included} onClick={confirm}>{confirming ? 'Confirmando...' : !realFormatFlow || stage === 5 ? 'Confirmar importação' : 'Continuar para confirmação'}</button></>}<button className="button secondary" disabled={batch.status !== 'IMPORTED'} onClick={openExport}><Download />Gerar Planilha de Indicadores</button></footer>
-    </>}<ExportDialog state={exportDialog} setState={setExportDialog} onGenerate={generate} generating={generating} error={error} /></div>;
+    </>}{ignoreDialog && <IgnoreIncompleteDialog count={incompleteItems.length} onCancel={() => setIgnoreDialog(false)} onIgnore={ignoreIncomplete} disabled={busy} />}<ExportDialog state={exportDialog} setState={setExportDialog} onGenerate={generate} generating={generating} error={error} /></div>;
 }

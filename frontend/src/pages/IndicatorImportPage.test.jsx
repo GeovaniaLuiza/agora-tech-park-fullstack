@@ -36,12 +36,12 @@ describe('telas de importação de indicadores', () => {
     api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
-    expect(MAX_IMPORT_BYTES).toBe(52_428_800);
+    expect(MAX_IMPORT_BYTES).toBe(104_857_600);
     const oversized = new File(['xlsx'], 'grande.xlsx');
     Object.defineProperty(oversized, 'size', { value: MAX_IMPORT_BYTES + 1 });
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [oversized] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 50 MB.');
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 100 MB.');
     const file = new File([new Uint8Array(15_759)], 'planilha.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     expect(file.size).toBe(15_759);
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [file] } });
@@ -54,13 +54,13 @@ describe('telas de importação de indicadores', () => {
   });
 
   it.each([
-    ['EVENTS', 50], ['EVENTS', '50'], ['RESIDENTS', 50], ['RESIDENTS', '50'],
-  ])('usa 52428800 bytes em %s mesmo se as opções retornam %s', async (type, maxBytes) => {
+    ['EVENTS', 100], ['EVENTS', '100'], ['RESIDENTS', 100], ['RESIDENTS', '100'],
+  ])('usa 104857600 bytes em %s mesmo se as opções retornam %s', async (type, maxBytes) => {
     api.getIndicatorImportOptions.mockResolvedValueOnce({ eventModes: [], eventTypes: [], maxBytes });
     api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
-    expect(screen.getByText(/Formato: XLSX · Limite: 50 MB/)).toBeTruthy();
+    expect(screen.getByText(/Formato: XLSX · Limite: 100 MB/)).toBeTruthy();
     const file = new File([new Uint8Array(15_759)], 'planilha.xlsx');
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
@@ -69,7 +69,7 @@ describe('telas de importação de indicadores', () => {
   });
 
   it.each(['EVENTS', 'RESIDENTS'])('limpa erro de limite do backend antes de tentar novamente em %s', async (type) => {
-    api.uploadIndicatorImport.mockRejectedValueOnce(Object.assign(new Error('A planilha excede o limite de 50 MB.'), { code: 'PAYLOAD_TOO_LARGE' }));
+    api.uploadIndicatorImport.mockRejectedValueOnce(Object.assign(new Error('A planilha excede o limite de 100 MB.'), { code: 'PAYLOAD_TOO_LARGE' }));
     let resolveUpload;
     api.uploadIndicatorImport.mockReturnValueOnce(new Promise((resolve) => { resolveUpload = resolve; }));
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
@@ -84,6 +84,24 @@ describe('telas de importação de indicadores', () => {
     await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
   });
 
+  it.each(['EVENTS', 'RESIDENTS'])('normaliza erro legado do backend e limpa ao selecionar arquivo válido em %s', async (type) => {
+    // Simulates a cached response from the previous upload limit.
+    const previousLimit = MAX_IMPORT_BYTES / 2 / 1024 / 1024;
+    api.uploadIndicatorImport.mockRejectedValueOnce(Object.assign(new Error(`A planilha excede o limite de ${previousLimit} MB.`), { code: 'PAYLOAD_TOO_LARGE' }));
+    api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    const chooseFile = () => fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'dados.xlsx')] } });
+    chooseFile();
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 100 MB.');
+    chooseFile();
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it.each(['EVENTS', 'RESIDENTS'])('preserva outros erros ao selecionar novo arquivo em %s', async (type) => {
     api.uploadIndicatorImport.mockRejectedValueOnce(new Error('A planilha possui colunas inválidas.'));
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
@@ -95,16 +113,17 @@ describe('telas de importação de indicadores', () => {
     expect(screen.getByRole('alert').textContent).toBe('A planilha possui colunas inválidas.');
   });
 
-  it.each(['EVENTS', 'RESIDENTS'])('mostra 50 MB e bloqueia arquivo acima do limite antes do upload de %s', async (type) => {
+  it.each(['EVENTS', 'RESIDENTS'])('mostra 100 MB e bloqueia arquivo acima do limite antes do upload de %s', async (type) => {
     const { container } = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
-    expect(screen.getByText(/Formato: XLSX · Limite: 50 MB/)).toBeTruthy();
-    expect(screen.getByText(/Somente XLSX · limite de 50 MB/)).toBeTruthy();
+    expect(screen.getByText(/Formato: XLSX · Limite: 100 MB/)).toBeTruthy();
+    expect(screen.getByText(/Somente XLSX · limite de 100 MB/)).toBeTruthy();
+    expect(screen.queryByText(/(?:10|50) MB/)).toBeNull();
     const file = new File(['xlsx'], 'planilha.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     Object.defineProperty(file, 'size', { value: MAX_IMPORT_BYTES + 1 });
     fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 50 MB.');
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 100 MB.');
     expect(api.uploadIndicatorImport).not.toHaveBeenCalled();
   });
 
@@ -420,7 +439,7 @@ describe('telas de importação de indicadores', () => {
     fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
     await screen.findByText('Revisão salva com sucesso.');
     expect(api.saveIndicatorImportReview).toHaveBeenNthCalledWith(2, 'batch-1', [{
-      ...item, included: true, reviewStatus: 'VALIDATED', validationStatus: 'REVIEW_REQUIRED',
+      ...item, included: true, reviewStatus: 'PENDING', validationStatus: 'REVIEW_REQUIRED',
     }]);
   });
 
@@ -631,5 +650,90 @@ describe('ignorar registro individual na revisão', () => {
     await screen.findByText('Importação confirmada e indicadores atualizados.');
     expect(api.confirmIndicatorImport).toHaveBeenCalledTimes(2);
     expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, expect.arrayContaining([expect.objectContaining({ id: 'invalid', included: false, reviewStatus: 'EXCLUDED' }), expect.objectContaining({ id: 'valid', included: true })]));
+  });
+});
+
+describe('ignorar registros incompletos em lote', () => {
+  const load = async (type, items) => {
+    const batch = { ...(type === 'RESIDENTS' ? residentBatch : eventBatch), summary: { records: items.length, rowsRead: items.length, companies: items.length, uniqueCnpjs: 3, occupations: items.length }, draft: { items } };
+    api.uploadIndicatorImport.mockResolvedValue(batch);
+    api.saveIndicatorImportReview.mockImplementation(async (_id, reviewed) => ({ ...batch, draft: { items: reviewed } }));
+    api.confirmIndicatorImport.mockResolvedValue({ ...batch, status: 'IMPORTED' });
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'dados.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
+    return batch;
+  };
+  const card = (label) => screen.getByText(label, { selector: '.import-summary small' }).parentElement.querySelector('strong').textContent;
+  const row = (name) => screen.getByText(name, { selector: 'strong' }).closest('tr');
+
+  it.each(['EVENTS', 'RESIDENTS'])('exibe botão desabilitado sem bloqueantes em %s, mesmo com avisos', async (type) => {
+    const base = type === 'RESIDENTS' ? residentItems[0] : eventItems[0];
+    await load(type, [{ ...base, included: true, validationStatus: 'WARNING', issues: [{ message: 'Aviso não bloqueante' }] }]);
+    expect(screen.getByRole('button', { name: 'Ignorar incompletos' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Ignorar registro' })).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('confirma, ignora somente bloqueantes, recalcula e restaura em %s', async (type) => {
+    const base = type === 'RESIDENTS' ? residentItems[0] : eventItems[0];
+    const invalid = (id) => ({ ...base, id, sourceRows: [Number(id)], name: `Incompleto ${id}`, contracts: type === 'RESIDENTS' && id === '3' ? base.contracts.map((contract) => ({ ...contract, eligibleBlock: false })) : base.contracts, included: true, validationStatus: 'REVIEW_REQUIRED', reviewStatus: 'PENDING', issues: [{ message: `Erro impeditivo ${id}` }] });
+    const items = [invalid('3'), { ...invalid('4'), included: type === 'RESIDENTS' }, { ...base, id: 'warning', sourceRows: [5], name: 'Registro com aviso', included: true, validationStatus: 'WARNING', reviewStatus: 'WITH_WARNINGS', issues: [{ message: 'Aviso não bloqueante' }] }, { ...base, id: 'valid', sourceRows: [6], name: 'Registro válido', included: true, validationStatus: 'VALID', reviewStatus: 'VALIDATED', issues: [] }, { ...invalid('7'), included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED' }];
+    const batch = await load(type, items);
+    expect(card(type === 'EVENTS' ? 'Registros encontrados' : 'Linhas lidas')).toBe('5');
+    expect(card('Revisão necessária')).toBe('2');
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar incompletos' }));
+    const dialog = screen.getByRole('dialog', { name: 'Ignorar 2 registros incompletos?' });
+    expect(within(dialog).getByText('Esses registros não serão considerados na atualização dos indicadores. Eles poderão ser restaurados antes da confirmação da importação.')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(card('Revisão necessária')).toBe('2');
+    // The action covers the whole draft, including records hidden by filters.
+    fireEvent.change(screen.getByPlaceholderText(type === 'EVENTS' ? 'Buscar evento' : 'Buscar empresa'), { target: { value: 'Registro válido' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar incompletos' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ignorar registros' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(card('Revisão necessária')).toBe('0');
+    expect(card('Ignorados')).toBe('3');
+    expect(card('Válidos')).toBe('1');
+    expect(card(type === 'EVENTS' ? 'Com aviso' : 'Avisos')).toBe('1');
+    expect(card(type === 'EVENTS' ? 'Registros encontrados' : 'Linhas lidas')).toBe('5');
+    if (type === 'RESIDENTS') {
+      expect(card('Empresas identificadas')).toBe('5');
+      expect(card('CNPJs únicos')).toBe('3');
+      expect(card('Ocupações')).toBe('5');
+    }
+    expect(screen.getByRole('button', { name: 'Ignorar incompletos' }).disabled).toBe(true);
+    fireEvent.change(screen.getByPlaceholderText(type === 'EVENTS' ? 'Buscar evento' : 'Buscar empresa'), { target: { value: '' } });
+    expect(within(row('Incompleto 3')).getByText('Ignorado')).toBeTruthy();
+    expect(within(row('Incompleto 4')).getByText('Ignorado')).toBeTruthy();
+    expect(within(row('Registro com aviso')).getByText('Aviso')).toBeTruthy();
+    fireEvent.click(within(row('Incompleto 3')).getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar selecionados' }));
+    expect(within(row('Incompleto 3')).getByText('Revisão necessária')).toBeTruthy();
+    expect(card('Revisão necessária')).toBe('1');
+    expect(card('Ignorados')).toBe('2');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, expect.arrayContaining([
+      expect.objectContaining({ id: '3', included: true, reviewStatus: 'PENDING', validationStatus: 'REVIEW_REQUIRED' }),
+      expect.objectContaining({ id: '4', included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED' }),
+      expect.objectContaining({ id: 'warning', included: true, reviewStatus: 'WITH_WARNINGS', validationStatus: 'WARNING' }),
+      expect.objectContaining({ id: 'valid', included: true, validationStatus: 'VALID' }),
+    ]));
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar incompletos' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ignorar registros' }));
+    expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByText('Importação confirmada e indicadores atualizados.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, expect.arrayContaining([
+      expect.objectContaining({ id: '3', included: false, reviewStatus: 'EXCLUDED' }),
+      expect.objectContaining({ id: '4', included: false, reviewStatus: 'EXCLUDED' }),
+      expect.objectContaining({ id: 'warning', included: true, validationStatus: 'WARNING' }),
+      expect.objectContaining({ id: 'valid', included: true }),
+    ]));
+    expect(api.confirmIndicatorImport).toHaveBeenCalledWith(batch.id);
   });
 });

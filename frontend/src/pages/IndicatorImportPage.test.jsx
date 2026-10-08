@@ -260,10 +260,10 @@ describe('telas de importação de indicadores', () => {
     })));
     assertRows(true);
     selectTwo();
-    fireEvent.click(screen.getByRole('button', { name: /Restaurar/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar selecionados' }));
     assertRows(false);
     expect(screen.getByText('0 selecionado(s)')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Restaurar/ }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Restaurar selecionados' }).disabled).toBe(true);
     expect(within(monthly()).getByText('Mar').parentElement.querySelector('strong').textContent).toBe(String(total));
     fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
     await screen.findByText('Revisão salva com sucesso.');
@@ -295,7 +295,7 @@ describe('telas de importação de indicadores', () => {
       expect(screen.getByText('0 selecionado(s)')).toBeTruthy();
       rows().forEach((row) => expect(within(row).getAllByRole('checkbox')[0].checked).toBe(false));
       expect(screen.getByRole('button', { name: 'Excluir dos indicadores' }).disabled).toBe(true);
-      expect(screen.getByRole('button', { name: /Restaurar/ }).disabled).toBe(true);
+      expect(screen.getByRole('button', { name: 'Restaurar selecionados' }).disabled).toBe(true);
     };
 
     selectResidents();
@@ -313,7 +313,7 @@ describe('telas de importação de indicadores', () => {
     })));
 
     selectResidents();
-    fireEvent.click(screen.getByRole('button', { name: /Restaurar/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar selecionados' }));
     assertSelectionCleared();
     expect(within(rows()[0]).getAllByRole('checkbox')[1].checked).toBe(true);
     expect(within(rows()[1]).getAllByRole('checkbox')[1].checked).toBe(false);
@@ -350,7 +350,7 @@ describe('telas de importação de indicadores', () => {
     }]);
 
     fireEvent.click(within(row()).getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: /Restaurar/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar selecionados' }));
     expect(within(row()).getByText('Revisão necessária')).toBeTruthy();
     expect(within(row()).getByRole('button', { name: 'Sim' }).className).toContain('active');
     fireEvent.click(screen.getByRole('button', { name: /Salvar revisão/ }));
@@ -380,7 +380,7 @@ describe('telas de importação de indicadores', () => {
 
     selection = screen.getAllByRole('checkbox').filter((element) => !element.closest('label'));
     fireEvent.click(selection[0]); fireEvent.click(selection[1]);
-    fireEvent.click(screen.getByRole('button', { name: /Restaurar/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar selecionados' }));
     selection = screen.getAllByRole('checkbox').filter((element) => !element.closest('label'));
     fireEvent.click(selection[0]); fireEvent.click(selection[1]);
     fireEvent.change(screen.getByDisplayValue('Participantes: informar manualmente'), { target: { value: 'MAX' } });
@@ -525,4 +525,47 @@ it('mostra resumo de empresas e ocupações antes da confirmação de residentes
   await screen.findByText('Importação concluída');
   expect(api.confirmIndicatorImport).toHaveBeenCalledWith('batch-2');
   expect(screen.getByText(/Registros processados: 1/)).toBeTruthy();
+});
+
+
+describe('ignorar registro individual na revisão', () => {
+  it.each(['RESIDENTS', 'EVENTS'])('ignora, mantém visível e restaura erros de %s', async (type) => {
+    const resident = type === 'RESIDENTS';
+    const issue = { field: resident ? 'document' : 'startAt', message: resident ? 'CNPJ ausente na linha 3' : 'Data inválida na linha 3' };
+    const invalid = { ...(resident ? residentItems[0] : eventItems[0]), id: 'invalid', sourceRows: [3], name: 'Registro com erro', included: true, reviewStatus: 'PENDING', validationStatus: 'REVIEW_REQUIRED', issues: [issue] };
+    const valid = { ...(resident ? residentItems[0] : eventItems[0]), id: 'valid', name: 'Registro válido', included: true, validationStatus: 'VALID', issues: [] };
+    const batch = { ...(resident ? residentBatch : eventBatch), draft: { items: [invalid, valid] } };
+    api.uploadIndicatorImport.mockResolvedValue(batch);
+    api.saveIndicatorImportReview.mockImplementation(async (_id, items) => ({ ...batch, draft: { items } }));
+    api.confirmIndicatorImport.mockRejectedValueOnce(new Error(issue.message + '. Corrija ou ignore o registro antes de confirmar.'))
+      .mockResolvedValue({ ...batch, status: 'IMPORTED' });
+    const { container } = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [new File(['xlsx'], 'dados.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
+    expect(screen.getByText(issue.message)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
+    const row = () => screen.getByText('Registro com erro').closest('tr');
+    fireEvent.click(within(row()).getByRole('button', { name: 'Ignorar registro' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(within(row()).getByText('Ignorado')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, expect.arrayContaining([expect.objectContaining({ id: 'invalid', included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED' })]));
+    fireEvent.click(within(row()).getByRole('button', { name: 'Restaurar' }));
+    expect(within(row()).getByText('Revisão necessária')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, expect.arrayContaining([expect.objectContaining({ id: 'invalid', included: true, reviewStatus: 'PENDING', validationStatus: 'REVIEW_REQUIRED', issues: [issue] })]));
+    fireEvent.click(within(row()).getByRole('button', { name: 'Ignorar registro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByText('Importação confirmada e indicadores atualizados.');
+    expect(api.confirmIndicatorImport).toHaveBeenCalledTimes(2);
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, expect.arrayContaining([expect.objectContaining({ id: 'invalid', included: false, reviewStatus: 'EXCLUDED' }), expect.objectContaining({ id: 'valid', included: true })]));
+  });
 });

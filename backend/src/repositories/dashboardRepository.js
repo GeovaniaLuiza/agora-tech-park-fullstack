@@ -1,4 +1,5 @@
 import { query } from '../db/pool.js';
+import { summary } from './indicatorRepository.js';
 
 export async function operationalSummary() {
   const { rows } = await query(
@@ -29,31 +30,20 @@ export async function operationalSummary() {
   return rows[0];
 }
 
-export async function institutionalCards({ year, month = null, category = null, sourceType, centerId = null }) {
-  const { rows } = await query(
-    `SELECT d.code,d.name AS title,d.description,d.category,d.unit,d.value_type,d.aggregation_type,
-      v.numeric_value,v.text_value,v.json_value,v.year,v.month,v.source_type,
-      v.consolidated_at,v.updated_at,
-      previous.numeric_value AS previous_numeric_value,previous.text_value AS previous_text_value
-     FROM indicator_definitions d
-     JOIN LATERAL (SELECT candidate.* FROM indicator_values candidate WHERE candidate.indicator_id=d.id
-       AND candidate.year=$1 AND (($2::int IS NULL AND candidate.month IS NULL) OR candidate.month=$2)
-       AND candidate.deleted_at IS NULL
-       AND candidate.innovation_center_id=COALESCE($5::uuid,(SELECT id FROM innovation_centers WHERE active ORDER BY name LIMIT 1))
-       AND (($4='LIVE' AND candidate.source_type IN ('FORM_RESPONSE','MANUAL_ENTRY','SYSTEM_CALCULATION','SPREADSHEET_IMPORT')) OR candidate.source_type=$4)
-       ORDER BY CASE candidate.source_type WHEN 'FORM_RESPONSE' THEN 1 WHEN 'SYSTEM_CALCULATION' THEN 2 WHEN 'MANUAL_ENTRY' THEN 3 ELSE 4 END,
-         candidate.updated_at DESC LIMIT 1) v ON TRUE
-     LEFT JOIN LATERAL (SELECT candidate.* FROM indicator_values candidate WHERE candidate.indicator_id=d.id
-       AND candidate.year=$1-1 AND candidate.month IS NOT DISTINCT FROM v.month AND candidate.deleted_at IS NULL
-       AND candidate.innovation_center_id=v.innovation_center_id
-       AND (($4='LIVE' AND candidate.source_type IN ('FORM_RESPONSE','MANUAL_ENTRY','SYSTEM_CALCULATION','SPREADSHEET_IMPORT')) OR candidate.source_type=$4)
-       ORDER BY CASE candidate.source_type WHEN 'FORM_RESPONSE' THEN 1 WHEN 'SYSTEM_CALCULATION' THEN 2 WHEN 'MANUAL_ENTRY' THEN 3 ELSE 4 END,
-         candidate.updated_at DESC LIMIT 1) previous ON TRUE
-     WHERE d.active AND ($3::text IS NULL OR d.category=$3)
-     ORDER BY d.category,d.name`,
-    [year, month, category, sourceType, centerId],
-  );
-  return rows;
+export async function institutionalCards({ year, month = null, category = null, sourceType = 'LIVE', centerId = null }) {
+  const period = month ? `${year}-${String(month).padStart(2, '0')}` : String(year);
+  const previousPeriod = month ? `${year - 1}-${String(month).padStart(2, '0')}` : String(year - 1);
+  const [current, previous] = await Promise.all([
+    summary({ period, category, sourceType, centerId }),
+    summary({ period: previousPeriod, category, sourceType, centerId }),
+  ]);
+  const previousByCode = new Map(previous.map((row) => [row.code, row]));
+  return current.filter((row) => row.value != null || row.text_value != null || row.json_value != null).map((row) => ({
+    ...row, title: row.name, numeric_value: row.value, source_type: row.source,
+    consolidated_at: row.updated_at,
+    previous_numeric_value: previousByCode.get(row.code)?.value ?? null,
+    previous_text_value: previousByCode.get(row.code)?.text_value ?? null,
+  }));
 }
 
 export async function series(codes, { year, month = null, category = null, sourceType, startDate = null, endDate = null, centerId = null }) {

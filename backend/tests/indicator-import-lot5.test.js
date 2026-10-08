@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { residentWorkbookFixture } from './fixtures/indicator-import-workbooks.js';
-import { XLSX_MIME } from '../src/domain/indicatorImportCatalog.js';
+import { MAX_IMPORT_BYTES, XLSX_MIME } from '../src/domain/indicatorImportCatalog.js';
 
 const mocks = vi.hoisted(() => ({
   repo: { findCenter: vi.fn(), findPrevious: vi.fn(), createBatch: vi.fn(), findBatch: vi.fn(), latestDraft: vi.fn(), saveDraft: vi.fn(), replaceBatchRecords: vi.fn(), markImported: vi.fn() },
@@ -32,7 +32,7 @@ describe('indicatorImportService lote 5', () => {
     const valid = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
     await expect(service.preview({ type: 'EVENTS', fileName: 'x.xlsx', mimeType: 'text/plain', buffer: valid }, admin)).rejects.toMatchObject({ code: 'INVALID_FILE_TYPE' });
     await expect(service.preview({ type: 'EVENTS', fileName: 'x.xlsx', mimeType: XLSX_MIME, buffer: Buffer.alloc(0) }, admin)).rejects.toMatchObject({ code: 'EMPTY_FILE' });
-    await expect(service.preview({ type: 'EVENTS', fileName: 'x.xlsx', mimeType: XLSX_MIME, buffer: Buffer.alloc(10 * 1024 * 1024 + 1) }, admin)).rejects.toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
+    await expect(service.preview({ type: 'EVENTS', fileName: 'x.xlsx', mimeType: XLSX_MIME, buffer: Buffer.alloc(MAX_IMPORT_BYTES + 1) }, admin)).rejects.toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
     await expect(service.preview({ type: 'EVENTS', fileName: 'x.xlsx', mimeType: XLSX_MIME, buffer: Buffer.from('nao-xlsx') }, admin)).rejects.toMatchObject({ code: 'INVALID_XLSX_SIGNATURE' });
   });
 

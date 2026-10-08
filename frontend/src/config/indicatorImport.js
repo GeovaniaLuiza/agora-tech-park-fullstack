@@ -1,0 +1,2 @@
+export const MAX_IMPORT_FILE_SIZE_MB = 50;
+export const MAX_IMPORT_BYTES = MAX_IMPORT_FILE_SIZE_MB * 1024 * 1024;

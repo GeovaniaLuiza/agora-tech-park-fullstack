@@ -9,6 +9,7 @@ router.get('/options', controller.options);
 router.get('/export/status', controller.exportStatus);
 router.post('/export', controller.exportWorkbook);
 router.get('/:type/draft', controller.draft);
+router.get('/:type/indicators', controller.indicators);
 router.post('/:type/preview', express.raw({ type: '*/*', limit: MAX_IMPORT_BYTES }), controller.preview);
 router.get('/batches/:id', controller.batch);
 router.put('/batches/:id/review', controller.review);

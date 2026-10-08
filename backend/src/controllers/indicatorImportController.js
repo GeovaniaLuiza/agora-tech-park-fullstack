@@ -1,5 +1,10 @@
 import * as service from '../services/indicatorImportService.js';
 import { generateOfficialWorkbook, workbookStatus } from '../services/indicatorWorkbookExporter.js';
+import { confirmedIndicators } from '../services/importedIndicatorService.js';
+
+export const indicators = async (req, res, next) => {
+  try { res.json(await confirmedIndicators({ ...req.query, type: req.params.type }, req.user)); } catch (error) { next(error); }
+};
 
 export const options = (_req, res) => res.json(service.importOptions());
 export const preview = async (req, res, next) => {

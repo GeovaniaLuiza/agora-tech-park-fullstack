@@ -200,7 +200,7 @@ export async function confirm(id, user) {
   ensureManager(user); const batch = await ensureBatch(id);
   if (batch.status === IMPORT_STATUS.IMPORTED) throw serviceError(409, 'Esta importação já foi confirmada.', 'IMPORT_ALREADY_CONFIRMED');
   if (![IMPORT_STATUS.REVIEW_PENDING, IMPORT_STATUS.WITH_WARNINGS, IMPORT_STATUS.VALIDATED].includes(batch.status)) throw serviceError(409, 'Importação indisponível para confirmação.', 'IMPORT_NOT_CONFIRMABLE');
-  const included = (batch.draft.items || []).filter((item) => item.included && !item.ignored);
+  const included = (batch.draft.items || []).filter((item) => item.included && !item.ignored && item.reviewStatus !== 'EXCLUDED');
   if (!included.length) throw serviceError(422, 'Selecione ao menos um registro antes de confirmar.', 'NO_INCLUDED_RECORDS');
   const unresolved = included.flatMap((item) => batch.import_type === IMPORT_TYPES.EVENTS ? validateEvent(item) : item.document === undefined ? [] : normalizeResident(item).issues);
   if (unresolved.length) throw serviceError(422, unresolved[0].message + '. Corrija ou ignore o registro antes de confirmar.', 'REVIEW_REQUIRED', { issues: unresolved });

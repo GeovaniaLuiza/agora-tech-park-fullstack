@@ -135,3 +135,19 @@ export async function recordsForOfficialWorkbook(centerId, year) {
   );
   return rows;
 }
+
+export async function confirmedRecords(centerId, year, importType) {
+  const { rows } = await query(
+    `SELECT r.* FROM indicator_records r
+     JOIN indicator_import_batches b ON b.id=r.import_batch_id
+     WHERE r.innovation_center_id=$1 AND b.import_type=$3 AND b.status='IMPORTED'
+       AND r.active AND r.deleted_at IS NULL
+       AND ((r.record_type='EVENT' AND EXTRACT(YEAR FROM r.event_at)=$2::int)
+         OR (r.record_type='RESIDENT_COMPANY'
+           AND (r.start_date IS NULL OR r.start_date<=make_date($2::int,12,31))
+           AND (r.end_date IS NULL OR r.end_date>=make_date($2::int,1,1))))
+     ORDER BY COALESCE(r.event_at,r.start_date),r.name,r.id`,
+    [centerId, year, importType],
+  );
+  return rows;
+}

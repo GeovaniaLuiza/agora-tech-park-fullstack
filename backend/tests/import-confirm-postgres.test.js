@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import dotenv from 'dotenv';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import ExcelJS from 'exceljs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventWorkbookFixture, residentWorkbookFixture } from './fixtures/indicator-import-workbooks.js';
 import { XLSX_MIME } from '../src/domain/indicatorImportCatalog.js';
@@ -94,6 +95,60 @@ async function assertScreens(code, value, month = null) {
 }
 
 describe('Confirmar → fonte oficial → Indicadores e Dashboard (PostgreSQL real)', () => {
+  it('Eventos.xlsx → revisão → confirmação → detalhamento por ano/mês com valores persistidos', async () => {
+    const batch = await review(await preview('EVENTS', await eventWorkbookFixture()), (_item, index) => index === 0 || index === 2);
+    const endpoint = '/api/indicator-imports/EVENTS/indicators';
+    const before = await http('get', endpoint).query({ centerId, year: 2026 });
+    expect(before.status).toBe(200);
+    expect(before.body.records).toEqual([]);
+    expect(before.body.total).toBe(0);
+    expect((await confirm(batch.id)).status).toBe(200);
+    const response = await http('get', endpoint).query({ centerId, year: 2026 });
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.monthly).toEqual([0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(response.body.total).toBe(2);
+    expect(response.body.records).toHaveLength(2);
+    expect(response.body.records.map((record) => record.source_rows)).toEqual([[2], [4]]);
+    expect(response.body.records.map((record) => [record.participants, record.participating_companies])).toEqual([[20, 3], [15, 2]]);
+    for (const month of [3, 4]) {
+      const filtered = await http('get', endpoint).query({ centerId, year: 2026, month });
+      expect(filtered.body.records).toHaveLength(1);
+      expect(filtered.body.total).toBe(2);
+      expect(Number((await official('EVENTOS_REALIZADOS', month)).numeric_value)).toBe(response.body.monthly[month - 1]);
+    }
+    expect(Number((await official('EVENTOS_REALIZADOS', null)).numeric_value)).toBe(response.body.total);
+    const otherYear = await http('get', endpoint).query({ centerId, year: 2025 });
+    expect(otherYear.body.records).toEqual([]);
+    expect(otherYear.body.total).toBe(0);
+    expect((await confirm(batch.id)).status).toBe(409);
+    expect((await http('get', endpoint).query({ centerId, year: 2026 })).body.total).toBe(2);
+  });
+  it('Clientes.xlsx → confirmação → CNPJ consolidado, ocupações e entrada/saída intermediárias', async () => {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await residentWorkbookFixture());
+    const sheet = workbook.getWorksheet('Clientes');
+    sheet.getCell('H5').value = '15/06/2026';
+    sheet.getCell('I5').value = '12/09/2026';
+    const batch = await review(await preview('RESIDENTS', Buffer.from(await workbook.xlsx.writeBuffer())), (item) => item.sourceRows.includes(3) || item.sourceRows.includes(5));
+    expect((await confirm(batch.id)).status).toBe(200);
+    const endpoint = '/api/indicator-imports/RESIDENTS/indicators';
+    const response = await http('get', endpoint).query({ centerId, year: 2026 });
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.monthly).toEqual([1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1]);
+    expect(response.body.total).toBe(1);
+    expect(response.body.records).toHaveLength(2);
+    const occupations = response.body.records.flatMap((record) => record.extra.contracts);
+    expect(occupations).toHaveLength(3);
+    expect(occupations.map((contract) => contract.block).sort()).toEqual(['HUB', 'MOB', 'UNI']);
+    expect(occupations.every((contract) => !['Disponível', 'Áreas Comuns'].includes(contract.legend))).toBe(true);
+    for (let month = 1; month <= 12; month += 1) expect(Number((await official('EMPRESAS_RESIDENTES', month)).numeric_value)).toBe(response.body.monthly[month - 1]);
+    expect(Number((await official('EMPRESAS_RESIDENTES', null)).numeric_value)).toBe(response.body.total);
+    const june = await http('get', endpoint).query({ centerId, year: 2026, month: 6 });
+    expect(june.body.records).toHaveLength(2);
+    const october = await http('get', endpoint).query({ centerId, year: 2026, month: 10 });
+    expect(october.body.records).toHaveLength(1);
+    expect(october.body.records[0].extra.contracts).toHaveLength(2);
+  });
   it('persiste somente eventos considerados, com participantes e empresas, e publica valores idempotentes', async () => {
     const buffer = await eventWorkbookFixture();
     const batch = await review(await preview('EVENTS', buffer), (_item, index) => index === 0);

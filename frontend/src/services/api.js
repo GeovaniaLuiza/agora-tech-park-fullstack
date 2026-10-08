@@ -235,6 +235,7 @@ export const getNotifications = () => apiRequest('/notifications');
 export const markNotificationRead = (id) => apiRequest(`/notifications/${id}/read`, { method: 'PATCH', body: '{}' });
 
 export const getIndicatorImportOptions = () => apiRequest('/indicator-imports/options');
+export const getConfirmedImportIndicators = (type, filters) => apiRequest(`/indicator-imports/${type}/indicators?${new URLSearchParams(filters)}`);
 export const getIndicatorImportBatch = (id) => apiRequest(`/indicator-imports/batches/${id}`);
 export const getIndicatorImportDraft = (type, centerId) => apiRequest(`/indicator-imports/${type}/draft?${new URLSearchParams({ centerId })}`);
 export const saveIndicatorImportReview = (id, items) => apiRequest(`/indicator-imports/batches/${id}/review`, { method: 'PUT', body: JSON.stringify({ items }) });

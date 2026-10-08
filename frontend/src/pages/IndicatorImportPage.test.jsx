@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -23,7 +23,7 @@ beforeEach(() => {
   api.uploadIndicatorImport.mockResolvedValue(eventBatch);
   api.saveIndicatorImportReview.mockImplementation(async (_id, items) => ({ ...eventBatch, draft: { items } }));
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const openReview = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Preview' }));
@@ -31,6 +31,99 @@ const openReview = async () => {
 };
 
 describe('telas de importação de indicadores', () => {
+  it('isola o estado ao trocar de Eventos para Residentes com um batch aberto', async () => {
+    // Eventos reais não possuem contracts; a reutilização do estado causava
+    // TypeError em contracts.some/length no render de Residentes.
+    const event = { ...eventItems[0] };
+    delete event.contracts;
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...eventBatch, draft: { items: [{ ...event, included: true }] } });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await screen.findByText('Evento Anônimo');
+    view.rerender(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+    await screen.findByRole('heading', { name: 'Importar Empresas Residentes' });
+    expect(screen.queryByText('Evento Anônimo')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    vi.restoreAllMocks();
+  });
+  it('descarta recuperação de batch de outra rota que chega depois de unmount', async () => {
+    let resolveDraft;
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((resolve) => { resolveDraft = resolve; }));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('EVENTS', 'center-1'));
+    view.rerender(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+    await act(async () => resolveDraft(eventBatch));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(screen.queryByText('Evento Anônimo')).toBeNull();
+    vi.restoreAllMocks();
+  });
+  it.each([['EVENTS', eventBatch], ['RESIDENTS', residentBatch]])('informa lote inválido de %s sem lançar erro na renderização', async (type, batch) => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...batch, draft: null });
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    expect((await screen.findByRole('alert')).textContent).toContain('dados inválidos');
+  });
+  it('descarta o rascunho do centro anterior quando a resposta chega fora de ordem', async () => {
+    api.getInnovationCenters.mockResolvedValueOnce([{ id: 'center-1', name: 'Centro A' }, { id: 'center-2', name: 'Centro B' }]);
+    let resolvePrevious;
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((resolve) => { resolvePrevious = resolve; })).mockResolvedValueOnce(residentBatch);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('RESIDENTS', 'center-1'));
+    fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'center-2' } });
+    await screen.findByText('Empresa Anônima');
+    await act(async () => resolvePrevious({ ...residentBatch, draft: { items: [{ ...residentItems[0], name: 'Empresa do centro anterior' }] } }));
+    expect(screen.queryByText('Empresa do centro anterior')).toBeNull();
+    expect(confirm).toHaveBeenCalledOnce();
+  });
+  it('não recupera rascunho antigo depois que um novo arquivo é selecionado', async () => {
+    let resolveDraft;
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((resolve) => { resolveDraft = resolve; }));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'Clientes.xlsx')] } });
+    await act(async () => resolveDraft(residentBatch));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(screen.queryByText('Empresa Anônima')).toBeNull();
+  });
+  it.each([['EVENTS', eventBatch, 'eventos'], ['RESIDENTS', residentBatch, 'residentes']])('mantém %s na confirmação e mostra erro quando o servidor falha', async (type, batch, slug) => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...batch, draft: { items: batch.draft.items.map((item) => ({ ...item, included: true })) } });
+    api.confirmIndicatorImport.mockRejectedValueOnce(new Error('Confirmação falhou'));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Continuar para confirmação' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Confirmação falhou');
+    expect(screen.queryByRole('link', { name: `Ver indicadores de ${slug}` })).toBeNull();
+    expect(screen.queryByText('Importação concluída')).toBeNull();
+  });
+  it('aceita campos de texto opcionais nulos ao recuperar o batch', async () => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...eventBatch, draft: { items: [{ ...eventItems[0], name: null, location: null }] } });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await screen.findByLabelText('Evento da linha 2');
+    expect(screen.queryByRole('alert')).toBeNull();
+    vi.restoreAllMocks();
+  });
+  it.each([['EVENTS', eventBatch, 'eventos'], ['RESIDENTS', residentBatch, 'residentes']])('confirma %s antes de disponibilizar a rota de indicadores', async (type, original, slug) => {
+    const ready = { ...original, year: 2026, draft: { items: original.draft.items.map((item) => ({ ...item, included: true, reviewStatus: 'VALIDATED' })) } };
+    api.getIndicatorImportDraft.mockResolvedValueOnce(ready);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    let resolveConfirm;
+    api.confirmIndicatorImport.mockReturnValueOnce(new Promise((resolve) => { resolveConfirm = resolve; }));
+    render(<MemoryRouter initialEntries={[`/indicadores/importar-${slug}`]}><Routes><Route path={`/indicadores/importar-${slug}`} element={<IndicatorImportPage type={type} />} /><Route path={`/indicadores/${slug}`} element={<h2>Destino confirmado</h2>} /></Routes></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Continuar para confirmação' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    expect(screen.queryByRole('link', { name: `Ver indicadores de ${slug}` })).toBeNull();
+    await act(async () => resolveConfirm({ ...ready, status: 'IMPORTED' }));
+    await screen.findByText('Importação concluída');
+    const link = screen.getByRole('link', { name: `Ver indicadores de ${slug}` });
+    expect(link.getAttribute('href')).toBe(`/indicadores/${slug}?centerId=center-1&year=2026`);
+    fireEvent.click(link);
+    await screen.findByRole('heading', { name: 'Destino confirmado' });
+    vi.restoreAllMocks();
+  });
   it('não importa no upload: valida, mostra preview e salva a decisão humana', async () => {
     render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
     await screen.findByRole('option', { name: 'Centro de Inovação' });

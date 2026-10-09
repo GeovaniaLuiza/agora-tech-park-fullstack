@@ -74,6 +74,36 @@ describe('escopo e autenticação do parser de revisão', () => {
     expect(response.status).toBe(status);
     expect(mocks.findBatch).not.toHaveBeenCalled();
   });
+
+  it.each([401, 403])('rejeita corpo de revisão maior que 100 KB com HTTP %i antes do parser', async (status) => {
+    mocks.authenticate.mockImplementation((req, res, next) => {
+      expect(req.body).toBeUndefined();
+      if (status === 401) return res.sendStatus(401);
+      req.user = { sub: 'resident-1', role: 'RESIDENT' }; next();
+    });
+    // Malformed as well as large: parsing before authorization would return 400.
+    const response = await request(app).put('/api/indicator-imports/batches/batch-1/review')
+      .set('Content-Type', 'application/json').send('{invalid json' + ' '.repeat(102_400));
+    expect(response.status).toBe(status);
+    expect(mocks.findBatch).not.toHaveBeenCalled();
+    expect(mocks.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('rejeita JSON de revisão acima de 200 MB sem atribuir o erro à planilha', async () => {
+    const body = Buffer.alloc(MAX_IMPORT_REVIEW_BYTES + 1, 0x20);
+    body.write('{"items":[]}');
+    const response = await request(app).put('/api/indicator-imports/batches/batch-1/review')
+      // Send the JSON bytes directly, without serializing Buffer's { type, data }.
+      .set('Content-Type', 'application/json').serialize((value) => value).send(body);
+    expect(response.status).toBe(413);
+    expect(response.body).toEqual({
+      code: 'IMPORT_REQUEST_TOO_LARGE',
+      message: 'Os dados da revisão ou operação excedem o limite da requisição. Reduza os dados enviados e tente novamente.',
+    });
+    expect(mocks.authenticate).toHaveBeenCalledOnce();
+    expect(mocks.findBatch).not.toHaveBeenCalled();
+    expect(mocks.saveDraft).not.toHaveBeenCalled();
+  }, 20000);
 });
 
 async function smallWorkbook(type) {

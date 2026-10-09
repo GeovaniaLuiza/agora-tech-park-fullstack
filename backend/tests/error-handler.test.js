@@ -81,6 +81,17 @@ describe('contrato HTTP de erros', () => {
     expect(response.body).toEqual({ code: 'RATE_LIMIT', message: 'Aguarde', retryAfterSeconds: 15 });
   });
 
+  it('classifica HTTP 413 sem URL de origem como excesso do corpo da requisição', () => {
+    const req = { method: 'POST', is: vi.fn().mockReturnValue(false) };
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+    errorHandler({ status: 413 }, req, res, vi.fn());
+    expect(res.status).toHaveBeenCalledWith(413);
+    expect(res.json).toHaveBeenCalledWith({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'O corpo da requisição excede o limite permitido para esta operação.',
+    });
+  });
+
   it('oculta a mensagem de um erro inesperado em produção', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     const response = await failingRequest(new Error('internal-synthetic-detail'));

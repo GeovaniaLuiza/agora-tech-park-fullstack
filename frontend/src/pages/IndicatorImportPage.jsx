@@ -205,7 +205,7 @@ function ImportFlow({ type }) {
       if (!active || fileSelected.current || !draft) return;
       const restoredItems = readItems(draft, type);
       if (window.confirm('Existe uma importação não finalizada. Deseja continuar de onde parou?')) { setBatch(draft); setItems(restoredItems); setStage(4); }
-    }).catch((reason) => { if (active) setError(reason.message); });
+    }).catch((reason) => { if (active && !fileSelected.current) setError(reason.message); });
     return () => { active = false; };
   }, [centerId, type]);
   useEffect(() => { const leave = (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } }; window.addEventListener('beforeunload', leave); return () => window.removeEventListener('beforeunload', leave); }, [dirty]);

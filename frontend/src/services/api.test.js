@@ -1,7 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiRequest, publishForm, tokenStore } from './api';
+import { apiRequest, confirmIndicatorImport, publishForm, tokenStore } from './api';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL?.trim() || 'http://localhost:3002/api';
+describe('requisição de confirmação de importação', () => {
+  beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('envia POST com JSON vazio e autenticação e retorna o lote IMPORTED', async () => {
+    tokenStore.set('import-token', false);
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200,
+      text: async () => JSON.stringify({ id: 'batch-1', status: 'IMPORTED' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(confirmIndicatorImport('batch-1')).resolves.toEqual({ id: 'batch-1', status: 'IMPORTED' });
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBaseUrl}/indicator-imports/batches/batch-1/confirm`, expect.objectContaining({
+      method: 'POST', body: '{}', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer import-token' },
+    }));
+  });
+
+  it('propaga mensagem e código do backend quando a confirmação retorna 422', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422, headers: new Headers(),
+      text: async () => JSON.stringify({ code: 'NO_INCLUDED_RECORDS', message: 'Selecione ao menos um registro antes de confirmar.' }) }));
+    await expect(confirmIndicatorImport('batch-1')).rejects.toMatchObject({ status: 422, code: 'NO_INCLUDED_RECORDS',
+      message: 'Selecione ao menos um registro antes de confirmar.' });
+  });
+});
+
 describe('armazenamento da sessão', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
   it('usa sessionStorage quando lembrar-me está desmarcado', () => {

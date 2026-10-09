@@ -31,6 +31,73 @@ const openReview = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
 };
 
+describe.each(['EVENTS', 'RESIDENTS'])('navegação e execução da confirmação final de %s', (type) => {
+  async function savedReview(included = true) {
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    const batch = { ...base, status: 'VALIDATED', year: 2026, draft: { items: Array.from({ length: 235 }, (_, index) => ({
+      ...base.draft.items[0], id: `record-${index}`, sourceRows: [index + 2], included,
+      reviewStatus: 'VALIDATED', validationStatus: index < 192 ? 'VALID' : 'WARNING', issues: [],
+      duplicateGroup: index < 192 ? null : 'duplicate',
+    })) } };
+    api.confirmIndicatorImport.mockReset();
+    api.saveIndicatorImportReview.mockResolvedValue(batch);
+    api.getIndicatorImportDraft.mockResolvedValueOnce(batch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    return batch;
+  }
+
+  it('avança de 4 para 5 sem POST e executa a API somente pelo botão final, com 235 incluídos', async () => {
+    const batch = await savedReview();
+    expect(screen.getByText('0 selecionado(s)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
+    const finalActions = screen.getByRole('region', { name: 'Confirmação final da importação' });
+    const finalButton = within(finalActions).getByRole('button', { name: 'Confirmar importação' });
+    expect(finalButton.disabled).toBe(false);
+    expect(document.activeElement).toBe(finalButton);
+    expect(finalActions.compareDocumentPosition(screen.getByText('Formato esperado')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Confirmar importação' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Ir para confirmação' }).disabled).toBe(true);
+    expect(screen.getByText(/235 registros serão importados|235 empresas serão importadas/)).toBeTruthy();
+    expect(screen.getByText('Válidos', { selector: 'small' }).closest('article').querySelector('strong').textContent).toBe('192');
+    expect(screen.getByText(type === 'EVENTS' ? 'Com aviso' : 'Avisos', { selector: 'small' }).closest('article').querySelector('strong').textContent).toBe('43');
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
+    expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+    api.confirmIndicatorImport.mockResolvedValueOnce({ ...batch, status: 'IMPORTED' });
+    fireEvent.click(finalButton);
+    await screen.findByText('Importação concluída');
+    expect(api.confirmIndicatorImport).toHaveBeenCalledExactlyOnceWith(batch.id);
+    expect(screen.getByText('Importado')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Confirmar importação' })).toBeNull();
+  });
+
+  it('mostra erro da API, mantém a etapa 5 e permite tentar novamente', async () => {
+    const batch = await savedReview();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+    api.confirmIndicatorImport.mockRejectedValueOnce(new Error('Não foi possível confirmar este lote.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível confirmar este lote.');
+    expect(within(screen.getByRole('region', { name: 'Confirmação final da importação' })).getByRole('alert')).toBeTruthy();
+    expect(screen.queryByText('Importado')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(false);
+    api.confirmIndicatorImport.mockResolvedValueOnce({ ...batch, status: 'IMPORTED' });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByText('Importação concluída');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('desabilita o botão final sem incluídos mesmo com registros selecionados', async () => {
+    await savedReview(false);
+    fireEvent.click(within(screen.getAllByRole('row')[1]).getAllByRole('checkbox')[0]);
+    expect(screen.getByText('1 selecionado(s)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
+    expect(screen.getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(true);
+    expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+  });
+});
+
 describe('inclusão explícita e confirmação da revisão', () => {
   const card = (label) => screen.getByText(label, { selector: 'small' }).closest('article').querySelector('strong').textContent;
   const restore = async (batch) => {
@@ -116,7 +183,7 @@ describe('inclusão explícita e confirmação da revisão', () => {
     await screen.findByText('Revisão salva com sucesso.');
     expect(screen.getByText('1 selecionado(s)')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
     expect(screen.getByText(/0 registros serão importados · 1 serão ignorados|0 empresas serão importadas\/atualizadas/)).toBeTruthy();
     expect(screen.getByText('3 registros sem decisão não serão importados.')).toBeTruthy();
     expect(screen.getByText(/Nenhum registro incluído/)).toBeTruthy();
@@ -175,7 +242,7 @@ describe('recuperação de erros e respostas tardias da importação', () => {
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await screen.findByRole('button', { name: 'Salvar revisão' });
     fireEvent.click(screen.getByRole('button', { name: 'Ignorar registro' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
     expect((await screen.findByRole('alert')).textContent).toBe(requestMessage);
     expect(screen.queryByText('Resumo final')).toBeNull();
     expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
@@ -289,7 +356,7 @@ describe('telas de importação de indicadores', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
     await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
     expect(screen.queryByRole('alert')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
     await screen.findByText('Resumo final');
     expect(screen.queryByRole('alert')).toBeNull();
     // Even an old response still containing legacy JSON fields cannot restore an alert.
@@ -308,7 +375,7 @@ describe('telas de importação de indicadores', () => {
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     fireEvent.click(await screen.findByRole('button', { name: 'Salvar revisão' }));
     await screen.findByRole('alert');
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
     await screen.findByText('Resumo final');
     expect(screen.queryByRole('alert')).toBeNull();
   });

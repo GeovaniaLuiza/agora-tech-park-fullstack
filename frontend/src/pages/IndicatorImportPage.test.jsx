@@ -31,7 +31,190 @@ const openReview = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
 };
 
+describe('recuperação de erros e respostas tardias da importação', () => {
+  const readyBatch = (type) => {
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    return { ...base, draft: { items: base.draft.items.map((item) => ({ ...item, included: true, reviewStatus: 'VALIDATED' })) } };
+  };
+  const requestMessage = 'Os dados da revisão excedem o limite da requisição.';
+
+  it.each(['EVENTS', 'RESIDENTS'])('preserva erro de JSON ao avançar e limpa após salvar novamente em %s', async (type) => {
+    const batch = readyBatch(type);
+    api.getIndicatorImportDraft.mockResolvedValueOnce(batch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.saveIndicatorImportReview.mockRejectedValueOnce(Object.assign(new Error(requestMessage), { code: 'IMPORT_REQUEST_TOO_LARGE' }))
+      .mockResolvedValueOnce(batch);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Salvar revisão' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(requestMessage);
+    expect(screen.getByRole('alert').textContent).not.toContain('A planilha excede');
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+    await screen.findByText('Resumo final');
+    expect(screen.getByRole('alert').textContent).toBe(requestMessage);
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, batch.draft.items);
+    expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('não avança para confirmar se a revisão alterada falha em %s', async (type) => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce(readyBatch(type));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.saveIndicatorImportReview.mockRejectedValueOnce(new Error(requestMessage));
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(requestMessage);
+    expect(screen.queryByText('Resumo final')).toBeNull();
+    expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+    expect(api.saveIndicatorImportReview).toHaveBeenCalledOnce();
+  });
+
+  const lateCases = ['EVENTS', 'RESIDENTS'].flatMap((type) => ['upload', 'save', 'confirm'].flatMap((operation) =>
+    ['success', 'failure'].map((outcome) => [type, operation, outcome])));
+  it.each(lateCases)('descarta resposta de %s/%s/%s após sair da tela', async (type, operation, outcome) => {
+    const batch = readyBatch(type);
+    const method = { upload: 'uploadIndicatorImport', save: 'saveIndicatorImportReview', confirm: 'confirmIndicatorImport' }[operation];
+    let resolveRequest, rejectRequest;
+    api[method].mockReturnValueOnce(new Promise((resolve, reject) => { resolveRequest = resolve; rejectRequest = reject; }));
+    if (operation !== 'upload') api.getIndicatorImportDraft.mockResolvedValueOnce(batch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    if (operation === 'upload') {
+      await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+      fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'import.xlsx')] } });
+      fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    } else {
+      await screen.findByRole('button', { name: 'Salvar revisão' });
+      if (operation === 'confirm') {
+        fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+      } else fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    }
+    expect(api[method]).toHaveBeenCalledOnce();
+    view.unmount();
+    const nextType = type === 'EVENTS' ? 'RESIDENTS' : 'EVENTS';
+    render(<MemoryRouter><IndicatorImportPage type={nextType} /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenLastCalledWith(nextType, 'center-1'));
+    await act(async () => {
+      if (outcome === 'failure') rejectRequest(new Error(requestMessage));
+      else resolveRequest(operation === 'confirm' ? { ...batch, status: 'IMPORTED' } : batch);
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByText('Importação concluída')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Salvar revisão' })).toBeNull();
+    expect(api[method]).toHaveBeenCalledOnce();
+  });
+
+  const loadSelectedEvents = async () => {
+    const batch = readyBatch('EVENTS');
+    batch.draft.items.push({ ...batch.draft.items[0], id: 'event-3', sourceRows: [3] });
+    api.getIndicatorImportDraft.mockResolvedValueOnce(batch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    screen.getAllByRole('checkbox').forEach((checkbox) => fireEvent.click(checkbox));
+    return { view, batch };
+  };
+
+  it('interrompe agrupamento quando salvar a revisão alterada falha', async () => {
+    await loadSelectedEvents();
+    fireEvent.change(screen.getByLabelText('Temática da linha 2'), { target: { value: 'Tecnologia' } });
+    api.saveIndicatorImportReview.mockRejectedValueOnce(new Error(requestMessage));
+    fireEvent.click(screen.getByRole('button', { name: 'Agrupar selecionados' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(requestMessage);
+    expect(api.groupImportedEvents).not.toHaveBeenCalled();
+  });
+
+  it('remove erro do agrupamento depois de uma nova tentativa válida', async () => {
+    const { batch } = await loadSelectedEvents();
+    api.groupImportedEvents.mockRejectedValueOnce(new Error(requestMessage)).mockResolvedValueOnce(batch);
+    fireEvent.click(screen.getByRole('button', { name: 'Agrupar selecionados' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(requestMessage);
+    fireEvent.click(screen.getByRole('button', { name: 'Agrupar selecionados' }));
+    await screen.findByText('Reservas agrupadas em um único evento.');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Agrupar selecionados' }).disabled).toBe(true);
+    expect(api.groupImportedEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['success', 'failure'])('descarta agrupamento tardio com %s após sair da tela', async (outcome) => {
+    const { view, batch } = await loadSelectedEvents();
+    let resolveRequest, rejectRequest;
+    api.groupImportedEvents.mockReturnValueOnce(new Promise((resolve, reject) => { resolveRequest = resolve; rejectRequest = reject; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agrupar selecionados' }));
+    expect(api.groupImportedEvents).toHaveBeenCalledOnce();
+    view.unmount();
+    render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenLastCalledWith('RESIDENTS', 'center-1'));
+    await act(async () => outcome === 'success' ? resolveRequest(batch) : rejectRequest(new Error(requestMessage)));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Salvar revisão' })).toBeNull();
+  });
+});
+
 describe('telas de importação de indicadores', () => {
+  it.each(['EVENTS', 'RESIDENTS'])('não exibe erros legados do draft após upload válido e reload em %s', async (type) => {
+    const message = 'A planilha excede o limite de 200 MB.';
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    const oldDraft = { ...base, fileSize: 15_759, draft: { ...base.draft,
+      error: message, importError: message, validationError: message } };
+    api.getIndicatorImportDraft.mockResolvedValueOnce(oldDraft);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.uploadIndicatorImport.mockResolvedValueOnce({ ...base, fileSize: 15_759 });
+    const view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Salvar revisão' })).toBeTruthy());
+    expect(screen.queryByRole('alert')).toBeNull();
+    // A failed save of a pristine draft previously left this error on Confirmar.
+    api.saveIndicatorImportReview.mockRejectedValueOnce(new Error(message));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(message);
+    const file = new File([new Uint8Array(15_759)], type === 'EVENTS' ? 'Eventos.xlsx' : 'Clientes.xlsx');
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [file] } });
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    await screen.findByText('Resumo final');
+    expect(screen.queryByRole('alert')).toBeNull();
+    // Even an old response still containing legacy JSON fields cannot restore an alert.
+    view.unmount();
+    api.getIndicatorImportDraft.mockResolvedValueOnce(oldDraft);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText(/Tamanho: 15,4 KB/)).toBeTruthy();
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('limpa erro antigo de revisão ao avançar draft válido para Confirmar em %s', async (type) => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.saveIndicatorImportReview.mockRejectedValueOnce(new Error('A planilha excede o limite de 200 MB.'));
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    await screen.findByText('Resumo final');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('limpa erro local quando a recuperação seguinte retorna draft válido em %s', async (type) => {
+    api.getInnovationCenters.mockResolvedValueOnce([{ id: 'center-1', name: 'Centro 1' }, { id: 'center-2', name: 'Centro 2' }]);
+    api.getIndicatorImportDraft.mockRejectedValueOnce(new Error('A planilha excede o limite de 200 MB.'));
+    api.getIndicatorImportDraft.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await screen.findByRole('alert');
+    fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'center-2' } });
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it.each(['EVENTS', 'RESIDENTS'])('descarta erro tardio de rascunho após selecionar e validar arquivo de %s', async (type) => {
     let rejectDraft;
     api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectDraft = reject; }));

@@ -32,6 +32,63 @@ const openReview = async () => {
 };
 
 describe('telas de importação de indicadores', () => {
+  it.each(['EVENTS', 'RESIDENTS'])('não exibe erros legados do draft após upload válido e reload em %s', async (type) => {
+    const message = 'A planilha excede o limite de 200 MB.';
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    const oldDraft = { ...base, fileSize: 15_759, draft: { ...base.draft,
+      error: message, importError: message, validationError: message } };
+    api.getIndicatorImportDraft.mockResolvedValueOnce(oldDraft);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.uploadIndicatorImport.mockResolvedValueOnce({ ...base, fileSize: 15_759 });
+    const view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Salvar revisão' })).toBeTruthy());
+    expect(screen.queryByRole('alert')).toBeNull();
+    // A failed save of a pristine draft previously left this error on Confirmar.
+    api.saveIndicatorImportReview.mockRejectedValueOnce(new Error(message));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(message);
+    const file = new File([new Uint8Array(15_759)], type === 'EVENTS' ? 'Eventos.xlsx' : 'Clientes.xlsx');
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [file] } });
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    await screen.findByText('Resumo final');
+    expect(screen.queryByRole('alert')).toBeNull();
+    // Even an old response still containing legacy JSON fields cannot restore an alert.
+    view.unmount();
+    api.getIndicatorImportDraft.mockResolvedValueOnce(oldDraft);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText(/Tamanho: 15,4 KB/)).toBeTruthy();
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('limpa erro antigo de revisão ao avançar draft válido para Confirmar em %s', async (type) => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.saveIndicatorImportReview.mockRejectedValueOnce(new Error('A planilha excede o limite de 200 MB.'));
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    await screen.findByText('Resumo final');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('limpa erro local quando a recuperação seguinte retorna draft válido em %s', async (type) => {
+    api.getInnovationCenters.mockResolvedValueOnce([{ id: 'center-1', name: 'Centro 1' }, { id: 'center-2', name: 'Centro 2' }]);
+    api.getIndicatorImportDraft.mockRejectedValueOnce(new Error('A planilha excede o limite de 200 MB.'));
+    api.getIndicatorImportDraft.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await screen.findByRole('alert');
+    fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'center-2' } });
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it.each(['EVENTS', 'RESIDENTS'])('descarta erro tardio de rascunho após selecionar e validar arquivo de %s', async (type) => {
     let rejectDraft;
     api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectDraft = reject; }));

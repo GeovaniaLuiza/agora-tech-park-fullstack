@@ -2,14 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { errorHandler } from '../src/middlewares/errorHandler.js';
+import { XLSX_MIME } from '../src/domain/indicatorImportCatalog.js';
 
 afterEach(() => vi.unstubAllEnvs());
 
-function failingRequest(error, route = '/resource') {
+function failingRequest(error, route = '/resource', method = 'get', contentType) {
   const app = express();
-  app.get(route, (_req, _res, next) => next(error));
+  app[method](route.split('?')[0], (_req, _res, next) => next(error));
   app.use(errorHandler);
-  return request(app).get(route);
+  const response = request(app)[method](route);
+  return contentType ? response.set('Content-Type', contentType) : response;
 }
 
 describe('contrato HTTP de erros', () => {
@@ -34,13 +36,42 @@ describe('contrato HTTP de erros', () => {
   });
 
   it.each([
-    ['/indicator-imports/upload', { type: 'entity.too.large' }, '200 MB'],
-    ['/profile/avatar', { status: 413 }, '2 MB'],
-  ])('informa o limite correto no upload %s', async (route, error, limit) => {
-    const response = await failingRequest(error, route);
+    ['/api/indicator-imports/EVENTS/preview?centerId=1', { type: 'entity.too.large' }, '200 MB', 'post', XLSX_MIME],
+    ['/api/indicator-imports/RESIDENTS/preview', { status: 413 }, '200 MB', 'post', XLSX_MIME],
+    ['/api/auth/me/avatar', { status: 413 }, '2 MB', 'patch', 'application/json'],
+  ])('informa o limite correto no upload %s', async (route, error, limit, method, contentType) => {
+    const response = await failingRequest(error, route, method, contentType);
     expect(response.status).toBe(413);
     expect(response.body.code).toBe('PAYLOAD_TOO_LARGE');
     expect(response.body.message).toContain(limit);
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('não chama JSON excessivo de XLSX grande no preview de %s', async (type) => {
+    const response = await failingRequest({ type: 'entity.too.large' }, `/api/indicator-imports/${type}/preview`, 'post', 'application/json');
+    expect(response.body.code).toBe('IMPORT_REQUEST_TOO_LARGE');
+    expect(response.body.message).not.toContain('A planilha excede');
+  });
+
+  it.each([
+    ['application/json', 'O corpo JSON'],
+    ['application/octet-stream', 'O corpo da requisição'],
+  ])('classifica outros HTTP 413 de %s sem mencionar planilha ou imagem', async (contentType, message) => {
+    const response = await failingRequest({ status: 413 }, '/api/resource', 'post', contentType);
+    expect(response.status).toBe(413);
+    expect(response.body.message).toContain(message);
+    expect(response.body.message).not.toMatch(/planilha|imagem/);
+  });
+
+  it.each([
+    ['/api/indicator-imports/batches/batch-1/review', 'put'],
+    ['/api/indicator-imports/batches/batch-1/confirm', 'post'],
+    ['/api/indicator-imports/EVENTS/draft', 'get'],
+    ['/api/indicator-imports/RESIDENTS/draft', 'get'],
+  ])('não confunde o limite da requisição %s com o tamanho do XLSX', async (route, method) => {
+    const response = await failingRequest({ type: 'entity.too.large' }, route, method);
+    expect(response.status).toBe(413);
+    expect(response.body.code).toBe('IMPORT_REQUEST_TOO_LARGE');
+    expect(response.body.message).not.toContain('A planilha excede');
   });
 
   it('preserva Retry-After e os detalhes controlados de rate limit', async () => {

@@ -27,6 +27,8 @@ app.use(metricsMiddleware);
 app.get('/metrics', metricsHandler);
 app.use(createRateLimiter(RATE_LIMIT_CONFIG.global));
 app.use('/api/auth/me/avatar', express.json({ limit: '3mb' }));
+// Import routes authenticate before parsing their larger review bodies.
+app.use('/api/indicator-imports', indicatorImportRoutes);
 app.use(express.json({ limit:'100kb' }));
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
@@ -34,7 +36,6 @@ app.use('/api/forms', formRoutes);
 app.use('/api', responseRoutes);
 app.use('/api/indicators', indicatorRoutes);
 app.use('/api/indicator-management', indicatorManagementRoutes);
-app.use('/api/indicator-imports', indicatorImportRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/admin', accessRoutes);
 app.use('/api/notifications', notificationRoutes);

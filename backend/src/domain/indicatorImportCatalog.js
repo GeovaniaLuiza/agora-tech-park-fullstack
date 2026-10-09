@@ -7,6 +7,8 @@ export const IMPORT_STATUS = Object.freeze({
 
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 export { MAX_IMPORT_FILE_SIZE_MB, MAX_IMPORT_BYTES, IMPORT_FILE_TOO_LARGE_MESSAGE } from './indicatorImportUpload.js';
+// Independent of the XLSX limit: reviews include expanded text and occupations.
+export const MAX_IMPORT_REVIEW_BYTES = 200 * 1024 * 1024;
 export const IMPORT_YEAR = 2026;
 export const EVENT_SHEET = 'Eventos';
 export const EVENT_HEADERS = Object.freeze(['Lista', 'Data', 'Local', 'Temática', 'Modo', 'Tipo de Evento', 'Nº de Participantes', 'Nº de Empresas Participantes']);

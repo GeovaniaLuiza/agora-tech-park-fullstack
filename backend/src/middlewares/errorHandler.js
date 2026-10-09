@@ -1,10 +1,18 @@
 import { logger } from '../observability/logger.js';
-import { IMPORT_FILE_TOO_LARGE_MESSAGE } from '../domain/indicatorImportCatalog.js';
+import { IMPORT_FILE_TOO_LARGE_MESSAGE, XLSX_MIME } from '../domain/indicatorImportCatalog.js';
 
 export function errorHandler(error, req, res, _next) {
   if (error?.type === 'entity.too.large' || error?.status === 413) {
-    const spreadsheet = req.originalUrl?.includes('/indicator-imports/');
-    return res.status(413).json({ message: spreadsheet ? IMPORT_FILE_TOO_LARGE_MESSAGE : 'A imagem é muito grande. Envie uma foto JPG, PNG ou WebP de até 2 MB.', code: 'PAYLOAD_TOO_LARGE' });
+    const path = req.originalUrl?.split('?')[0] || '';
+    const spreadsheet = req.method === 'POST' && /\/indicator-imports\/(EVENTS|RESIDENTS)\/preview\/?$/i.test(path) && req.is(XLSX_MIME);
+    if (spreadsheet) return res.status(413).json({ message: IMPORT_FILE_TOO_LARGE_MESSAGE, code: 'PAYLOAD_TOO_LARGE' });
+    if (path === '/api/auth/me/avatar') {
+      return res.status(413).json({ message: 'A imagem é muito grande. Envie uma foto JPG, PNG ou WebP de até 2 MB.', code: 'PAYLOAD_TOO_LARGE' });
+    }
+    if (path.includes('/indicator-imports/')) {
+      return res.status(413).json({ message: 'Os dados da revisão ou operação excedem o limite da requisição. Reduza os dados enviados e tente novamente.', code: 'IMPORT_REQUEST_TOO_LARGE' });
+    }
+    return res.status(413).json({ message: req.is('application/json') ? 'O corpo JSON excede o limite permitido para esta operação.' : 'O corpo da requisição excede o limite permitido para esta operação.', code: 'PAYLOAD_TOO_LARGE' });
   }
   // Detect database connection failures (pg Pool AggregateError or direct ECONNREFUSED)
   try {

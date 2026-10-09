@@ -62,9 +62,11 @@ export default function IndicatorsPage() {
     // Load the full year once so period filters retain the Jan–Dec series.
     Promise.allSettled([getIndicators({ centerId, year, ...officialFilters }), getIndicators({ centerId, year: String(Number(year) - 1), ...officialFilters })]).then(([now, before]) => {
       if (!active) return;
-      if (now.status === 'rejected') setResponse({ key: requestKey, error: now.reason.message });
+      if (now.status === 'rejected') throw now.reason;
       else if (!Array.isArray(now.value)) setResponse({ key: requestKey, error: 'Resposta inválida ao carregar indicadores.' });
       else setResponse({ key: requestKey, items: now.value, previous: before.status === 'fulfilled' && Array.isArray(before.value) ? before.value : [], comparisonError: before.status === 'rejected' ? 'Comparativo indisponível: não foi possível consultar o ano anterior.' : '' });
+    }).catch((reason) => {
+      if (active) setResponse({ key: requestKey, error: reason?.message || 'Não foi possível carregar indicadores.' });
     });
     return () => { active = false; };
   }, [centerId, year, requestKey]);
@@ -74,7 +76,7 @@ export default function IndicatorsPage() {
   const availableCategories = indicatorBlocks.filter((block) => (current?.items || []).some((item) => block.codes.includes(item.code)));
   const featured = overviewCodes.map((code) => items.find((item) => item.code === code)).filter(Boolean);
   const highlights = ['FATURAMENTO_EMPRESAS', 'COLABORADORES_EMPRESAS'].map((code) => items.find((item) => item.code === code)).filter(Boolean);
-  const years = [...new Set([year, '2026', ...(metadata?.years || []).map(String)])].sort().reverse();
+  const years = [...new Set([year, '2026', ...(metadata?.years || []).map(String)])].sort((a, b) => Number(b) - Number(a));
   const error = metadata?.error || current?.error || exportError;
   const loading = !metadata || Boolean(centerId && !current);
 

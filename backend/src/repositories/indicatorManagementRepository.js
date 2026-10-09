@@ -16,7 +16,7 @@ export async function listCenters({ includeInactive = false } = {}) {
   return rows;
 }
 
-export async function findCenter(id, client = { query }) {
+export async function findCenter(id, client = pool) {
   const { rows } = await client.query('SELECT * FROM innovation_centers WHERE id=$1', [id]);
   return rows[0];
 }
@@ -41,7 +41,7 @@ export async function updateCenter(id, data, userId) {
   return rows[0];
 }
 
-export async function listDefinitions(centerId, client = { query }) {
+export async function listDefinitions(centerId, client = pool) {
   const { rows } = await client.query(
     `SELECT d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.periodicity,
        d.calculation_type,d.annual_aggregation,d.sort_order,d.source_entity,d.formula,
@@ -258,7 +258,7 @@ export async function deleteRecord(id, userId) {
   return rows[0];
 }
 
-export async function recordsForCalculation(centerId, year, client = { query }) {
+export async function recordsForCalculation(centerId, year, client = pool) {
   const { rows } = await client.query(
     `SELECT * FROM indicator_records WHERE innovation_center_id=$1 AND deleted_at IS NULL
        AND ((year IS NULL AND event_at IS NULL AND start_date IS NULL) OR year=$2::int OR EXTRACT(YEAR FROM event_at)=$2::int
@@ -268,7 +268,7 @@ export async function recordsForCalculation(centerId, year, client = { query }) 
   return rows;
 }
 
-export async function manualValuesForCalculation(centerId, year, client = { query }) {
+export async function manualValuesForCalculation(centerId, year, client = pool) {
   const { rows } = await client.query(
     `SELECT v.*,d.code,d.value_type,d.annual_aggregation FROM indicator_values v
      JOIN indicator_definitions d ON d.id=v.indicator_id
@@ -280,7 +280,7 @@ export async function manualValuesForCalculation(centerId, year, client = { quer
   return rows;
 }
 
-export async function allDefinitions(client = { query }) {
+export async function allDefinitions(client = pool) {
   const { rows } = await client.query(
     `SELECT * FROM indicator_definitions WHERE active`,
   );

@@ -4,7 +4,11 @@ import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({ query: vi.fn() }));
-vi.mock('../../src/db/pool.js', () => db);
+vi.mock('../../src/db/pool.js', async (importOriginal) => ({
+  ...await importOriginal(),
+  query: db.query,
+  pool: { query: db.query },
+}));
 import { list } from '../../src/controllers/indicatorController.js';
 import { summary } from '../../src/repositories/indicatorRepository.js';
 import { institutionalCards } from '../../src/repositories/dashboardRepository.js';

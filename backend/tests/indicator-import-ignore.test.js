@@ -74,6 +74,22 @@ describe('exclusão em lote de bloqueantes', () => {
 });
 
 describe('exclusão individual de registros', () => {
+  it.each(['EVENTS', 'RESIDENTS'])('mantém erro obrigatório no draft ignorado e rejeita confirmar sem incluídos em %s', async (type) => {
+    const invalid = type === 'RESIDENTS' ? resident('r3', { document: '' }) : {
+      id: 'e3', sourceRows: [3], name: 'Evento sem data', startAt: null, location: 'HUB', included: true,
+    };
+    setup(type, [invalid]);
+    await expect(confirm('batch', user)).rejects.toMatchObject({ code: 'REVIEW_REQUIRED' });
+    const saved = await review([exclude(invalid)]);
+    const reloaded = await mocks.repo.findBatch('batch');
+    expect(reloaded.draft).toEqual(saved.draft);
+    expect(reloaded.draft.items[0]).toMatchObject({ included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED' });
+    expect(reloaded.draft.items[0].issues.length).toBeGreaterThan(0);
+    expect(reloaded.summary).toMatchObject({ included: 0, ignored: 1, needsReview: 0 });
+    await expect(confirm('batch', user)).rejects.toMatchObject({ code: 'NO_INCLUDED_RECORDS' });
+    expect(mocks.repo.replaceBatchRecords).not.toHaveBeenCalled();
+  });
+
   it.each(['document', 'date', 'block', 'legend'])('ignora residente com erro de %s e restaura validação real', async (field) => {
     const invalid = resident('r3', field === 'document' ? { document: '' } : { contracts: [{ sourceRow: 3, legend: field === 'legend' ? 'Outra' : 'Locada', block: field === 'block' ? 'OUTRO' : 'HUB', areaInput: '10', startInput: field === 'date' ? 'data inválida' : '01/01/2026' }] });
     expect(invalid.validationStatus).toBe('REVIEW_REQUIRED');

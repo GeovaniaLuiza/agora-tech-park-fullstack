@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { consolidateResidents, normalizeResident } from '../src/services/residentImportParser.js';
+import { consolidateResidents, normalizeResident, summarizeResidents } from '../src/services/residentImportParser.js';
+import { summarizeEvents, validateEvent } from '../src/services/eventImportParser.js';
 
 const mocks = vi.hoisted(() => ({
   repo: { findBatch: vi.fn(), saveDraft: vi.fn(), replaceBatchRecords: vi.fn(), markImported: vi.fn() },
@@ -28,6 +29,49 @@ beforeEach(() => {
 const review = (items) => saveReview('batch', { items }, user);
 const exclude = (item) => ({ ...item, included: false, reviewStatus: 'EXCLUDED' });
 const restore = (item) => ({ ...item, included: true, reviewStatus: 'PENDING' });
+
+describe('exclusão em lote de bloqueantes', () => {
+  it.each(['EVENTS', 'RESIDENTS'])('preserva avisos, restaura erros e confirma somente incluídos em %s', async (type) => {
+    let items;
+    if (type === 'RESIDENTS') {
+      items = [resident('r3', { document: '' }), resident('r4', { document: '' }), resident('r5', {
+        sourceRows: [5, 6], contracts: [
+          { sourceRow: 5, legend: 'Locada', block: 'HUB', unit: '201', areaInput: '10', startInput: '01/01/2026', endInput: '31/01/2026' },
+          { sourceRow: 6, legend: 'Locada', block: 'HUB', unit: '201', areaInput: '10', startInput: '01/03/2026', endInput: '' },
+        ],
+      }), resident('r7', { document: '04252011000110' })];
+    } else {
+      const event = (id, overrides = {}) => {
+        const item = { id, name: id, sourceRows: [Number(id.slice(1))], startAt: '2026-01-01T00:00:00Z', location: 'HUB', included: true, reviewStatus: 'VALIDATED', ...overrides };
+        item.issues = validateEvent(item);
+        item.validationStatus = item.issues.length ? 'REVIEW_REQUIRED' : item.duplicateGroup ? 'WARNING' : 'VALID';
+        return item;
+      };
+      items = [event('e3', { name: '' }), event('e4', { startAt: null }), event('e5', { duplicateGroup: 'dup' }), event('e7')];
+    }
+    const summarize = type === 'RESIDENTS' ? summarizeResidents : summarizeEvents;
+    const original = summarize(items);
+    expect(original).toMatchObject({ needsReview: 2, warnings: 1, valid: 1 });
+    setup(type, items);
+    await expect(confirm('batch', user)).rejects.toMatchObject({ code: 'REVIEW_REQUIRED' });
+    const ignoreIncomplete = () => review(current.draft.items.map((item) => item.validationStatus === 'REVIEW_REQUIRED' ? exclude(item) : item));
+    await ignoreIncomplete();
+    expect(current.draft.items).toHaveLength(4);
+    expect(current.summary).toMatchObject({ needsReview: 0, ignored: 2, warnings: 1, valid: 1, rowsRead: original.rowsRead, records: original.records });
+    if (type === 'RESIDENTS') expect(current.summary).toMatchObject({ companies: original.companies, uniqueCnpjs: original.uniqueCnpjs, occupations: original.occupations });
+    expect(current.draft.items.slice(0, 2)).toEqual([expect.objectContaining({ included: false, validationStatus: 'IGNORED' }), expect.objectContaining({ included: false, validationStatus: 'IGNORED' })]);
+    await review(current.draft.items.map((item, index) => index === 0 ? restore(item) : item));
+    expect(current.draft.items[0]).toMatchObject({ included: true, validationStatus: 'REVIEW_REQUIRED' });
+    expect(current.summary).toMatchObject({ needsReview: 1, ignored: 1 });
+    await expect(confirm('batch', user)).rejects.toMatchObject({ code: 'REVIEW_REQUIRED' });
+    await ignoreIncomplete();
+    await confirm('batch', user);
+    const records = mocks.repo.replaceBatchRecords.mock.calls[0][1];
+    expect(records).toHaveLength(2);
+    expect(records.map((record) => record.name)).toEqual(items.slice(2).map((item) => item.name));
+    expect(current.summary).toMatchObject({ processed: 2, ignored: 2 });
+  });
+});
 
 describe('exclusão individual de registros', () => {
   it.each(['document', 'date', 'block', 'legend'])('ignora residente com erro de %s e restaura validação real', async (field) => {

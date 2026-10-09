@@ -44,7 +44,7 @@ beforeEach(() => {
 
 describe.each(['EVENTS', 'RESIDENTS'])('limite de upload de %s', (type) => {
   it.each([15_759, MAX_IMPORT_BYTES - 1, MAX_IMPORT_BYTES])('aceita %i bytes via middleware e serviço', async (size) => {
-    expect(MAX_IMPORT_BYTES).toBe(100 * 1024 * 1024);
+    expect(MAX_IMPORT_BYTES).toBe(209_715_200);
     const buffer = Buffer.alloc(size);
     buffer.set([0x50, 0x4b, 0x03, 0x04]);
     const response = await request(app).post(`/api/indicator-imports/${type}/preview`)
@@ -54,25 +54,25 @@ describe.each(['EVENTS', 'RESIDENTS'])('limite de upload de %s', (type) => {
     expect(type === 'EVENTS' ? mocks.parseEvents : mocks.parseResidents).toHaveBeenCalledOnce();
   }, 15000);
 
-  it('rejeita 100 MB + 1 byte no middleware com a mensagem correta', async () => {
+  it('rejeita 200 MB + 1 byte no middleware com a mensagem correta', async () => {
     const response = await request(app).post(`/api/indicator-imports/${type}/preview`)
       .set('Content-Type', XLSX_MIME).send(Buffer.alloc(MAX_IMPORT_BYTES + 1));
     expect(response.status).toBe(413);
-    expect(response.body).toEqual({ code: 'PAYLOAD_TOO_LARGE', message: 'A planilha excede o limite de 100 MB.' });
+    expect(response.body).toEqual({ code: 'PAYLOAD_TOO_LARGE', message: 'A planilha excede o limite de 200 MB.' });
     expect(mocks.findCenter).not.toHaveBeenCalled();
     expect(mocks.parseEvents).not.toHaveBeenCalled();
     expect(mocks.parseResidents).not.toHaveBeenCalled();
   }, 15000);
 
-  it('também rejeita 100 MB + 1 byte na validação direta do serviço', async () => {
+  it('também rejeita 200 MB + 1 byte na validação direta do serviço', async () => {
     await expect(preview({ type, fileName: 'planilha.xlsx', mimeType: XLSX_MIME,
       buffer: Buffer.alloc(MAX_IMPORT_BYTES + 1) }, { sub: 'admin-1', role: 'ADMIN' }))
-      .rejects.toMatchObject({ status: 413, code: 'PAYLOAD_TOO_LARGE', message: 'A planilha excede o limite de 100 MB.' });
+      .rejects.toMatchObject({ status: 413, code: 'PAYLOAD_TOO_LARGE', message: 'A planilha excede o limite de 200 MB.' });
   });
 });
 
-it('publica o mesmo limite de 100 MB nas opções para o frontend', async () => {
+it('publica o mesmo limite de 200 MB nas opções para o frontend', async () => {
   const response = await request(app).get('/api/indicator-imports/options');
   expect(response.status).toBe(200);
-  expect(response.body.maxBytes).toBe(100 * 1024 * 1024);
+  expect(response.body.maxBytes).toBe(209_715_200);
 });

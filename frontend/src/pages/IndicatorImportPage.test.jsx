@@ -36,12 +36,12 @@ describe('telas de importação de indicadores', () => {
     api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
-    expect(MAX_IMPORT_BYTES).toBe(104_857_600);
+    expect(MAX_IMPORT_BYTES).toBe(209_715_200);
     const oversized = new File(['xlsx'], 'grande.xlsx');
     Object.defineProperty(oversized, 'size', { value: MAX_IMPORT_BYTES + 1 });
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [oversized] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 100 MB.');
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 200 MB.');
     const file = new File([new Uint8Array(15_759)], 'planilha.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     expect(file.size).toBe(15_759);
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [file] } });
@@ -54,13 +54,13 @@ describe('telas de importação de indicadores', () => {
   });
 
   it.each([
-    ['EVENTS', 100], ['EVENTS', '100'], ['RESIDENTS', 100], ['RESIDENTS', '100'],
-  ])('usa 104857600 bytes em %s mesmo se as opções retornam %s', async (type, maxBytes) => {
+    ['EVENTS', 200], ['EVENTS', '200'], ['RESIDENTS', 200], ['RESIDENTS', '200'],
+  ])('usa 209715200 bytes em %s mesmo se as opções retornam %s', async (type, maxBytes) => {
     api.getIndicatorImportOptions.mockResolvedValueOnce({ eventModes: [], eventTypes: [], maxBytes });
     api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
-    expect(screen.getByText(/Formato: XLSX · Limite: 100 MB/)).toBeTruthy();
+    expect(screen.getByText(/Formato: XLSX · Limite: 200 MB/)).toBeTruthy();
     const file = new File([new Uint8Array(15_759)], 'planilha.xlsx');
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
@@ -69,7 +69,7 @@ describe('telas de importação de indicadores', () => {
   });
 
   it.each(['EVENTS', 'RESIDENTS'])('limpa erro de limite do backend antes de tentar novamente em %s', async (type) => {
-    api.uploadIndicatorImport.mockRejectedValueOnce(Object.assign(new Error('A planilha excede o limite de 100 MB.'), { code: 'PAYLOAD_TOO_LARGE' }));
+    api.uploadIndicatorImport.mockRejectedValueOnce(Object.assign(new Error('A planilha excede o limite de 200 MB.'), { code: 'PAYLOAD_TOO_LARGE' }));
     let resolveUpload;
     api.uploadIndicatorImport.mockReturnValueOnce(new Promise((resolve) => { resolveUpload = resolve; }));
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
@@ -86,7 +86,7 @@ describe('telas de importação de indicadores', () => {
 
   it.each(['EVENTS', 'RESIDENTS'])('normaliza erro legado do backend e limpa ao selecionar arquivo válido em %s', async (type) => {
     // Simulates a cached response from the previous upload limit.
-    const previousLimit = MAX_IMPORT_BYTES / 2 / 1024 / 1024;
+    const previousLimit = MAX_IMPORT_BYTES / 4 / 1024 / 1024;
     api.uploadIndicatorImport.mockRejectedValueOnce(Object.assign(new Error(`A planilha excede o limite de ${previousLimit} MB.`), { code: 'PAYLOAD_TOO_LARGE' }));
     api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
@@ -94,7 +94,7 @@ describe('telas de importação de indicadores', () => {
     const chooseFile = () => fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'dados.xlsx')] } });
     chooseFile();
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 100 MB.');
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 200 MB.');
     chooseFile();
     expect(screen.queryByRole('alert')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
@@ -113,18 +113,19 @@ describe('telas de importação de indicadores', () => {
     expect(screen.getByRole('alert').textContent).toBe('A planilha possui colunas inválidas.');
   });
 
-  it.each(['EVENTS', 'RESIDENTS'])('mostra 100 MB e bloqueia arquivo acima do limite antes do upload de %s', async (type) => {
+  it.each(['EVENTS', 'RESIDENTS'])('mostra 200 MB e bloqueia arquivo acima do limite antes do upload de %s', async (type) => {
     const { container } = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
-    expect(screen.getByText(/Formato: XLSX · Limite: 100 MB/)).toBeTruthy();
-    expect(screen.getByText(/Somente XLSX · limite de 100 MB/)).toBeTruthy();
-    expect(screen.queryByText(/(?:10|50) MB/)).toBeNull();
+    expect(screen.getByText(/Formato: XLSX · Limite: 200 MB/)).toBeTruthy();
+    expect(screen.getByText(/Somente XLSX · limite de 200 MB/)).toBeTruthy();
+    expect(container.textContent).not.toMatch(/\b(?:50|100) MB\b/);
     const file = new File(['xlsx'], 'planilha.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     Object.defineProperty(file, 'size', { value: MAX_IMPORT_BYTES + 1 });
     fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 100 MB.');
+    expect((await screen.findByRole('alert')).textContent).toBe('A planilha excede o limite de 200 MB.');
     expect(api.uploadIndicatorImport).not.toHaveBeenCalled();
+    expect(container.textContent).not.toMatch(/\b(?:50|100) MB\b/);
   });
 
   it.each([

@@ -31,6 +31,15 @@ const exclude = (item) => ({ ...item, included: false, reviewStatus: 'EXCLUDED' 
 const restore = (item) => ({ ...item, included: true, reviewStatus: 'PENDING' });
 
 describe('exclusão em lote de bloqueantes', () => {
+  it.each(['EVENTS', 'RESIDENTS'])('identifica exatamente cada registro bloqueante em %s', async (type) => {
+    const items = type === 'RESIDENTS' ? [resident('r3', { document: '' }), resident('r4', { document: '' })]
+      : [3, 4].map((row) => ({ id: `e${row}`, name: `Evento ${row}`, sourceRows: [row], startAt: null, location: 'HUB', included: true }));
+    setup(type, items);
+    const error = await confirm('batch', user).catch((reason) => reason);
+    expect(error.code).toBe('REVIEW_REQUIRED');
+    expect(error.details.issues).toEqual(expect.arrayContaining(items.map((item) => expect.objectContaining({ itemId: item.id }))));
+    expect(mocks.repo.replaceBatchRecords).not.toHaveBeenCalled();
+  });
   it.each(['EVENTS', 'RESIDENTS'])('preserva avisos, restaura erros e confirma somente incluídos em %s', async (type) => {
     let items;
     if (type === 'RESIDENTS') {

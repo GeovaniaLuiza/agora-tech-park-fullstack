@@ -78,6 +78,7 @@ export async function apiRequest(path, options = {}) {
       nextAction: data?.nextAction,
       fields: data?.error?.fields ?? data?.fields ?? undefined,
       previousImport: data?.previousImport,
+      issues: data?.issues,
     });
   }
 

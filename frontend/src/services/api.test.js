@@ -6,6 +6,13 @@ describe('requisição de confirmação de importação', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
   afterEach(() => vi.unstubAllGlobals());
 
+  it('preserva os IDs dos registros com erros obrigatórios', async () => {
+    const issues = [{ itemId: 'resident-3', field: 'document', message: 'CNPJ ausente na linha 3' }];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422, headers: new Headers(),
+      text: async () => JSON.stringify({ code: 'REVIEW_REQUIRED', message: 'Corrija ou ignore o registro antes de confirmar.', issues }) }));
+    await expect(confirmIndicatorImport('batch-1')).rejects.toMatchObject({ code: 'REVIEW_REQUIRED', issues });
+  });
+
   it('envia POST com JSON vazio e autenticação e retorna o lote IMPORTED', async () => {
     tokenStore.set('import-token', false);
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200,

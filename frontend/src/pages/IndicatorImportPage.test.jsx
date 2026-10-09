@@ -32,6 +32,41 @@ const openReview = async () => {
 };
 
 describe('telas de importação de indicadores', () => {
+  it.each(['EVENTS', 'RESIDENTS'])('descarta erro tardio de rascunho após selecionar e validar arquivo de %s', async (type) => {
+    let rejectDraft;
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectDraft = reject; }));
+    api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith(type, 'center-1'));
+    const file = new File([new Uint8Array(15_759)], type === 'EVENTS' ? 'Eventos.xlsx' : 'Clientes.xlsx');
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [file] } });
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+    await act(async () => rejectDraft(new Error('A planilha excede o limite de 200 MB.')));
+    expect(screen.getByText(/Tamanho: 15,4 KB/)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('Arquivo validado. Revise os registros antes de confirmar.');
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('descarta erro tardio de rascunho antes da validação de %s', async (type) => {
+    let rejectDraft;
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectDraft = reject; }));
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith(type, 'center-1'));
+    fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'dados.xlsx')] } });
+    await act(async () => rejectDraft(new Error('A planilha excede o limite de 200 MB.')));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Validar' }).disabled).toBe(false);
+    expect(api.uploadIndicatorImport).not.toHaveBeenCalled();
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('mostra erro de recuperação de rascunho sem arquivo selecionado em %s', async (type) => {
+    api.getIndicatorImportDraft.mockRejectedValueOnce(new Error('Falha ao recuperar rascunho.'));
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    expect((await screen.findByRole('alert')).textContent).toBe('Falha ao recuperar rascunho.');
+  });
+
   it.each(['EVENTS', 'RESIDENTS'])('limpa o erro de tamanho anterior ao selecionar 15759 bytes em %s', async (type) => {
     api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
@@ -51,6 +86,7 @@ describe('telas de importação de indicadores', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
     await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
     expect(api.uploadIndicatorImport).toHaveBeenCalledWith(type, 'center-1', file, false);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it.each([
@@ -139,9 +175,11 @@ describe('telas de importação de indicadores', () => {
     const file = new File(['xlsx'], 'planilha.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     Object.defineProperty(file, 'size', { value: size });
     fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } });
+    expect(screen.queryByRole('alert')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
     await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
     expect(api.uploadIndicatorImport).toHaveBeenCalledWith(type, 'center-1', file, false);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('exibe erro se o reprocessamento autorizado falha sem repetir a confirmação', async () => {

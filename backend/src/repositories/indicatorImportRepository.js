@@ -114,7 +114,7 @@ export async function replaceBatchRecords(batch, records, userId, finalize) {
   } finally { client.release(); }
 }
 
-export async function markImported(id, { imported, ignored, summary, userId }, client = { query }) {
+export async function markImported(id, { imported, ignored, summary, userId }, client = pool) {
   const { rows } = await client.query(
     `UPDATE indicator_import_batches SET status='IMPORTED',total_imported=$2,total_ignored=$3,
        summary=$4::jsonb,confirmed_by=$5,confirmed_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING *`,

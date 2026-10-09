@@ -29,6 +29,33 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('dashboard de indicadores oficiais', () => {
+  it('exibe erro e encerra o carregamento quando a consulta rejeita sem mensagem', async () => {
+    api.getIndicators.mockRejectedValue(null);
+    mount();
+    expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível carregar indicadores.');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('article', { name: rows[0].name })).toBeNull();
+  });
+
+  it('preserva os dados atuais e informa a falha apenas no comparativo', async () => {
+    api.getIndicators.mockImplementation(({ year }) => year === '2026' ? Promise.resolve(rows) : Promise.reject(new Error('Ano anterior indisponível')));
+    mount();
+    await screen.findByRole('article', { name: rows[0].name });
+    expect((await screen.findByRole('status')).textContent).toBe('Comparativo indisponível: não foi possível consultar o ano anterior.');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('ordena anos numericamente em ordem decrescente, mantendo strings e removendo duplicatas', async () => {
+    const history = [999, '10000', 2025, '2026', 2025];
+    api.getIndicatorHistory.mockResolvedValue(history);
+    mount(); await screen.findByRole('article', { name: rows[0].name });
+
+    expect(within(screen.getByLabelText('Ano')).getAllByRole('option').map((option) => option.value))
+      .toEqual(['10000', '2026', '2025', '999']);
+    expect(screen.getByLabelText('Ano').value).toBe('2026');
+    expect(history).toEqual([999, '10000', 2025, '2026', 2025]);
+  });
+
   it('mostra consolidado, série Jan–Dez, lacunas e zero registrado', async () => {
     mount(); await screen.findByRole('article', { name: 'Nº de Novas Startups' });
     const item = card('Nº de Novas Startups');

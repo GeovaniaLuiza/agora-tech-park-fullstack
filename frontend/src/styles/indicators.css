@@ -1,6 +1,6 @@
 .official-indicators-page{display:grid;gap:22px}
-.official-indicators-page h2{font:700 18px Manrope;margin:0 0 16px}
-.official-indicators-page h3{font:600 13px Manrope;margin:0 0 6px}
+.official-indicators-page h2{font:700 18px Manrope,sans-serif;margin:0 0 16px}
+.official-indicators-page h3{font:600 13px Manrope,sans-serif;margin:0 0 6px}
 .official-filters{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
 .official-filters label{display:grid;gap:6px;font-size:12px;color:var(--muted)}
 .official-filters select{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px 12px;color:var(--navy);max-width:100%;min-width:100px}
@@ -13,7 +13,7 @@
 .official-summary-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:14px;margin-top:14px}
 .official-kpi{min-width:0;display:flex;flex-direction:column;gap:8px}
 .official-kpi-heading{display:flex;gap:12px;justify-content:space-between;align-items:start}.official-kpi-heading h3{color:var(--muted);line-height:1.5}.official-kpi-heading svg{flex-shrink:0;color:var(--primary);width:20px;height:20px}
-.official-kpi-value{font:700 clamp(20px,2vw,28px) Manrope;overflow-wrap:anywhere}.official-kpi-value.missing{font-size:20px;color:var(--muted)}
+.official-kpi-value{font:700 clamp(20px,2vw,28px) Manrope,sans-serif;overflow-wrap:anywhere}.official-kpi-value.missing{font-size:20px;color:var(--muted)}
 .official-kpi footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;margin-top:auto;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:10px}
 .official-section-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.official-section-heading span{color:var(--muted);font-size:12px}
 .official-monthly-chart{margin-top:12px}.official-monthly-chart svg{display:block;width:100%;height:auto}

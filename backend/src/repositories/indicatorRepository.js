@@ -1,7 +1,8 @@
-import { query } from '../db/pool.js';
+import { pool, query } from '../db/pool.js';
 
-export async function summary({ period = null, year: requestedYear = null, name = null, category = null, sourceType = 'LIVE', centerId = null, officialDashboard = false, codes = null } = {}, client = { query }) {
-  const official = (officialDashboard === true || officialDashboard === 'true') && sourceType === 'SPREADSHEET_IMPORT';
+export async function summary({ period = null, year: requestedYear = null, name = null, category = null, sourceType = 'LIVE', centerId = null, officialDashboard, codes = null } = {}, client = pool) {
+  const officialRequested = typeof officialDashboard === 'boolean' ? officialDashboard : officialDashboard === 'true';
+  const official = officialRequested && sourceType === 'SPREADSHEET_IMPORT';
   const year = requestedYear ? Number(requestedYear) : /^\d{4}/.test(period || '') ? Number(String(period).slice(0, 4)) : new Date().getFullYear();
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(period || '') ? Number(String(period).slice(5, 7)) : null;
   const { rows } = await client.query(

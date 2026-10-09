@@ -3,6 +3,15 @@ vi.mock('../src/db/pool.js', () => ({ query: vi.fn() }));
 import { summary } from '../src/repositories/indicatorRepository.js';
 
 describe('consulta do dashboard oficial de indicadores', () => {
+  it.each([
+    [true, true], [false, false], ['true', true], ['false', false],
+    [undefined, false], [null, false], ['', false], [1, false], ['1', false],
+  ])('normaliza officialDashboard=%s sem coerção frouxa', async (officialDashboard, expected) => {
+    const client = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    await summary({ sourceType: 'SPREADSHEET_IMPORT', officialDashboard, codes: 'TEST' }, client);
+    expect(client.query.mock.calls[0][1].slice(6)).toEqual([expected, expected ? ['TEST'] : null]);
+  });
+
   it('isola centro, ano e origem e inclui definições sem valores', async () => {
     const rows = [{ code: 'EVENTOS_REALIZADOS', value: null, monthly_values: [] }];
     const client = { query: vi.fn().mockResolvedValue({ rows }) };

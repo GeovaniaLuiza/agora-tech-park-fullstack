@@ -16,7 +16,7 @@ export function selectEmailProvider(environment = process.env) {
 
 export function createEmailProvider(
   environment = process.env,
-  providers = { mock: createMockProvider, smtp: createSmtpProvider },
+  { mock = createMockProvider, smtp = createSmtpProvider } = {},
 ) {
-  return providers[selectEmailProvider(environment)](environment);
+  return { mock, smtp }[selectEmailProvider(environment)](environment);
 }

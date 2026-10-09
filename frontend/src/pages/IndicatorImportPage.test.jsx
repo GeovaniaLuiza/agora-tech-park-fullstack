@@ -31,6 +31,116 @@ const openReview = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
 };
 
+describe('inclusão explícita e confirmação da revisão', () => {
+  const card = (label) => screen.getByText(label, { selector: 'small' }).closest('article').querySelector('strong').textContent;
+  const restore = async (batch) => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce(batch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const view = render(<MemoryRouter><IndicatorImportPage type={batch.importType} /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    return view;
+  };
+
+  it.each(['EVENTS', 'RESIDENTS'].flatMap((type) => ['upload', 'draft'].map((entry) => [type, entry])))('inclui 192 válidos e 43 avisos, salva, restaura e confirma %s via %s', async (type, entry) => {
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    const items = Array.from({ length: 235 }, (_, index) => ({
+      ...base.draft.items[0], id: `record-${index}`, sourceRows: [index + 2], name: `Registro ${index}`,
+      included: type === 'RESIDENTS', reviewStatus: type === 'EVENTS' ? 'PENDING' : index < 192 ? 'VALIDATED' : 'WITH_WARNINGS',
+      validationStatus: index < 192 ? 'VALID' : 'WARNING', issues: [], duplicateGroup: index < 192 ? null : 'dup-1',
+      discontinuous: type === 'RESIDENTS' && index >= 192,
+    }));
+    let saved = { ...base, fileName: type === 'EVENTS' ? 'Eventos.xlsx' : 'Clientes.xlsx', fileSize: 15_759,
+      summary: { rowsRead: 235 }, draft: { items } };
+    api.saveIndicatorImportReview.mockImplementation(async (_id, reviewed) => {
+      saved = { ...saved, draft: { items: reviewed.map((item) => ({ ...item })) } };
+      return saved;
+    });
+    let view;
+    if (entry === 'draft') view = await restore(saved);
+    else {
+      api.uploadIndicatorImport.mockResolvedValueOnce(saved);
+      view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+      await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+      fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File([new Uint8Array(15_759)], saved.fileName)] } });
+      fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+      await screen.findByText('Arquivo validado. Revise os registros antes de confirmar.');
+      await openReview();
+    }
+    expect(screen.getByText(/Tamanho: 15,4 KB/)).toBeTruthy();
+    expect(card('Válidos')).toBe('192');
+    expect(card(type === 'EVENTS' ? 'Com aviso' : 'Avisos')).toBe('43');
+    expect(card('Revisão necessária')).toBe('0');
+    expect(card('Ignorados')).toBe('0');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(type === 'EVENTS');
+    if (type === 'EVENTS') {
+      // The action includes eligible records across all pages and filters.
+      fireEvent.change(screen.getByPlaceholderText('Buscar evento'), { target: { value: 'Registro 0' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Incluir elegíveis' }));
+      expect(screen.getByText(/235 incluído\(s\) nos indicadores · 0 sem decisão/)).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+      await screen.findByText('Revisão salva com sucesso.');
+    }
+    expect(saved.draft.items.filter((item) => item.included)).toHaveLength(235);
+    expect(card('Válidos')).toBe('192');
+    expect(card(type === 'EVENTS' ? 'Com aviso' : 'Avisos')).toBe('43');
+    view.unmount();
+    await restore(saved);
+    expect(screen.getByText('0 selecionado(s)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+    expect(screen.getByText(type === 'EVENTS' ? /235 registros serão importados · 0 serão ignorados/ : /235 empresas serão importadas\/atualizadas/)).toBeTruthy();
+    expect(screen.getByText('0 registros sem decisão não serão importados.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(false);
+    api.confirmIndicatorImport.mockResolvedValueOnce({ ...saved, status: 'IMPORTED' });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByText('Importação confirmada e indicadores atualizados.');
+    expect(api.confirmIndicatorImport).toHaveBeenCalledWith(saved.id);
+  }, 15_000);
+
+  it.each(['EVENTS', 'RESIDENTS'])('distingue seleção, inclusão, exclusão e falta de decisão em %s', async (type) => {
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    const items = Array.from({ length: 4 }, (_, index) => ({
+      ...base.draft.items[0], id: `record-${index}`, name: `Registro ${index}`, sourceRows: [index + 2],
+      included: false, reviewStatus: index === 1 ? 'EXCLUDED' : 'PENDING',
+      validationStatus: index === 1 ? 'IGNORED' : index === 3 ? 'REVIEW_REQUIRED' : 'VALID',
+      issues: index === 3 ? [{ message: 'Campo obrigatório ausente' }] : [], duplicateGroup: null,
+    }));
+    const batch = { ...base, summary: { rowsRead: 4 }, draft: { items } };
+    api.saveIndicatorImportReview.mockImplementation(async (_id, reviewed) => ({ ...batch, draft: { items: reviewed } }));
+    await restore(batch);
+    const firstRow = screen.getByText('Registro 0').closest('tr');
+    fireEvent.click(within(firstRow).getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(screen.getByText('1 selecionado(s)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect(screen.getByText(/0 registros serão importados · 1 serão ignorados|0 empresas serão importadas\/atualizadas/)).toBeTruthy();
+    expect(screen.getByText('3 registros sem decisão não serão importados.')).toBeTruthy();
+    expect(screen.getByText(/Nenhum registro incluído/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Incluir selecionados' }));
+    expect(screen.getByText(/1 incluído\(s\) nos indicadores · 2 sem decisão/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Incluir elegíveis' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, expect.arrayContaining([
+      expect.objectContaining({ id: 'record-0', included: true }),
+      expect.objectContaining({ id: 'record-1', included: false, reviewStatus: 'EXCLUDED' }),
+      expect.objectContaining({ id: 'record-2', included: true }),
+      expect.objectContaining({ id: 'record-3', included: false, validationStatus: 'REVIEW_REQUIRED' }),
+    ]));
+    expect(card('Ignorados')).toBe('1');
+    expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+    expect(screen.getByText('1 registros sem decisão não serão importados.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(false);
+  });
+});
+
 describe('recuperação de erros e respostas tardias da importação', () => {
   const readyBatch = (type) => {
     const base = type === 'EVENTS' ? eventBatch : residentBatch;

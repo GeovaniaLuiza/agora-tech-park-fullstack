@@ -669,6 +669,90 @@ describe('ignorar registros incompletos em lote', () => {
   const card = (label) => screen.getByText(label, { selector: '.import-summary small' }).parentElement.querySelector('strong').textContent;
   const row = (name) => screen.getByText(name, { selector: 'strong' }).closest('tr');
 
+  it('mantém o foco no diálogo e cancela por Escape sem alterar registros', async () => {
+    const item = { ...eventItems[0], included: true, validationStatus: 'REVIEW_REQUIRED', reviewStatus: 'PENDING' };
+    await load('EVENTS', [item]);
+    const trigger = screen.getByRole('button', { name: 'Ignorar incompletos' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog');
+    const cancel = within(dialog).getByRole('button', { name: 'Cancelar' });
+    const ignore = within(dialog).getByRole('button', { name: 'Ignorar registros' });
+    expect(document.activeElement).toBe(cancel);
+
+    // Internal navigation stays native; only the two boundaries wrap focus.
+    expect(fireEvent.keyDown(cancel, { key: 'Tab' })).toBe(true);
+    expect(document.activeElement).toBe(cancel);
+    expect(fireEvent.keyDown(cancel, { key: 'Tab', shiftKey: true })).toBe(false);
+    expect(document.activeElement).toBe(ignore);
+    expect(fireEvent.keyDown(ignore, { key: 'Tab', shiftKey: true })).toBe(true);
+    expect(document.activeElement).toBe(ignore);
+    expect(fireEvent.keyDown(ignore, { key: 'Tab' })).toBe(false);
+    expect(document.activeElement).toBe(cancel);
+    fireEvent.keyDown(cancel, { key: 'Enter' });
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    fireEvent.keyDown(cancel, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(card('Revisão necessária')).toBe('1');
+    expect(card('Ignorados')).toBe('0');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith('batch-1', [item]);
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'])('ignora também os incompletos fora da página atual em %s', async (type) => {
+    const base = type === 'RESIDENTS' ? residentItems[0] : eventItems[0];
+    const items = Array.from({ length: 22 }, (_, index) => ({
+      ...base, id: `record-${index}`, name: `Registro ${index}`, sourceRows: [index + 2],
+      included: true, reviewStatus: index === 0 || index === 21 ? 'PENDING' : 'VALIDATED',
+      validationStatus: index === 0 || index === 21 ? 'REVIEW_REQUIRED' : 'VALID',
+      issues: index === 0 || index === 21 ? [{ message: 'Campo obrigatório ausente' }] : [],
+    }));
+    const batch = await load(type, items);
+    expect(row('Registro 0')).toBeTruthy();
+    expect(screen.queryByText('Registro 21', { selector: 'strong' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar incompletos' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ignorar registros' }));
+    expect(card('Revisão necessária')).toBe('0');
+    expect(card('Ignorados')).toBe('2');
+    expect(card('Válidos')).toBe('20');
+    fireEvent.click(screen.getByRole('button', { name: 'Próxima' }));
+    expect(within(row('Registro 21')).getByText('Ignorado')).toBeTruthy();
+    expect(within(row('Registro 20')).getByText('Válido')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, items.map((item, index) =>
+      index === 0 || index === 21 ? { ...item, included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED' } : item));
+  });
+
+  it('restaura residentes válidos e com avisos sem restaurar os não selecionados', async () => {
+    const excluded = { ...residentItems[0], sourceRows: [4], included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED' };
+    const items = [
+      { ...excluded, id: 'valid', name: 'Válido selecionado', issues: [] },
+      { ...excluded, id: 'warning', name: 'Aviso selecionado', discontinuous: true },
+      { ...excluded, id: 'other', name: 'Não selecionado', issues: [] },
+    ];
+    const batch = await load('RESIDENTS', items);
+    for (const name of ['Válido selecionado', 'Aviso selecionado']) {
+      fireEvent.click(within(row(name)).getAllByRole('checkbox')[0]);
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar selecionados' }));
+    expect(within(row('Válido selecionado')).getByText('Válido')).toBeTruthy();
+    expect(within(row('Aviso selecionado')).getByText('Aviso')).toBeTruthy();
+    expect(within(row('Não selecionado')).getByText('Ignorado')).toBeTruthy();
+    expect(card('Ignorados')).toBe('1');
+    expect(card('Válidos')).toBe('1');
+    expect(card('Avisos')).toBe('1');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, [
+      { ...items[0], included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID' },
+      { ...items[1], included: true, reviewStatus: 'WITH_WARNINGS', validationStatus: 'WARNING' },
+      items[2],
+    ]);
+  });
+
   it.each(['EVENTS', 'RESIDENTS'])('exibe botão desabilitado sem bloqueantes em %s, mesmo com avisos', async (type) => {
     const base = type === 'RESIDENTS' ? residentItems[0] : eventItems[0];
     await load(type, [{ ...base, included: true, validationStatus: 'WARNING', issues: [{ message: 'Aviso não bloqueante' }] }]);

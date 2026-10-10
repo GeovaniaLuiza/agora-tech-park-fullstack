@@ -202,7 +202,8 @@ export async function confirm(id, user) {
   if (![IMPORT_STATUS.REVIEW_PENDING, IMPORT_STATUS.WITH_WARNINGS, IMPORT_STATUS.VALIDATED].includes(batch.status)) throw serviceError(409, 'Importação indisponível para confirmação.', 'IMPORT_NOT_CONFIRMABLE');
   const included = (batch.draft.items || []).filter((item) => item.included && !item.ignored && item.reviewStatus !== 'EXCLUDED');
   if (!included.length) throw serviceError(422, 'Selecione ao menos um registro antes de confirmar.', 'NO_INCLUDED_RECORDS');
-  const unresolved = included.flatMap((item) => batch.import_type === IMPORT_TYPES.EVENTS ? validateEvent(item) : item.document === undefined ? [] : normalizeResident(item).issues);
+  const unresolved = included.flatMap((item) => (batch.import_type === IMPORT_TYPES.EVENTS ? validateEvent(item) : item.document === undefined ? [] : normalizeResident(item).issues)
+    .map((issue) => ({ ...issue, itemId: item.id })));
   if (unresolved.length) throw serviceError(422, unresolved[0].message + '. Corrija ou ignore o registro antes de confirmar.', 'REVIEW_REQUIRED', { issues: unresolved });
   const records = included.map(batch.import_type === IMPORT_TYPES.EVENTS ? eventRecord : residentRecord);
   const summary = batch.import_type === IMPORT_TYPES.EVENTS ? summarizeEvents(batch.draft.items, batch.year) : summarizeResidents(batch.draft.items, batch.year);

@@ -31,6 +31,149 @@ const openReview = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
 };
 
+describe.each(['EVENTS', 'RESIDENTS'])('ignorar bloqueantes na etapa 5 de %s', (type) => {
+  const card = (label) => screen.getByText(label, { selector: 'small' }).closest('article').querySelector('strong').textContent;
+  async function finalReview(count, withValid = true, fixture = {}) {
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    const invalid = Array.from({ length: count }, (_, index) => ({
+      ...base.draft.items[0], id: `invalid-${index}`, name: `Inconsistente ${index}`, sourceRows: [index + 3],
+      document: '', included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID', issues: [],
+    }));
+    const issues = invalid.map((item) => ({ itemId: item.id, message: `${type === 'RESIDENTS' ? 'CNPJ ausente' : 'Data inválida'} na linha ${item.sourceRows[0]}` }));
+    const valid = { ...base.draft.items[0], id: 'valid', name: 'Registro válido', sourceRows: [9], included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID', issues: [] };
+    const warning = { ...valid, id: 'warning', name: 'Registro com aviso', sourceRows: [10], validationStatus: 'WARNING', reviewStatus: 'WITH_WARNINGS', issues: [{ message: 'Aviso não bloqueante' }] };
+    const undecided = { ...valid, id: 'undecided', name: 'Sem decisão', sourceRows: [11], included: false, validationStatus: 'REVIEW_REQUIRED', reviewStatus: 'PENDING', issues: [{ message: 'Erro em registro sem decisão' }] };
+    let saved = { ...base, summary: fixture.summary || base.summary, fileName: fixture.fileName,
+      draft: { items: [...invalid, ...(withValid ? fixture.items || [valid, warning, undecided] : [])] } };
+    api.getIndicatorImportDraft.mockImplementation(async () => saved);
+    api.saveIndicatorImportReview.mockImplementation(async (_id, reviewed) => {
+      saved = { ...saved, draft: { items: structuredClone(reviewed) } };
+      return saved;
+    });
+    api.confirmIndicatorImport.mockRejectedValueOnce(Object.assign(new Error(`${issues[0].message}. Corrija ou ignore o registro antes de confirmar.`), { code: 'REVIEW_REQUIRED', issues }));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    let view;
+    await act(async () => { view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>); });
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByRole('alert');
+    return { view, invalid, issues, getSaved: () => saved };
+  }
+
+  it('passa de 85 para 84 incluídos sem alterar os demais registros na homologação', async () => {
+    const base = type === 'RESIDENTS' ? residentItems[0] : eventItems[0];
+    const remaining = Array.from({ length: 84 }, (_, index) => ({
+      ...base, id: `included-${index}`, name: `Registro ${index}`, sourceRows: [index + 4], included: true,
+      validationStatus: index < 65 ? 'VALID' : 'WARNING', reviewStatus: index < 65 ? 'VALIDATED' : 'WITH_WARNINGS',
+      issues: index < 65 ? [] : [{ message: 'Aviso não bloqueante' }],
+    }));
+    const fixture = { fileName: type === 'RESIDENTS' ? 'Clientes.xlsx' : 'Eventos.xlsx', items: remaining,
+      summary: { rowsRead: 163, companies: 85, uniqueCnpjs: 72, occupations: 121, records: 85 } };
+    const { view, issues, getSaved } = await finalReview(1, true, fixture);
+    const checkSourceCounts = () => {
+      if (type !== 'RESIDENTS') return;
+      for (const [label, value] of [['Linhas lidas', 163], ['Empresas identificadas', 85], ['CNPJs únicos', 72], ['Ocupações', 121]]) {
+        expect(card(label)).toBe(String(value));
+      }
+    };
+    checkSourceCounts();
+    expect(card('Válidos')).toBe('65');
+    expect(card('Incluídos')).toBe('85');
+    expect(card('Inválidos ainda incluídos / pendentes')).toBe('1');
+    const final = screen.getByRole('region', { name: 'Confirmação final da importação' });
+    expect(within(final).getByRole('alert').textContent).toBe(`${issues[0].message}. Corrija ou ignore o registro antes de confirmar.`);
+    fireEvent.click(within(final).getByRole('button', { name: 'Ignorar registro' }));
+    await waitFor(() => expect(within(final).getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(false));
+    expect(card('Incluídos')).toBe('84');
+    expect(card('Ignorados')).toBe('1');
+    expect(card('Inválidos ainda incluídos / pendentes')).toBe('0');
+    checkSourceCounts();
+    expect(api.saveIndicatorImportReview).toHaveBeenCalledExactlyOnceWith(getSaved().id, getSaved().draft.items);
+    expect(getSaved().draft.items).toHaveLength(85);
+    expect(getSaved().draft.items[0]).toMatchObject({ included: false, document: '', issues: [issues[0]] });
+    expect(getSaved().draft.items.slice(1)).toEqual(remaining);
+    expect(within(screen.getByRole('region', { name: 'Registros ignorados' })).getByText(issues[0].message)).toBeTruthy();
+    view.unmount();
+    await act(async () => { render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>); });
+    expect(card('Incluídos')).toBe('84');
+    expect(card('Ignorados')).toBe('1');
+    checkSourceCounts();
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
+    api.confirmIndicatorImport.mockResolvedValueOnce({ ...getSaved(), status: 'IMPORTED' });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByText('Importação concluída');
+  });
+
+  it.each([[1, 'individual'], [2, 'individual'], [2, 'lote']])('ignora %i inválido(s) por ação %s, persiste e libera confirmação', async (count, action) => {
+    const { view, issues, getSaved } = await finalReview(count);
+    const region = () => screen.getByRole('region', { name: 'Confirmação final da importação' });
+    expect(within(region()).getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(true);
+    expect(card('Inválidos ainda incluídos / pendentes')).toBe(String(count));
+    if (count === 1) expect(within(region()).queryByRole('button', { name: 'Ignorar registros inválidos' })).toBeNull();
+    if (action === 'individual') {
+      for (let index = count - 1; index >= 0; index--) {
+        const group = within(region()).getByRole('group', { name: `Registro da linha ${index + 3}` });
+        expect(within(group).getByText(issues[index].message)).toBeTruthy();
+        fireEvent.click(within(group).getByRole('button', { name: 'Ignorar registro' }));
+        await waitFor(() => expect(getSaved().draft.items[index].included).toBe(false));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Salvar revisão' }).disabled).toBe(false));
+        expect(card('Inválidos ainda incluídos / pendentes')).toBe(String(index));
+        if (index > 0) {
+          expect(getSaved().draft.items[0].included).toBe(true);
+          expect(within(region()).getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(true);
+        }
+      }
+    } else {
+      fireEvent.click(within(region()).getByRole('button', { name: 'Ignorar registros inválidos' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Ignorar 2 registros inválidos?' })).getByRole('button', { name: 'Ignorar registros' }));
+    }
+    await waitFor(() => expect(within(region()).getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(false));
+    expect(card('Incluídos')).toBe('2');
+    expect(card('Ignorados')).toBe(String(count));
+    expect(card('Inválidos ainda incluídos / pendentes')).toBe('0');
+    expect(screen.queryByRole('alert')).toBeNull();
+    for (let index = 0; index < count; index++) {
+      const item = getSaved().draft.items[index];
+      expect(item).toMatchObject({ included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED', document: '', issues: [issues[index]] });
+      const ignored = within(screen.getByRole('region', { name: 'Registros ignorados' })).getByRole('group', { name: `Registro da linha ${index + 3}` });
+      expect(within(ignored).getByText('Ignorado')).toBeTruthy();
+      expect(within(ignored).getByText(issues[index].message)).toBeTruthy();
+    }
+    expect(getSaved().draft.items.find((item) => item.id === 'warning')).toMatchObject({ included: true, validationStatus: 'WARNING' });
+    expect(getSaved().draft.items.find((item) => item.id === 'undecided')).toMatchObject({ included: false, reviewStatus: 'PENDING', validationStatus: 'REVIEW_REQUIRED' });
+    view.unmount();
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    expect(card('Ignorados')).toBe(String(count));
+    expect(card('Inválidos ainda incluídos / pendentes')).toBe('0');
+    expect(screen.getAllByText('Ignorado', { selector: 'span' })).toHaveLength(count);
+    fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
+    api.confirmIndicatorImport.mockResolvedValueOnce({ ...getSaved(), status: 'IMPORTED' });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByText('Importação concluída');
+    expect(api.confirmIndicatorImport).toHaveBeenCalledTimes(2);
+  });
+
+  it('mantém o bloqueio e o registro incluído quando a persistência falha', async () => {
+    const { getSaved } = await finalReview(1);
+    api.saveIndicatorImportReview.mockRejectedValueOnce(new Error('Falha ao salvar revisão.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registro' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Falha ao salvar revisão.');
+    expect(getSaved().draft.items[0].included).toBe(true);
+    expect(screen.getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Ignorar registro' }).disabled).toBe(false);
+  });
+
+  it('continua impedindo confirmar quando todos os incluídos foram ignorados', async () => {
+    await finalReview(1, false);
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registro' }));
+    await screen.findByRole('region', { name: 'Registros ignorados' });
+    expect(card('Incluídos')).toBe('0');
+    expect(screen.getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(true);
+  });
+});
+
 describe.each(['EVENTS', 'RESIDENTS'])('navegação e execução da confirmação final de %s', (type) => {
   async function savedReview(included = true) {
     const base = type === 'EVENTS' ? eventBatch : residentBatch;

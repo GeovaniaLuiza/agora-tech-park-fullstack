@@ -29,6 +29,30 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('dashboard de indicadores oficiais', () => {
+  it('mostra Residentes e Eventos calculados após importar e mantém a regra anual e a origem', async () => {
+    const residentMonthly = [53, 58, 61, 61, 61, 63, 64, 65, 65, 63, 63, 62];
+    const eventMonthly = [0, 0, 0, 0, 0, 0, 235, 0, 0, 0, 0, 0];
+    const imported = [
+      { code: 'EMPRESAS_RESIDENTES', name: 'Nº de Empresas Residentes', value: '62', annual_aggregation: 'LAST_VALUE', consolidation_basis: 'LAST_VALUE', values: residentMonthly },
+      { code: 'EVENTOS_REALIZADOS', name: 'Nº de Eventos Realizados', value: '235', annual_aggregation: 'SUM', consolidation_basis: 'SUM', values: eventMonthly },
+    ].map(({ values, ...item }) => ({ ...item, source: 'SYSTEM_CALCULATION', unit: 'UNIDADE', value_type: 'INTEGER',
+      monthly_values: values.map((value, index) => ({ month: index + 1, value: String(value), source: 'SYSTEM_CALCULATION' })) }));
+    api.getIndicators.mockImplementation(async ({ year }) => year === '2026' ? imported : []);
+    mount();
+    await screen.findAllByRole('article', { name: imported[0].name });
+    const importedCard = name => screen.getAllByRole('article', { name }).at(-1);
+    expect(within(importedCard(imported[0].name)).getByText('62', { selector: 'strong' })).toBeTruthy();
+    expect(within(importedCard(imported[1].name)).getByText('235', { selector: 'strong' })).toBeTruthy();
+    expect(within(importedCard(imported[0].name)).getByText('UNIDADE · Cálculo do sistema')).toBeTruthy();
+    expect(within(importedCard(imported[0].name)).queryByText(/Consolidado anual da planilha/)).toBeNull();
+    expect(api.getIndicators).toHaveBeenCalledWith({ centerId: 'a', year: '2026', ...filters });
+    fireEvent.change(screen.getByLabelText('Período'), { target: { value: '7' } });
+    expect(within(importedCard(imported[0].name)).getByText('64', { selector: 'strong' })).toBeTruthy();
+    expect(within(importedCard(imported[1].name)).getByText('235', { selector: 'strong' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Período'), { target: { value: '12' } });
+    expect(within(importedCard(imported[0].name)).getByText('62', { selector: 'strong' })).toBeTruthy();
+    expect(within(importedCard(imported[1].name)).getByText('0', { selector: 'strong' })).toBeTruthy();
+  });
   it('exibe erro e encerra o carregamento quando a consulta rejeita sem mensagem', async () => {
     api.getIndicators.mockRejectedValue(null);
     mount();

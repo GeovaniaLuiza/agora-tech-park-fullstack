@@ -11,7 +11,10 @@ export async function summary({ period = null, year: requestedYear = null, name 
          ORDER BY CASE v.source_type WHEN 'FORM_RESPONSE' THEN 1 WHEN 'SYSTEM_CALCULATION' THEN 2 WHEN 'MANUAL_ENTRY' THEN 3 ELSE 4 END,v.updated_at DESC) AS rn
        FROM indicator_values v WHERE v.year=$1 AND v.deleted_at IS NULL
          AND v.innovation_center_id=COALESCE($6::uuid,(SELECT id FROM innovation_centers WHERE active ORDER BY name LIMIT 1))
-         AND (($5='LIVE' AND v.source_type IN ('FORM_RESPONSE','SYSTEM_CALCULATION','MANUAL_ENTRY','SPREADSHEET_IMPORT')) OR v.source_type=$5)
+         AND (($5='LIVE' AND v.source_type IN ('FORM_RESPONSE','SYSTEM_CALCULATION','MANUAL_ENTRY','SPREADSHEET_IMPORT')) OR v.source_type=$5
+           OR ($7::boolean AND v.source_type='SYSTEM_CALCULATION' AND v.indicator_id IN (
+             SELECT id FROM indicator_definitions WHERE code IN ('EMPRESAS_RESIDENTES','EVENTOS_REALIZADOS')
+           )))
          AND ($2::int IS NULL OR v.month=$2)
      ), selected AS (SELECT * FROM ranked WHERE rn=1), effective AS (
        SELECT v.* FROM selected v JOIN indicator_definitions definition ON definition.id=v.indicator_id
@@ -26,7 +29,8 @@ export async function summary({ period = null, year: requestedYear = null, name 
      SELECT d.id,d.code,d.name,d.description,d.category,d.unit,d.value_type,d.periodicity,d.annual_aggregation,d.aggregation_type,
        (SELECT center.name FROM innovation_centers center WHERE center.id=COALESCE($6::uuid,
          (SELECT id FROM innovation_centers WHERE active ORDER BY name LIMIT 1))) AS center_name,
-       CASE WHEN $7::boolean AND $2::int IS NULL AND COUNT(v.month)=0 AND COUNT(v.id)>0 THEN 'RECORDED_ANNUAL'
+       CASE WHEN $7::boolean AND $2::int IS NULL AND COUNT(v.month)=0 AND COUNT(v.id)>0
+         AND BOOL_AND(v.source_type='SPREADSHEET_IMPORT') THEN 'RECORDED_ANNUAL'
          ELSE COALESCE(d.annual_aggregation,d.aggregation_type) END AS consolidation_basis,
        CASE WHEN $2::int IS NOT NULL THEN MAX(v.numeric_value)
          WHEN COUNT(v.month)=0 THEN MAX(v.numeric_value)

@@ -1,4 +1,7 @@
 import { MAX_IMPORT_BYTES } from '../config/indicatorImport.js';
+import { residentHomologationWorkbookFixture, eventHomologationWorkbookFixture } from '../../../backend/tests/fixtures/indicator-import-workbooks.js';
+import { parseResidentWorkbook, summarizeResidents } from '../../../backend/src/services/residentImportParser.js';
+import { parseEventWorkbook, summarizeEvents } from '../../../backend/src/services/eventImportParser.js';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -30,6 +33,139 @@ const openReview = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Preview' }));
   fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
 };
+
+it('Eventos.xlsx real: inclui 192 válidos e 43 avisos, salva, retoma e confirma os 235', async () => {
+  const parsed = await parseEventWorkbook(await eventHomologationWorkbookFixture());
+  let saved = { ...eventBatch, year: 2026, fileName: 'Eventos.xlsx', summary: parsed.summary, draft: { items: parsed.items } };
+  api.getIndicatorImportDraft.mockImplementation(async () => structuredClone(saved));
+  api.saveIndicatorImportReview.mockImplementation(async (_id, items) => {
+    saved = { ...saved, summary: summarizeEvents(items, 2026), draft: { items: structuredClone(items) } };
+    return structuredClone(saved);
+  });
+  api.confirmIndicatorImport.mockResolvedValue({ ...saved, status: 'IMPORTED', summary: { processed: 235, indicatorsUpdated: true } });
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const card = label => screen.getByText(label, { selector: 'small' }).closest('article').querySelector('strong').textContent;
+  const renderPage = () => render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+  const view = renderPage();
+  await screen.findByRole('button', { name: 'Salvar revisão' });
+  for (const [label, value] of [['Registros encontrados', 235], ['Válidos', 192], ['Com aviso', 43], ['Revisão necessária', 0], ['Ignorados', 0], ['Incluídos', 0]]) expect(card(label)).toBe(String(value));
+  const decisions = within(screen.getByRole('region', { name: 'Decisões da revisão' }));
+  expect(decisions.getByRole('button', { name: 'Ignorar registros incorretos' }).disabled).toBe(true);
+  expect(screen.getByRole('button', { name: 'Ir para confirmação' }).disabled).toBe(true);
+  fireEvent.click(decisions.getByRole('button', { name: 'Incluir elegíveis' }));
+  expect(card('Incluídos')).toBe('235');
+  expect(card('Com aviso')).toBe('43');
+  expect(card('Inválidos ainda incluídos / pendentes')).toBe('0');
+  expect(screen.getByRole('button', { name: 'Ir para confirmação' }).disabled).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+  await screen.findByText('Revisão salva com sucesso.');
+  expect(saved.draft.items.filter(item => item.included)).toHaveLength(235);
+  expect(saved.draft.items.filter(item => item.validationStatus === 'WARNING')).toHaveLength(43);
+  view.unmount();
+  renderPage();
+  await screen.findByRole('button', { name: 'Salvar revisão' });
+  expect(card('Incluídos')).toBe('235');
+  expect(card('Com aviso')).toBe('43');
+  fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
+  expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+  api.confirmIndicatorImport.mockResolvedValueOnce({ ...saved, status: 'IMPORTED', summary: { ...saved.summary, processed: 235, indicatorsUpdated: true } });
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+  await screen.findByText('Importação concluída');
+  expect(api.confirmIndicatorImport).toHaveBeenCalledExactlyOnceWith(saved.id);
+  expect(screen.getByText('Importação confirmada e indicadores atualizados.')).toBeTruthy();
+  expect(screen.getByText('Indicadores atualizados', { selector: 'small' }).closest('li').classList.contains('active')).toBe(true);
+}, 15000);
+
+it.each(['EVENTS', 'RESIDENTS'])('Incluir elegíveis preserva aviso não bloqueante e não inclui erro obrigatório em %s', async type => {
+  const base = type === 'EVENTS' ? eventItems[0] : residentItems[0];
+  const items = [
+    { ...base, id: 'warning', included: false, reviewStatus: 'PENDING', validationStatus: 'WARNING', issues: [{ message: 'Aviso não bloqueante' }] },
+    { ...base, id: 'error', included: false, reviewStatus: 'PENDING', validationStatus: 'REVIEW_REQUIRED', issues: [{ message: 'Erro obrigatório' }] },
+  ];
+  const batch = { ...(type === 'EVENTS' ? eventBatch : residentBatch), draft: { items } };
+  api.getIndicatorImportDraft.mockResolvedValue(batch);
+  api.saveIndicatorImportReview.mockImplementation(async (_id, reviewed) => ({ ...batch, draft: { items: reviewed } }));
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Incluir elegíveis' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+  await screen.findByText('Revisão salva com sucesso.');
+  expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, [
+    expect.objectContaining({ id: 'warning', included: true, validationStatus: 'WARNING', issues: items[0].issues }),
+    items[1],
+  ]);
+});
+
+it.each(['EVENTS', 'RESIDENTS'])('Ignorar registro usa o ID exato quando dois registros têm o mesmo nome em %s', async type => {
+  const base = type === 'EVENTS' ? eventItems[0] : residentItems[0];
+  const items = [3, 4].map(row => ({ ...base, id: `exact-${row}`, sourceRows: [row], name: 'Nome repetido',
+    included: true, validationStatus: 'VALID', reviewStatus: 'VALIDATED', issues: [] }));
+  const batch = { ...(type === 'EVENTS' ? eventBatch : residentBatch), draft: { items } };
+  api.getIndicatorImportDraft.mockResolvedValue(batch);
+  api.saveIndicatorImportReview.mockImplementation(async (_id, reviewed) => ({ ...batch, draft: { items: reviewed } }));
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+  await screen.findByRole('button', { name: 'Salvar revisão' });
+  const rows = screen.getAllByText('Nome repetido', { selector: 'strong' }).map(element => element.closest('tr'));
+  fireEvent.click(within(rows[1]).getByRole('button', { name: 'Ignorar registro' }));
+  expect(within(rows[1]).getByText('Ignorado')).toBeTruthy();
+  expect(within(rows[0]).getByText('Válido')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+  await screen.findByText('Revisão salva com sucesso.');
+  expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, [items[0],
+    { ...items[1], included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED' }]);
+});
+
+it('Clientes.xlsx real: salva e retoma a revisão, ignora 20 inválidos e conclui com 65 válidos incluídos', async () => {
+  const parsed = await parseResidentWorkbook(await residentHomologationWorkbookFixture());
+  let saved = { ...residentBatch, year: 2026, fileName: 'Clientes.xlsx', summary: parsed.summary, draft: { items: parsed.items } };
+  api.getIndicatorImportDraft.mockImplementation(async () => structuredClone(saved));
+  api.saveIndicatorImportReview.mockImplementation(async (_id, items) => {
+    saved = { ...saved, status: 'VALIDATED', summary: summarizeResidents(items, 2026), draft: { items: structuredClone(items) } };
+    return structuredClone(saved);
+  });
+  api.confirmIndicatorImport.mockImplementation(async () => ({ ...saved, status: 'IMPORTED', summary: { ...saved.summary, processed: 65, indicatorsUpdated: true } }));
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const card = (label) => screen.getByText(label, { selector: 'small' }).closest('article').querySelector('strong').textContent;
+  const renderPage = () => render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+  const view = renderPage();
+  await screen.findByRole('button', { name: 'Salvar revisão' });
+  for (const [label, count] of [['Linhas lidas', 163], ['Empresas identificadas', 85], ['CNPJs únicos', 72], ['Ocupações', 121], ['Válidos', 65], ['Avisos', 0], ['Incluídos', 85], ['Ignorados', 42], ['Inválidos ainda incluídos / pendentes', 20]]) expect(card(label)).toBe(String(count));
+  expect(screen.getByRole('button', { name: 'Ir para confirmação' }).disabled).toBe(true);
+  expect(screen.getByText(/A confirmação está bloqueada por 20 registros inválidos/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+  await screen.findByText('Revisão salva com sucesso.');
+  expect(screen.getByRole('button', { name: 'Ir para confirmação' }).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros incorretos' }));
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Ignorar 20 registros inválidos?' })).getByRole('button', { name: 'Ignorar registros' }));
+  expect(card('Incluídos')).toBe('65');
+  expect(card('Ignorados')).toBe('62');
+  expect(card('Inválidos ainda incluídos / pendentes')).toBe('0');
+  expect(screen.queryByText(/A confirmação está bloqueada/)).toBeNull();
+  expect(screen.getByRole('button', { name: 'Ir para confirmação' }).disabled).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+  await screen.findByText('Revisão salva com sucesso.');
+  expect(saved.draft.items).toHaveLength(127);
+  expect(saved.draft.items.filter((item) => item.included)).toEqual(parsed.items.filter((item) => item.validationStatus === 'VALID'));
+  expect(saved.draft.items.filter((item) => !item.included && !item.ignored && item.reviewStatus !== 'EXCLUDED')).toEqual([]);
+  for (const [label, count] of [['Linhas lidas', 163], ['Empresas identificadas', 85], ['CNPJs únicos', 72], ['Ocupações', 121]]) expect(card(label)).toBe(String(count));
+  expect(saved.draft.items.filter(item => item.issues.length)).toEqual(parsed.items.filter(item => item.issues.length).map(item => ({ ...item, included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED' })));
+  view.unmount();
+  renderPage();
+  await screen.findByRole('button', { name: 'Salvar revisão' });
+  expect(card('Incluídos')).toBe('65');
+  expect(card('Ignorados')).toBe('62');
+  for (const [label, count] of [['Linhas lidas', 163], ['Empresas identificadas', 85], ['CNPJs únicos', 72], ['Ocupações', 121]]) expect(card(label)).toBe(String(count));
+  expect(screen.getByRole('button', { name: 'Ir para confirmação' }).disabled).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
+  expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
+  expect(screen.getByText(/65 empresas serão importadas\/atualizadas · 101 ocupações serão vinculadas · 62 registros serão ignorados/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+  await screen.findByText('Importação concluída');
+  expect(api.confirmIndicatorImport).toHaveBeenCalledExactlyOnceWith(saved.id);
+  expect(screen.getByText('Importação confirmada e indicadores atualizados.')).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Ver indicadores de residentes' }).getAttribute('href')).toBe('/indicadores/residentes?centerId=center-1&year=2026');
+}, 15000);
 
 describe.each(['EVENTS', 'RESIDENTS'])('ignorar bloqueantes na etapa 5 de %s', (type) => {
   const card = (label) => screen.getByText(label, { selector: 'small' }).closest('article').querySelector('strong').textContent;
@@ -110,7 +246,7 @@ describe.each(['EVENTS', 'RESIDENTS'])('ignorar bloqueantes na etapa 5 de %s', (
     const region = () => screen.getByRole('region', { name: 'Confirmação final da importação' });
     expect(within(region()).getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(true);
     expect(card('Inválidos ainda incluídos / pendentes')).toBe(String(count));
-    if (count === 1) expect(within(region()).queryByRole('button', { name: 'Ignorar registros inválidos' })).toBeNull();
+    if (count === 1) expect(within(region()).queryByRole('button', { name: 'Ignorar registros incorretos' })).toBeNull();
     if (action === 'individual') {
       for (let index = count - 1; index >= 0; index--) {
         const group = within(region()).getByRole('group', { name: `Registro da linha ${index + 3}` });
@@ -125,7 +261,7 @@ describe.each(['EVENTS', 'RESIDENTS'])('ignorar bloqueantes na etapa 5 de %s', (
         }
       }
     } else {
-      fireEvent.click(within(region()).getByRole('button', { name: 'Ignorar registros inválidos' }));
+      fireEvent.click(within(region()).getByRole('button', { name: 'Ignorar registros incorretos' }));
       fireEvent.click(within(screen.getByRole('dialog', { name: 'Ignorar 2 registros inválidos?' })).getByRole('button', { name: 'Ignorar registros' }));
     }
     await waitFor(() => expect(within(region()).getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(false));
@@ -1237,7 +1373,7 @@ describe('decisões de ignorar persistidas na revisão', () => {
     if (action === 'individual') {
       fireEvent.click(within(screen.getByText('Registro 0', { selector: 'strong' }).closest('tr')).getByRole('button', { name: 'Ignorar registro' }));
     } else {
-      fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros inválidos' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros incorretos' }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ignorar registros' }));
     }
     expect(card('Incluídos')).toBe('84');
@@ -1282,7 +1418,7 @@ describe('ignorar registros incompletos em lote', () => {
   it('mantém o foco no diálogo e cancela por Escape sem alterar registros', async () => {
     const item = { ...eventItems[0], included: true, validationStatus: 'REVIEW_REQUIRED', reviewStatus: 'PENDING' };
     await load('EVENTS', [item]);
-    const trigger = screen.getByRole('button', { name: 'Ignorar registros inválidos' });
+    const trigger = screen.getByRole('button', { name: 'Ignorar registros incorretos' });
     trigger.focus();
     fireEvent.click(trigger);
     const dialog = screen.getByRole('dialog');
@@ -1322,7 +1458,7 @@ describe('ignorar registros incompletos em lote', () => {
     const batch = await load(type, items);
     expect(row('Registro 0')).toBeTruthy();
     expect(screen.queryByText('Registro 21', { selector: 'strong' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros inválidos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros incorretos' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ignorar registros' }));
     expect(card('Revisão necessária')).toBe('0');
     expect(card('Ignorados')).toBe('2');
@@ -1366,7 +1502,7 @@ describe('ignorar registros incompletos em lote', () => {
   it.each(['EVENTS', 'RESIDENTS'])('exibe botão desabilitado sem bloqueantes em %s, mesmo com avisos', async (type) => {
     const base = type === 'RESIDENTS' ? residentItems[0] : eventItems[0];
     await load(type, [{ ...base, included: true, validationStatus: 'WARNING', issues: [{ message: 'Aviso não bloqueante' }] }]);
-    expect(screen.getByRole('button', { name: 'Ignorar registros inválidos' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Ignorar registros incorretos' }).disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Ignorar registro' })).toBeTruthy();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -1378,14 +1514,14 @@ describe('ignorar registros incompletos em lote', () => {
     const batch = await load(type, items);
     expect(card(type === 'EVENTS' ? 'Registros encontrados' : 'Linhas lidas')).toBe('5');
     expect(card('Revisão necessária')).toBe('2');
-    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros inválidos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros incorretos' }));
     const dialog = screen.getByRole('dialog', { name: 'Ignorar 2 registros inválidos?' });
     expect(within(dialog).getByText('Esses registros não serão considerados na atualização dos indicadores. Eles poderão ser restaurados antes da confirmação da importação.')).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(card('Revisão necessária')).toBe('2');
     // The action covers the whole draft, including records hidden by filters.
     fireEvent.change(screen.getByPlaceholderText(type === 'EVENTS' ? 'Buscar evento' : 'Buscar empresa'), { target: { value: 'Registro válido' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros inválidos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros incorretos' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ignorar registros' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(card('Revisão necessária')).toBe('0');
@@ -1398,7 +1534,7 @@ describe('ignorar registros incompletos em lote', () => {
       expect(card('CNPJs únicos')).toBe('3');
       expect(card('Ocupações')).toBe('5');
     }
-    expect(screen.getByRole('button', { name: 'Ignorar registros inválidos' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Ignorar registros incorretos' }).disabled).toBe(true);
     fireEvent.change(screen.getByPlaceholderText(type === 'EVENTS' ? 'Buscar evento' : 'Buscar empresa'), { target: { value: '' } });
     expect(within(row('Incompleto 3')).getByText('Ignorado')).toBeTruthy();
     expect(within(row('Incompleto 4')).getByText('Ignorado')).toBeTruthy();
@@ -1416,7 +1552,7 @@ describe('ignorar registros incompletos em lote', () => {
       expect.objectContaining({ id: 'warning', included: true, reviewStatus: 'WITH_WARNINGS', validationStatus: 'WARNING' }),
       expect.objectContaining({ id: 'valid', included: true, validationStatus: 'VALID' }),
     ]));
-    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros inválidos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ignorar registros incorretos' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ignorar registros' }));
     expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));

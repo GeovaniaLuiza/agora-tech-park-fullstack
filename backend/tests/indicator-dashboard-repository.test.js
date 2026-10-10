@@ -23,6 +23,9 @@ describe('consulta do dashboard oficial de indicadores', () => {
     expect(sql).toContain('$7::boolean OR');
     expect(sql).toContain('annual.month IS NULL');
     expect(sql).toContain('monthly.month IS NOT NULL');
+    expect(sql).toContain("$7::boolean AND v.source_type='SYSTEM_CALCULATION'");
+    expect(sql).toContain("code IN ('EMPRESAS_RESIDENTES','EVENTOS_REALIZADOS')");
+    expect(sql).toContain("BOOL_AND(v.source_type='SPREADSHEET_IMPORT')");
   });
 
   it('exporta a seleção por códigos parametrizados e mantém o mês solicitado', async () => {

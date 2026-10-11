@@ -1,7 +1,7 @@
 import { MAX_IMPORT_BYTES } from '../config/indicatorImport.js';
-import { residentHomologationWorkbookFixture, eventHomologationWorkbookFixture } from '../../../backend/tests/fixtures/indicator-import-workbooks.js';
-import { parseResidentWorkbook, summarizeResidents } from '../../../backend/src/services/residentImportParser.js';
-import { parseEventWorkbook, summarizeEvents } from '../../../backend/src/services/eventImportParser.js';
+import residentImportDraft from '../test/fixtures/resident-import-draft.json';
+import eventImportDraft from '../test/fixtures/event-import-draft.json';
+
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -34,12 +34,14 @@ const openReview = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
 };
 
-it('Eventos.xlsx real: inclui 192 válidos e 43 avisos, salva, retoma e confirma os 235', async () => {
-  const parsed = await parseEventWorkbook(await eventHomologationWorkbookFixture());
+// Static anonymized API responses; XLSX parsing is covered by backend tests.
+// Save mocks persist decisions; the page computes review counts from the items.
+it('Revisão de Eventos.xlsx: inclui 192 válidos e 43 avisos, salva, retoma e confirma os 235', async () => {
+  const parsed = structuredClone(eventImportDraft);
   let saved = { ...eventBatch, year: 2026, fileName: 'Eventos.xlsx', summary: parsed.summary, draft: { items: parsed.items } };
   api.getIndicatorImportDraft.mockImplementation(async () => structuredClone(saved));
   api.saveIndicatorImportReview.mockImplementation(async (_id, items) => {
-    saved = { ...saved, summary: summarizeEvents(items, 2026), draft: { items: structuredClone(items) } };
+    saved = { ...saved, draft: { items: structuredClone(items) } };
     return structuredClone(saved);
   });
   api.confirmIndicatorImport.mockResolvedValue({ ...saved, status: 'IMPORTED', summary: { processed: 235, indicatorsUpdated: true } });
@@ -116,12 +118,12 @@ it.each(['EVENTS', 'RESIDENTS'])('Ignorar registro usa o ID exato quando dois re
     { ...items[1], included: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED' }]);
 });
 
-it('Clientes.xlsx real: salva e retoma a revisão, ignora 20 inválidos e conclui com 65 válidos incluídos', async () => {
-  const parsed = await parseResidentWorkbook(await residentHomologationWorkbookFixture());
+it('Revisão de Clientes.xlsx: salva e retoma a revisão, ignora 20 inválidos e conclui com 65 válidos incluídos', async () => {
+  const parsed = structuredClone(residentImportDraft);
   let saved = { ...residentBatch, year: 2026, fileName: 'Clientes.xlsx', summary: parsed.summary, draft: { items: parsed.items } };
   api.getIndicatorImportDraft.mockImplementation(async () => structuredClone(saved));
   api.saveIndicatorImportReview.mockImplementation(async (_id, items) => {
-    saved = { ...saved, status: 'VALIDATED', summary: summarizeResidents(items, 2026), draft: { items: structuredClone(items) } };
+    saved = { ...saved, status: 'VALIDATED', draft: { items: structuredClone(items) } };
     return structuredClone(saved);
   });
   api.confirmIndicatorImport.mockImplementation(async () => ({ ...saved, status: 'IMPORTED', summary: { ...saved.summary, processed: 65, indicatorsUpdated: true } }));

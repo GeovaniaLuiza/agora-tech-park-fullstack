@@ -20,7 +20,7 @@ function IndicatorCard({ item, month, year, chart = false }) {
     <strong className={`official-kpi-value ${!hasValue(value) ? 'missing' : ''}`}>{displayValue(item, value)}</strong>
     <p>{month ? `${months[Number(month) - 1]} de ${year}` : `${year} · ${annualRule(item)}`}</p>
     {chart && <MonthlyIndicatorChart item={item} month={month} />}
-    <footer><span>{item.unit} · Planilha oficial</span><span>{updated ? `Atualizado em ${new Date(updated).toLocaleDateString('pt-BR')}` : 'Sem atualização no período'}</span></footer>
+    <footer><span>{item.unit} · {(monthly?.source || item.source) === 'SYSTEM_CALCULATION' ? 'Cálculo do sistema' : 'Planilha oficial'}</span><span>{updated ? `Atualizado em ${new Date(updated).toLocaleDateString('pt-BR')}` : 'Sem atualização no período'}</span></footer>
   </article>;
 }
 

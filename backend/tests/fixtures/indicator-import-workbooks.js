@@ -1,7 +1,29 @@
 // Synthetic fixture: document numbers are deliberately invalid.
 import ExcelJS from 'exceljs';
+import homologationRows from './resident-homologation-rows.json' with { type: 'json' };
+import eventHomologationRows from './event-homologation-rows.json' with { type: 'json' };
+import { EVENT_HEADERS, RESIDENT_HEADERS } from '../../src/domain/indicatorImportCatalog.js';
 
 const asBuffer = async (workbook) => Buffer.from(await workbook.xlsx.writeBuffer());
+
+// Anonymized from Eventos.xlsx, preserving dates and possible duplicate groups.
+export async function eventHomologationWorkbookFixture() {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Eventos');
+  sheet.addRow(EVENT_HEADERS);
+  eventHomologationRows.forEach(row => sheet.addRow(row));
+  return asBuffer(workbook);
+}
+
+// Anonymized from Clientes.xlsx: same grouping, blocks, periods and invalid fields.
+// Names and CNPJs are synthetic; no local untracked workbook is required.
+export async function residentHomologationWorkbookFixture() {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Clientes');
+  sheet.getRow(2).values = RESIDENT_HEADERS;
+  homologationRows.forEach((row, index) => { sheet.getRow(index + 3).values = row; });
+  return asBuffer(workbook);
+}
 
 export async function eventWorkbookFixture() {
   const workbook = new ExcelJS.Workbook();

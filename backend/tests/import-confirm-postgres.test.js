@@ -158,6 +158,18 @@ describe('Confirmar → fonte oficial → Indicadores e Dashboard (PostgreSQL re
     const detailed = await http('get', '/api/indicator-imports/EVENTS/indicators').query({ centerId, year: 2026 });
     expect(detailed.body).toMatchObject({ monthly, total: 235 });
     expect(detailed.body.records).toHaveLength(235);
+    const eventSnapshot = (await setup.query("SELECT * FROM indicator_records WHERE record_type='EVENT' ORDER BY id")).rows;
+    const annualValueSnapshot = (await setup.query("SELECT v.* FROM indicator_values v JOIN indicator_definitions d ON d.id=v.indicator_id WHERE d.code='EVENTOS_REALIZADOS' ORDER BY v.id")).rows;
+    for (const month of [1, 7, 1, 7]) {
+      const filtered = await http('get', '/api/indicator-imports/EVENTS/indicators').query({ centerId, year: 2026, month });
+      expect(filtered.status, JSON.stringify(filtered.body)).toBe(200);
+      expect(filtered.body).toMatchObject({ month, monthly, total: 235 });
+      expect(filtered.body.records).toHaveLength(month === 1 ? 0 : 235);
+      expect(new Set(filtered.body.records.map(record => record.id)).size).toBe(filtered.body.records.length);
+      if (month === 7) expect(filtered.body.records).toEqual(detailed.body.records);
+    }
+    expect((await setup.query("SELECT * FROM indicator_records WHERE record_type='EVENT' ORDER BY id")).rows).toEqual(eventSnapshot);
+    expect((await setup.query("SELECT v.* FROM indicator_values v JOIN indicator_definitions d ON d.id=v.indicator_id WHERE d.code='EVENTOS_REALIZADOS' ORDER BY v.id")).rows).toEqual(annualValueSnapshot);
     const history = await http('get', '/api/indicators/history');
     expect(history.body).toContain('2026');
     const csv = await http('get', '/api/indicators/export/csv').query({ centerId, year: 2026, sourceType: 'SPREADSHEET_IMPORT', officialDashboard: 'true', codes: 'EMPRESAS_RESIDENTES,EVENTOS_REALIZADOS' });

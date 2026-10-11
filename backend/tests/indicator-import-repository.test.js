@@ -17,7 +17,18 @@ describe('confirmação com revisão bloqueada na transação', () => {
     expect(sql).toContain("b.status='IMPORTED'");
     expect(sql).toContain('r.active AND r.deleted_at IS NULL');
     expect(sql).toContain('EXTRACT(YEAR FROM r.event_at)=$2::int');
-    expect(params).toEqual(['center-1', 2027, 'EVENTS']);
+    expect(params).toEqual(['center-1', 2027, 'EVENTS', null]);
+  });
+  it.each([1, 7, 12])('aplica o mes %i ao detalhamento sem alterar a consulta anual', async (month) => {
+    mocks.read.mockResolvedValue({ rows: [] });
+    await confirmedRecords('center-1', 2026, 'EVENTS', month);
+    const [sql, params] = mocks.read.mock.calls[0];
+    expect(sql).toContain('r.innovation_center_id=$1');
+    expect(sql).toContain('EXTRACT(YEAR FROM r.event_at)=$2::int');
+    expect(sql).toContain("EXTRACT(MONTH FROM r.event_at AT TIME ZONE 'UTC')=$4::int");
+    expect(sql).toContain('$4::int IS NULL');
+    expect(params).toEqual(['center-1', 2026, 'EVENTS', month]);
+    expect(mocks.connect).not.toHaveBeenCalled();
   });
   it('reconfirmar o batch não grava registros nem valores', async () => {
     mocks.query.mockResolvedValue({ rows: [] })

@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiRequest, confirmIndicatorImport, publishForm, tokenStore } from './api';
+import { apiRequest, confirmIndicatorImport, getConfirmedImportIndicators, publishForm, tokenStore } from './api';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL?.trim() || 'http://localhost:3002/api';
+describe('consulta de eventos confirmados', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it.each(['1', '7'])('envia centerId/year/month=%s sem converter o mes para base zero', async (month) => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify({ records: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    await getConfirmedImportIndicators('EVENTS', { centerId: 'center-1', year: '2026', month });
+    expect(fetchMock).toHaveBeenCalledWith(`${apiBaseUrl}/indicator-imports/EVENTS/indicators?centerId=center-1&year=2026&month=${month}`, expect.any(Object));
+  });
+});
 describe('requisição de confirmação de importação', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
   afterEach(() => vi.unstubAllGlobals());

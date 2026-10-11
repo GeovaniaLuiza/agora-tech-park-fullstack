@@ -21,7 +21,10 @@ export async function confirmedIndicators({ type, centerId, year: inputYear, mon
   const monthly = Array.from({ length: 12 }, (_, index) => values.find((row) => row.month === index + 1)?.numericValue ?? 0);
   const bounds = monthBounds(year, month || 1);
   const annualRecords = type === 'RESIDENTS' ? records.filter((record) => isStockActive(record, `${year}-01-01`, `${year}-12-31`)) : records;
-  const detailed = annualRecords.filter((record) => !month || (type === 'EVENTS'
+  // Keep the annual calculation above independent of the selected detail period.
+  const detailRecords = type === 'EVENTS' && month !== null
+    ? await imports.confirmedRecords(centerId, year, type, month) : annualRecords;
+  const detailed = detailRecords.filter((record) => !month || (type === 'EVENTS'
     ? new Date(record.event_at).getUTCMonth() + 1 === month
     : isStockActive(record, bounds.start, bounds.end)));
   return { center, year, month, code: codes[type], monthly, total: values.find((row) => row.month === null)?.numericValue ?? 0,

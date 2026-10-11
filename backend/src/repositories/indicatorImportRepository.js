@@ -136,7 +136,7 @@ export async function recordsForOfficialWorkbook(centerId, year) {
   return rows;
 }
 
-export async function confirmedRecords(centerId, year, importType) {
+export async function confirmedRecords(centerId, year, importType, month = null) {
   const { rows } = await query(
     `SELECT r.* FROM indicator_records r
      JOIN indicator_import_batches b ON b.id=r.import_batch_id
@@ -146,8 +146,9 @@ export async function confirmedRecords(centerId, year, importType) {
          OR (r.record_type='RESIDENT_COMPANY'
            AND (r.start_date IS NULL OR r.start_date<=make_date($2::int,12,31))
            AND (r.end_date IS NULL OR r.end_date>=make_date($2::int,1,1))))
+       AND ($4::int IS NULL OR (r.record_type='EVENT' AND EXTRACT(MONTH FROM r.event_at AT TIME ZONE 'UTC')=$4::int))
      ORDER BY COALESCE(r.event_at,r.start_date),r.name,r.id`,
-    [centerId, year, importType],
+    [centerId, year, importType, month],
   );
   return rows;
 }

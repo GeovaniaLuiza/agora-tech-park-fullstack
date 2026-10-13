@@ -92,11 +92,17 @@ function reviewedEvents(original, submitted) {
     const reviewed = { ...source, name: text(item.name), location: text(item.location), startAt: parseDateValue(item.startAt)?.toISOString() || null,
       endAt: parseDateValue(item.endAt)?.toISOString() || null, participants: parseNumberValue(item.participants, { integer: true }) ?? (cleanText(item.participants) || null),
       theme: text(item.theme, 160), mode, subtype, participatingCompanies: parseNumberValue(item.participatingCompanies, { integer: true }) ?? (cleanText(item.participatingCompanies) || null),
-      included: Boolean(item.included), reviewStatus: item.included ? 'VALIDATED' : item.reviewStatus === 'EXCLUDED' ? 'EXCLUDED' : 'PENDING' };
+      included: Boolean(item.included) && !source.ignored, reviewStatus: source.ignored ? 'EXCLUDED' : item.included ? 'VALIDATED' : item.reviewStatus === 'EXCLUDED' ? 'EXCLUDED' : 'PENDING' };
+    if (source.sourceFormat === 'RESERVATIONS') {
+      reviewed.schedule = text(item.schedule ?? source.schedule, 100).replace(/\s*-\s*/g, ' - ');
+      reviewed.endDateRaw = item.endDateRaw === undefined ? source.endDateRaw : text(item.endDateRaw, 100);
+      reviewed.endAt = parseDateValue(reviewed.endDateRaw)?.toISOString() || null;
+      reviewed.manuallyCorrected = source.manuallyCorrected || ['schedule', 'endDateRaw'].some((field) => cleanText(source[field]) !== cleanText(reviewed[field]));
+    }
     reviewed.issues = validateEvent(reviewed);
-    reviewed.duplicateKey = reviewed.startAt ? `${reviewed.startAt.slice(0, 10)}|${normalizedKey(reviewed.name)}` : `row:${source.sourceRows[0]}`;
+    reviewed.duplicateKey = source.sourceFormat === 'RESERVATIONS' ? source.duplicateKey : reviewed.startAt ? `${reviewed.startAt.slice(0, 10)}|${normalizedKey(reviewed.name)}` : `row:${source.sourceRows[0]}`;
     reviewed.validationStatus = reviewed.reviewStatus === 'EXCLUDED' ? 'IGNORED' : reviewed.issues.length ? 'REVIEW_REQUIRED' : reviewed.duplicateGroup ? 'WARNING' : 'VALID';
-    reviewed.manuallyCorrected = source.manuallyCorrected || ['name', 'location', 'startAt', 'participants', 'theme', 'mode', 'subtype', 'participatingCompanies'].some((field) => cleanText(source[field]) !== cleanText(reviewed[field]));
+    reviewed.manuallyCorrected = reviewed.manuallyCorrected || source.manuallyCorrected || ['name', 'location', 'startAt', 'participants', 'theme', 'mode', 'subtype', 'participatingCompanies'].some((field) => cleanText(source[field]) !== cleanText(reviewed[field]));
     return reviewed;
   });
 }
@@ -154,6 +160,7 @@ export async function groupEvents(id, { itemIds, participantStrategy = 'MANUAL',
   if (batch.import_type !== IMPORT_TYPES.EVENTS) throw serviceError(422, 'Agrupamento disponível apenas para eventos.', 'INVALID_IMPORT_TYPE');
   if (![IMPORT_STATUS.REVIEW_PENDING, IMPORT_STATUS.WITH_WARNINGS, IMPORT_STATUS.VALIDATED].includes(batch.status)) throw serviceError(409, 'Esta importação não pode mais ser revisada.', 'IMPORT_NOT_EDITABLE');
   const selected = (batch.draft.items || []).filter((item) => itemIds?.includes(item.id));
+  if (selected.some((item) => item.ignored)) throw serviceError(422, 'Reservas não confirmadas não podem ser agrupadas.', 'INVALID_EVENT_GROUP');
   if (selected.length < 2 || new Set(selected.map((item) => item.duplicateKey)).size !== 1) throw serviceError(422, 'Selecione reservas com o mesmo nome e data.', 'INVALID_EVENT_GROUP');
   const known = selected.map((item) => parseNumberValue(item.participants, { integer: true })).filter((value) => value !== null);
   let participantValue = integerOrNull(participants, 'Participantes');
@@ -164,6 +171,10 @@ export async function groupEvents(id, { itemIds, participantStrategy = 'MANUAL',
   const merged = { ...selected[0], id: `event-group-${createHash('sha256').update(sourceRows.join(',')).digest('hex').slice(0, 12)}`,
     sourceRows, location: [...new Set(selected.map((item) => item.location).filter(Boolean))].join(' / '),
     participants: participantValue, participantStrategy, duplicateGroup: null, grouped: true, included: true, reviewStatus: 'VALIDATED' };
+  if (merged.sourceFormat === 'RESERVATIONS') {
+    merged.reservations = selected.flatMap((item) => item.reservations);
+    merged.sourceIds = [...new Set(selected.flatMap((item) => item.sourceIds))];
+  }
   merged.issues = validateEvent(merged);
   merged.validationStatus = merged.issues.length ? 'REVIEW_REQUIRED' : 'VALID';
   const remaining = (batch.draft.items || []).filter((item) => !itemIds.includes(item.id));
@@ -179,7 +190,8 @@ function eventRecord(item) {
     subtype: item.subtype || null, participants: item.participants, participatingCompanies: item.participatingCompanies,
     sector: null, result: null, programName: null, collaboratorsEntry: null, collaboratorsExit: null,
     intellectualProperty: null, fundsRaised: null, annualRevenue: null, internationalRelationships: null,
-    sourceRows: item.sourceRows, extra: { sourceKey: item.id, endAt: item.endAt, grouped: item.grouped, participantStrategy: item.participantStrategy } };
+    sourceRows: item.sourceRows, extra: { sourceKey: item.sourceKey || item.id, endAt: item.endAt, grouped: item.grouped, participantStrategy: item.participantStrategy,
+      ...(item.sourceFormat === 'RESERVATIONS' ? { sourceFormat: item.sourceFormat, sourceIds: item.sourceIds, reservations: item.reservations, schedule: item.schedule } : {}) } };
 }
 function residentRecord(item) {
   const location = [item.location, item.rooms?.length ? `Salas ${item.rooms.join(', ')}` : ''].filter(Boolean).join(' - ');
@@ -209,7 +221,9 @@ export async function confirm(id, user) {
   const summary = batch.import_type === IMPORT_TYPES.EVENTS ? summarizeEvents(batch.draft.items, batch.year) : summarizeResidents(batch.draft.items, batch.year);
   summary.processed = records.length;
   summary.indicatorsUpdated = true;
-  const ignored = batch.import_type === IMPORT_TYPES.RESIDENTS ? summary.excluded : (batch.draft.items || []).length - records.length;
+  const ignored = batch.import_type === IMPORT_TYPES.RESIDENTS ? summary.excluded : batch.sheet_name === 'Exportação'
+    ? batch.draft.items.filter((item) => !included.includes(item)).reduce((count, item) => count + item.sourceRows.length, 0)
+    : (batch.draft.items || []).length - records.length;
   summary.ignored = ignored;
   summary.excluded = ignored;
   const saved = await repository.replaceBatchRecords(batch, records, user.sub, async (client) => {

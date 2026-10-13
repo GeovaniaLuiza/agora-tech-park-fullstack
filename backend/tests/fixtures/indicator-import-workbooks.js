@@ -2,9 +2,19 @@
 import ExcelJS from 'exceljs';
 import homologationRows from './resident-homologation-rows.json' with { type: 'json' };
 import eventHomologationRows from './event-homologation-rows.json' with { type: 'json' };
+import reservationHomologationRows from './reservation-homologation-rows.json' with { type: 'json' };
+import { RESERVATION_HEADERS } from '../../src/services/reservationImportParser.js';
 import { EVENT_HEADERS, RESIDENT_HEADERS } from '../../src/domain/indicatorImportCatalog.js';
 
 const asBuffer = async (workbook) => Buffer.from(await workbook.xlsx.writeBuffer());
+
+export async function reservationWorkbookFixture(rows = reservationHomologationRows, headers = RESERVATION_HEADERS) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Exportação');
+  sheet.addRow(headers);
+  rows.forEach((row) => sheet.addRow(row));
+  return asBuffer(workbook);
+}
 
 // Anonymized from Eventos.xlsx, preserving dates and possible duplicate groups.
 export async function eventHomologationWorkbookFixture() {

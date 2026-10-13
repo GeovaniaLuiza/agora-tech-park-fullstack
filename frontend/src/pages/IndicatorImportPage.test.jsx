@@ -34,6 +34,40 @@ const openReview = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
 };
 
+it('Exportação detectada preserva contagens de linhas/salas e ignora pré-reserva ao salvar, retomar e confirmar', async () => {
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const valid = { ...eventItems[0], id: 'reservation-valid', sourceRows: [2, 3], duplicateGroup: null, validationStatus: 'VALID', issues: [], grouped: true,
+    reservations: [{ sourceId: 'sintetico-1', status: 'Confirmada', company: 'Empresa sintética', responsible: 'Pessoa sintética', schedule: '08:00 - 12:00' }] };
+  const ignored = { ...valid, id: 'reservation-ignored', sourceRows: [4], included: false, ignored: true, possibleEvent: false, reviewStatus: 'EXCLUDED', validationStatus: 'IGNORED', issues: [{ message: 'Reserva não confirmada' }] };
+  let saved = { ...eventBatch, sheetName: 'Exportação', fileName: 'Reservas.xlsx', year: 2026, draft: { items: [valid, ignored] } };
+  api.getIndicatorImportDraft.mockImplementation(async () => structuredClone(saved));
+  api.saveIndicatorImportReview.mockImplementation(async (_id, items) => (saved = { ...saved, draft: { items: structuredClone(items) } }));
+  api.confirmIndicatorImport.mockImplementation(async () => ({ ...saved, status: 'IMPORTED', summary: { processed: 1, indicatorsUpdated: true } }));
+  const card = label => screen.getByText(label, { selector: 'small' }).closest('article').querySelector('strong').textContent;
+  const show = () => render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+  const view = show();
+  await screen.findByText('Formato detectado: Exportação de Reservas');
+  expect(screen.getByText('Formatos aceitos')).toBeTruthy();
+  expect(screen.getByText('1. Planilha de Eventos · Aba: Eventos')).toBeTruthy();
+  expect(card('Linhas lidas')).toBe('3');
+  expect(card('Eventos identificados')).toBe('1');
+  expect(card('Ignorados')).toBe('1');
+  expect(screen.getAllByRole('button', { name: 'Sim' })[1].disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir elegíveis' }));
+  expect(card('Incluídos')).toBe('1');
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+  await screen.findByText('Revisão salva com sucesso.');
+  expect(saved.draft.items[1].included).toBe(false);
+  view.unmount();
+  show();
+  await screen.findByText('Formato detectado: Exportação de Reservas');
+  expect(card('Incluídos')).toBe('1');
+  fireEvent.click(screen.getByRole('button', { name: 'Ir para confirmação' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+  await screen.findByText('Importação concluída');
+  expect(api.confirmIndicatorImport).toHaveBeenCalledExactlyOnceWith(saved.id);
+});
+
 // Static anonymized API responses; XLSX parsing is covered by backend tests.
 // Save mocks persist decisions; the page computes review counts from the items.
 it('Revisão de Eventos.xlsx: inclui 192 válidos e 43 avisos, salva, retoma e confirma os 235', async () => {
@@ -338,7 +372,7 @@ describe.each(['EVENTS', 'RESIDENTS'])('navegação e execução da confirmaçã
     const finalButton = within(finalActions).getByRole('button', { name: 'Confirmar importação' });
     expect(finalButton.disabled).toBe(false);
     expect(document.activeElement).toBe(finalButton);
-    expect(finalActions.compareDocumentPosition(screen.getByText('Formato esperado')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(finalActions.compareDocumentPosition(screen.getByText(type === 'EVENTS' ? 'Formatos aceitos' : 'Formato esperado')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Confirmar importação' })).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Ir para confirmação' }).disabled).toBe(true);
     expect(screen.getByText(/235 registros serão importados|235 empresas serão importadas/)).toBeTruthy();

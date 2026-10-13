@@ -10,6 +10,19 @@ beforeEach(() => {
 });
 
 describe('confirmação com revisão bloqueada na transação', () => {
+  it('substitui reservas por chave estável ou ID original em arquivos diferentes e preserva Eventos antigos e Residentes', async () => {
+    const batch = { id: 'batch', innovation_center_id: 'center', updated_at: '2026-10-01T00:00:00Z' };
+    mocks.query.mockResolvedValue({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ status: 'VALIDATED', updated_at: batch.updated_at }] });
+    await replaceBatchRecords(batch, [{ recordType: 'EVENT', sourceRows: [2, 3], extra: { sourceFormat: 'RESERVATIONS', sourceKey: 'stable', sourceIds: ['id-1', 'id-2'] } }], 'admin');
+    const replacement = mocks.query.mock.calls.find(([sql]) => sql.includes("extra->>'sourceFormat'='RESERVATIONS'"));
+    expect(replacement[0]).toContain("record_type='EVENT'");
+    expect(replacement[0]).toContain('innovation_center_id=$1');
+    expect(replacement[0]).toContain("extra->>'sourceKey'=$2 OR (extra->'sourceIds') ?| $3::text[]");
+    expect(replacement[1]).toEqual(['center', 'stable', ['id-1', 'id-2'], 'admin']);
+    expect(mocks.query).toHaveBeenLastCalledWith('COMMIT');
+  });
   it('consulta somente registros ativos de batches confirmados, no centro e ano selecionados', async () => {
     mocks.read.mockResolvedValue({ rows: [{ id: 'confirmed-event' }] });
     expect(await confirmedRecords('center-1', 2027, 'EVENTS')).toEqual([{ id: 'confirmed-event' }]);

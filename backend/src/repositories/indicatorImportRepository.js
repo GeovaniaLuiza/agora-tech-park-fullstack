@@ -82,6 +82,15 @@ export async function replaceBatchRecords(batch, records, userId, finalize) {
       [batch.file_hash, batch.import_type, batch.innovation_center_id, batch.year, userId],
     );
     for (const record of records) {
+      if (record.recordType === 'EVENT' && record.extra?.sourceFormat === 'RESERVATIONS') {
+        await client.query(
+          `UPDATE indicator_records SET active=FALSE,deleted_at=NOW(),updated_at=NOW(),updated_by=$4
+           WHERE innovation_center_id=$1 AND record_type='EVENT' AND active AND deleted_at IS NULL
+             AND import_batch_id IS NOT NULL AND extra->>'sourceFormat'='RESERVATIONS'
+             AND (extra->>'sourceKey'=$2 OR (extra->'sourceIds') ?| $3::text[])`,
+          [batch.innovation_center_id, record.extra.sourceKey, record.extra.sourceIds, userId],
+        );
+      }
       if (record.recordType === 'RESIDENT_COMPANY' && record.extra?.document) {
         await client.query(
           `UPDATE indicator_records SET active=FALSE,deleted_at=NOW(),updated_at=NOW(),updated_by=$3

@@ -38,7 +38,7 @@ describe('formato real Eventos.xlsx', () => {
     expect(parsed.summary).toMatchObject({ records: 2, needsReview: 1, valid: 1 });
   });
   it('identifica aba, cabeçalho na linha 1 e coluna ausentes', async () => {
-    expect((await parseEventWorkbook(await eventsBuffer([], { sheetName: 'Outra' }))).errors[0].message).toBe('Aba "Eventos" não encontrada.');
+    expect((await parseEventWorkbook(await eventsBuffer([], { sheetName: 'Outra' }))).errors[0].message).toContain('Formato de planilha não reconhecido');
     expect((await parseEventWorkbook(await eventsBuffer([], { headerRow: 2 }))).errors[0].message).toContain('Cabeçalho esperado na linha 1');
     const headers = [...EVENT_HEADERS]; headers[0] = 'Nome';
     expect((await parseEventWorkbook(await eventsBuffer([], { headers }))).errors[0].message).toContain('Coluna "Lista" não encontrada');

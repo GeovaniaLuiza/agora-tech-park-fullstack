@@ -39,14 +39,79 @@ const continuePendingImport = async () => {
 };
 
 describe('gerenciamento explícito do lote ativo', () => {
-  it('lote EVENTS não interfere na consulta de RESIDENTS', async () => {
-    api.getIndicatorImportDraft.mockResolvedValueOnce(eventBatch);
-    const view = render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+  it.each(['EVENTS', 'RESIDENTS'])('lote de outro tipo não interfere na consulta de %s', async (type) => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce(type === 'EVENTS' ? residentBatch : eventBatch);
+    const view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
-    expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('RESIDENTS', 'center-1');
+    expect(api.getIndicatorImportDraft).toHaveBeenCalledWith(type, 'center-1');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByText('Nenhum arquivo selecionado')).toBeTruthy();
     expect(view.container.querySelector('.import-stepper li.active').textContent).toBe('1Arquivo');
+  });
+
+  it.each(['IMPORTED', 'CANCELLED'])('EVENTS %s não aparece como importação não finalizada', async (status) => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...eventBatch, status, centerId: 'center-1' });
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
+    expect(api.getIndicatorImportDraft).toHaveBeenCalledExactlyOnceWith('EVENTS', 'center-1');
+    expect(screen.queryByText('Existe uma importação não finalizada.')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(view.container.querySelector('.import-stepper li.active').textContent).toBe('1Arquivo');
+  });
+
+  it('bloqueia upload e permite retentar se o lote EVENTS retornado pertence a outro centro', async () => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...eventBatch, centerId: 'center-2', fileName: 'Outro centro.xlsx' })
+      .mockResolvedValueOnce({ ...eventBatch, centerId: 'center-1', fileName: 'Centro selecionado.xlsx' });
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    expect((await screen.findByRole('alert')).textContent).toContain('não pertence ao centro selecionado');
+    expect(screen.queryByText('Outro centro.xlsx')).toBeNull();
+    expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar consultar importação novamente' }));
+    expect(await screen.findByText('Centro selecionado.xlsx')).toBeTruthy();
+    expect(api.getIndicatorImportDraft).toHaveBeenLastCalledWith('EVENTS', 'center-1');
+    expect(api.uploadIndicatorImport).not.toHaveBeenCalled();
+  });
+
+  it('consulta EVENTS novamente ao trocar o centro e ignora resposta tardia do centro anterior', async () => {
+    api.getInnovationCenters.mockResolvedValue([{ id: 'center-1', name: 'Primeiro' }, { id: 'center-2', name: 'Segundo' }]);
+    let resolvePrevious;
+    api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((resolve) => { resolvePrevious = resolve; }))
+      .mockResolvedValueOnce({ ...eventBatch, id: 'second-batch', centerId: 'center-2', fileName: 'Segundo.xlsx' });
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('EVENTS', 'center-1'));
+    fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'center-2' } });
+    await screen.findByText('Segundo.xlsx');
+    await act(async () => resolvePrevious({ ...eventBatch, centerId: 'center-1', fileName: 'Primeiro.xlsx' }));
+    expect(screen.queryByText('Primeiro.xlsx')).toBeNull();
+    expect(api.getIndicatorImportDraft).toHaveBeenLastCalledWith('EVENTS', 'center-2');
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar e iniciar nova' }));
+    await waitFor(() => expect(api.cancelIndicatorImport).toHaveBeenCalledExactlyOnceWith('second-batch'));
+  });
+
+  it.each([
+    ['Eventos', 'Eventos.xlsx', 'Planilha de Eventos'],
+    ['Exportação', 'Exportação de Reservas.xlsx', 'Exportação de Reservas'],
+  ])('retoma exatamente o lote da aba %s com metadados e revisão, sem novo upload', async (sheetName, fileName, format) => {
+    const item = { ...eventItems[0], name: 'Evento revisado', included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID', issues: [] };
+    const saved = { ...eventBatch, id: `saved-${sheetName}`, centerId: 'center-1', sheetName, fileName, fileSize: 2048, year: 2026,
+      draft: { items: [item] }, summary: { rowsRead: 1 } };
+    api.getIndicatorImportDraft.mockResolvedValueOnce(saved);
+    api.saveIndicatorImportReview.mockResolvedValueOnce(saved);
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(fileName)).toBeTruthy();
+    expect(within(dialog).getByText('Descartar preserva o histórico do lote e não altera indicadores já confirmados.')).toBeTruthy();
+    await continuePendingImport();
+    expect(view.container.querySelector('.import-stepper li.active').textContent).toBe('4Revisão');
+    expect(screen.getByText(`Formato detectado: ${format}`)).toBeTruthy();
+    expect(screen.getByText(`Tamanho: 2 KB · Aba detectada: ${sheetName} · Linhas: 1`)).toBeTruthy();
+    expect(screen.getAllByText('Evento revisado', { selector: 'strong' })).toHaveLength(1);
+    expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
+    await screen.findByText('Revisão salva com sucesso.');
+    expect(api.saveIndicatorImportReview).toHaveBeenCalledExactlyOnceWith(saved.id, [item]);
+    expect(api.uploadIndicatorImport).not.toHaveBeenCalled();
+    expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
   });
 
   it.each(['EVENTS', 'RESIDENTS'].flatMap((type) => ['VALIDATED', 'WITH_WARNINGS', 'REVIEW_PENDING'].map((status) => [type, status])))('mostra contexto de %s / %s e só retoma após escolha, preservando decisões', async (type, status) => {

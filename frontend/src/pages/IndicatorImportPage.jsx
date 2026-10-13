@@ -255,7 +255,12 @@ function ImportFlow({ type }) {
     getIndicatorImportDraft(type, centerId).then((draft) => {
       if (!active || fileSelected.current) return;
       setError('');
-      if (draft?.importType === type && resumableStatuses.includes(draft?.status)) setPendingBatch(draft);
+      if (draft?.importType === type && resumableStatuses.includes(draft?.status)) {
+        if (draft.centerId != null && draft.centerId !== centerId) {
+          throw new Error('O lote retornado não pertence ao centro selecionado. Tente consultar a importação novamente.');
+        }
+        setPendingBatch(draft);
+      }
     }).catch((reason) => { if (active && !fileSelected.current) { setError(reason.message); setDraftLookupFailed(true); } })
       .finally(() => { if (active) setCheckingDraft(false); });
     return () => { active = false; };

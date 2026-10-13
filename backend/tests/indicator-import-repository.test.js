@@ -16,7 +16,7 @@ describe('retomada de importações', () => {
     const [sql, params] = mocks.read.mock.calls[0];
     expect(sql).toContain('b.import_type=$1 AND b.innovation_center_id=$2 AND b.is_current');
     expect(sql).toContain("b.status IN ('REVIEW_PENDING','WITH_WARNINGS','VALIDATED')");
-    expect(sql).not.toMatch(/IMPORTED|COMPLETED/);
+    expect(sql).not.toMatch(/IMPORTED|CANCELLED|COMPLETED/);
     expect(sql).toContain('ORDER BY b.created_at DESC,b.updated_at DESC,b.id DESC LIMIT 1');
     expect(params).toEqual([importType, 'center']);
     expect(mocks.connect).not.toHaveBeenCalled();
@@ -130,12 +130,14 @@ describe('ciclo de vida do lote atual', () => {
     expect(mocks.query).toHaveBeenLastCalledWith('COMMIT');
   });
 
-  it('descarta só o lote pendente atual, preserva dados e grava auditoria antes do commit', async () => {
+  it.each(['VALIDATED', 'WITH_WARNINGS', 'REVIEW_PENDING'])('descarta EVENTS %s, preserva histórico, registros e valores confirmados', async (status) => {
     mocks.query.mockResolvedValue({ rows: [] })
       .mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 'active', status: 'CANCELLED', is_current: true }] });
     const audit = vi.fn();
-    expect(await cancelBatch({ id: 'active', innovation_center_id: 'center' }, audit)).toMatchObject({ status: 'CANCELLED', is_current: true });
+    expect(await cancelBatch({ id: 'active', innovation_center_id: 'center', import_type: 'EVENTS', status }, audit)).toMatchObject({ status: 'CANCELLED', is_current: true });
+    expect(mocks.query.mock.calls[2][0]).toContain("SET status='CANCELLED'");
+    expect(mocks.query.mock.calls[2][1]).toEqual(['active']);
     expect(mocks.query.mock.calls[2][0]).toContain("WHERE id=$1 AND is_current AND status IN ('REVIEW_PENDING','WITH_WARNINGS','VALIDATED')");
     expect(mocks.query.mock.calls.map(([sql]) => sql).join(' ')).not.toMatch(/DELETE|indicator_records|indicator_values|SET is_current=FALSE/);
     expect(audit).toHaveBeenCalledWith(expect.objectContaining({ query: mocks.query }));

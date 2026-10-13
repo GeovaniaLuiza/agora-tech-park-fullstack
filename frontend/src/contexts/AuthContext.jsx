@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [sessionError, setSessionError] = useState('');
   const [sessionRateLimit, setSessionRateLimit] = useState(null);
+  const [sessionRecoveryRequired, setSessionRecoveryRequired] = useState(false);
 
   const logout = useCallback(async () => {
     try {
@@ -20,6 +21,7 @@ export function AuthProvider({ children }) {
       setUser(null);
       setSessionError('');
       setSessionRateLimit(null);
+      setSessionRecoveryRequired(false);
     }
   }, []);
 
@@ -27,25 +29,35 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setSessionError('');
     setSessionRateLimit(null);
-    if (!tokenStore.get()) {
+    setSessionRecoveryRequired(false);
+    const restoringToken = tokenStore.get();
+    if (!restoringToken) {
       setUser(null);
       setLoading(false);
       return;
     }
     try {
       const data = await getMe();
+      if (tokenStore.get() !== restoringToken) return;
       setUser(data.user);
       return data.user;
     } catch (error) {
+      if (tokenStore.get() && tokenStore.get() !== restoringToken) return;
       if (error.status === 429) {
         const limit = authRateLimit(error);
         setSessionRateLimit(limit);
         setSessionError(limit.message);
+        setSessionRecoveryRequired(true);
         return;
       }
-      tokenStore.clear();
-      setUser(null);
-      setSessionError('Sua sessão não pôde ser restaurada. Entre novamente.');
+      if (error.status === 401) {
+        tokenStore.clear();
+        setUser(null);
+        setSessionError('Sua sessão não pôde ser restaurada. Entre novamente.');
+      } else {
+        setSessionRecoveryRequired(true);
+        setSessionError('Não foi possível verificar sua sessão. Tente novamente em instantes.');
+      }
     } finally {
       setLoading(false);
     }
@@ -65,20 +77,30 @@ export function AuthProvider({ children }) {
     tokenStore.set(data.token, remember);
     try {
       const session = await getMe();
+      if (tokenStore.get() !== data.token) return;
       setUser(session.user);
       setSessionError('');
       setSessionRateLimit(null);
+      setSessionRecoveryRequired(false);
       return session.user;
     } catch (error) {
+      if (tokenStore.get() && tokenStore.get() !== data.token) throw error;
       if (error.status === 429) {
         const limit = authRateLimit(error);
         setSessionRateLimit(limit);
         setSessionError(limit.message);
+        setSessionRecoveryRequired(true);
         throw error;
       }
-      tokenStore.clear();
-      setUser(null);
-      setSessionRateLimit(null);
+      if (error.status === 401) {
+        tokenStore.clear();
+        setUser(null);
+        setSessionRecoveryRequired(false);
+      } else {
+        setSessionRecoveryRequired(true);
+        setSessionError('Não foi possível verificar sua sessão. Tente novamente em instantes.');
+        error.sessionRecoveryRequired = true;
+      }
       throw error;
     }
   }, []);
@@ -90,8 +112,8 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
   const value = useMemo(
-    () => ({ user, loading, sessionError, sessionRateLimit, login, logout, restoreSession, clearSessionError, updateAvatar }),
-    [user, loading, sessionError, sessionRateLimit, login, logout, restoreSession, clearSessionError, updateAvatar],
+    () => ({ user, loading, sessionError, sessionRateLimit, sessionRecoveryRequired, login, logout, restoreSession, clearSessionError, updateAvatar }),
+    [user, loading, sessionError, sessionRateLimit, sessionRecoveryRequired, login, logout, restoreSession, clearSessionError, updateAvatar],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

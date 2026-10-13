@@ -43,6 +43,7 @@ describe('restauração e encerramento da sessão', () => {
   it('confirma o perfil autenticado em /me antes de atualizar a sessão', async () => {
     api.tokenStore.get.mockReturnValue(null);
     api.login.mockResolvedValue({ token: 'token', user: { name: 'Resposta inicial', role: 'ADMIN' } });
+    api.tokenStore.set.mockImplementation((token) => api.tokenStore.get.mockReturnValue(token));
     api.getMe.mockResolvedValue({ user: { id: '1', name: 'Admin confirmado', role: 'ADMIN' } });
     render(<AuthProvider><Probe /></AuthProvider>);
     await waitFor(() => expect(screen.getByText('visitor')).toBeTruthy());
@@ -51,12 +52,12 @@ describe('restauração e encerramento da sessão', () => {
     expect(api.tokenStore.set).toHaveBeenCalledWith('token', true);
     expect(api.getMe).toHaveBeenCalledOnce();
   });
-  it('exibe erro e limpa token quando a restauração falha', async () => {
+  it('preserva token quando a restauração tem falha transitória', async () => {
     api.tokenStore.get.mockReturnValue('token');
     api.getMe.mockRejectedValue(new Error('expirada'));
     render(<AuthProvider><Probe /></AuthProvider>);
-    await waitFor(() => expect(screen.getByText(/não pôde ser restaurada/i)).toBeTruthy());
-    expect(api.tokenStore.clear).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText(/não foi possível verificar/i)).toBeTruthy());
+    expect(api.tokenStore.clear).not.toHaveBeenCalled();
     expect(screen.getByText('visitor')).toBeTruthy();
   });
 });

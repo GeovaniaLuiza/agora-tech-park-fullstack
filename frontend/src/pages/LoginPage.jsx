@@ -9,7 +9,7 @@ import { validateLogin } from '../utils/authValidation';
 import { authRateLimit } from '../utils/authRateLimit';
 
 export default function LoginPage() {
-  const { clearSessionError, login, sessionError, sessionRateLimit, restoreSession } = useAuth();
+  const { clearSessionError, login, sessionError, sessionRateLimit, sessionRecoveryRequired, restoreSession } = useAuth();
   const navigate = useNavigate();
   const emailRef = useRef(null);
   const [form, setForm] = useState({ email: '', password: '', remember: false });
@@ -27,7 +27,7 @@ export default function LoginPage() {
   const submit = async (event) => {
     event.preventDefault();
     if (loading || retryAfter > 0) return;
-    if (sessionRateLimit) {
+    if (sessionRecoveryRequired || sessionRateLimit) {
       setAlert('');
       const user = await restoreSession();
       if (user) navigate(homeForRole(user.role), { replace: true });
@@ -50,6 +50,10 @@ export default function LoginPage() {
         setAlert(limit.message);
         return;
       }
+      if (error.sessionRecoveryRequired) {
+        setAlert('Não foi possível verificar sua sessão. Tente novamente em instantes.');
+        return;
+      }
       const messages = {
         EMAIL_NOT_VERIFIED: 'Confirme seu e-mail antes de continuar.',
         APPROVAL_PENDING: 'Seu e-mail foi confirmado e sua solicitação está aguardando análise.',
@@ -65,7 +69,7 @@ export default function LoginPage() {
     <FormField label="E-mail" name="email" error={errors.email} required><input ref={emailRef} id="email" type="email" autoComplete="email" value={form.email} onChange={(e) => update('email', e.target.value)} aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? 'email-error' : undefined} /></FormField>
     <FormField label="Senha" name="password" error={errors.password} required><div className="password-input"><input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={form.password} onChange={(e) => update('password', e.target.value)} aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? 'password-error' : undefined} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ocultar senha' : 'Exibir senha'}>{showPassword ? <EyeOff /> : <Eye />}</button></div></FormField>
     <div className="login-options"><label><input type="checkbox" checked={form.remember} onChange={(e) => update('remember', e.target.checked)} /> Lembrar-me</label><button className="link-button" type="button" onClick={() => navigate('/esqueci-a-senha')}>Esqueci a senha</button></div>
-    <button type="submit" className="button primary auth-submit" disabled={loading || retryAfter > 0}>{loading ? 'Entrando...' : retryAfter ? `Tente novamente em ${retryAfter}s` : sessionRateLimit ? 'Retomar sessão' : <>Entrar <ArrowRight /></>}</button>
+    <button type="submit" className="button primary auth-submit" disabled={loading || retryAfter > 0}>{loading ? 'Entrando...' : retryAfter ? `Tente novamente em ${retryAfter}s` : sessionRecoveryRequired || sessionRateLimit ? 'Retomar sessão' : <>Entrar <ArrowRight /></>}</button>
     <small>Não tem acesso? <button className="link-button" type="button" onClick={() => navigate('/solicitar-acesso')}>Solicitar acesso</button></small>
   </form></AuthLayout>;
 }

@@ -321,6 +321,42 @@ describe('autenticação e solicitação de acesso', () => {
     expect((await request(app).get('/api/auth/me').set('Authorization', 'Bearer inválido')).status).toBe(401);
     expect((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${tokenFor(activeUser, '-1s')}`)).status).toBe(401);
   });
+  it.each(['/api/auth/me', '/api/indicator-imports/EVENTS/draft', '/api/indicator-imports/RESIDENTS/draft'])('%s não mascara falha de perfil/banco como 401', async (path) => {
+    const token = tokenFor(activeUser);
+    userRepo.findPublicProfile.mockRejectedValueOnce(Object.assign(new Error('database offline'), { code: 'ECONNREFUSED' }));
+    const unavailable = await request(app).get(path).set('Authorization', `Bearer ${token}`);
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.body.code).toBe('SERVICE_UNAVAILABLE');
+    userRepo.findPublicProfile.mockRejectedValueOnce(new Error('profile lookup failed'));
+    const failed = await request(app).get(path).set('Authorization', `Bearer ${token}`);
+    expect(failed.status).toBe(500);
+    expect(failed.body.code).toBe('INTERNAL_SERVER_ERROR');
+    expect((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`)).status).toBe(200);
+  });
+  it('token expirado retorna motivo explícito sem consultar perfil ou tentar refresh inexistente', async () => {
+    const response = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${tokenFor(activeUser, '-1s')}`);
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('TOKEN_EXPIRED');
+    expect(userRepo.findPublicProfile).not.toHaveBeenCalled();
+  });
+  it('atividade não renova JWT: token de 8h continua válido após 7h e expira após 8h', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const valid = jwt.sign({ sub: activeUser.id, iat: now - 7 * 3600 }, process.env.JWT_SECRET, { expiresIn: '8h' });
+    const expired = jwt.sign({ sub: activeUser.id, iat: now - 8 * 3600 - 1 }, process.env.JWT_SECRET, { expiresIn: '8h' });
+    expect((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${valid}`)).status).toBe(200);
+    const response = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${expired}`);
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('TOKEN_EXPIRED');
+  });
+  it('login emite JWT com validade absoluta configurada, sem refresh token', async () => {
+    userRepo.findByEmail.mockResolvedValue({ ...activeUser, password_hash: passwordHash });
+    const response = await request(app).post('/api/auth/login').send({ email: activeUser.email, password: 'Senha123' });
+    const payload = jwt.verify(response.body.token, process.env.JWT_SECRET);
+    const expected = jwt.decode(jwt.sign({ sub: activeUser.id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }));
+    expect(payload.exp - payload.iat).toBe(expected.exp - expected.iat);
+    expect(response.body.refreshToken).toBeUndefined();
+    expect(response.headers['set-cookie']).toBeUndefined();
+  });
   it('revalida o perfil atual do banco em cada sessão', async () => {
     userRepo.findPublicProfile.mockResolvedValue({ ...activeUser, role: 'GESTOR', organizations: [] });
     const response = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${tokenFor(activeUser)}`);

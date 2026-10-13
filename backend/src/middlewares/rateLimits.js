@@ -60,6 +60,7 @@ export function createRateLimiter(config, options = {}) {
     code = 'RATE_LIMIT_EXCEEDED',
     message = 'Muitas tentativas foram realizadas. Aguarde antes de tentar novamente.',
     nextAction = 'RETRY_LATER',
+    scope,
     ...rateLimitOptions
   } = options;
   return rateLimit({
@@ -70,6 +71,7 @@ export function createRateLimiter(config, options = {}) {
     ...rateLimitOptions,
     handler: (request, response) => {
       const retryAfter = retryAfterSeconds(request, config.windowMs);
+      if (scope) request.log?.warn({ event: 'rate_limit_exceeded', rateLimitScope: scope, retryAfter, requestId: request.id }, 'Request rate limited');
       response.set('Retry-After', String(retryAfter));
       response.status(429).json({
         code,
@@ -78,6 +80,7 @@ export function createRateLimiter(config, options = {}) {
         retryAfterSeconds: retryAfter,
         requestCreated: false,
         nextAction,
+        ...(scope ? { rateLimitScope: scope } : {}),
       });
     },
   });
@@ -100,8 +103,8 @@ export function createEmailRateLimiter(config) {
 export function createGlobalRateLimiters(config = RATE_LIMIT_CONFIG) {
   const isRead = (request) => ['GET', 'HEAD', 'OPTIONS'].includes(request.method);
   return [
-    createRateLimiter(config.globalRead, { skip: (request) => !isRead(request) }),
-    createRateLimiter(config.global, { skip: isRead }),
+    createRateLimiter(config.globalRead, { skip: (request) => !isRead(request), scope: 'GLOBAL_READ' }),
+    createRateLimiter(config.global, { skip: isRead, scope: 'GLOBAL_WRITE' }),
   ];
 }
 

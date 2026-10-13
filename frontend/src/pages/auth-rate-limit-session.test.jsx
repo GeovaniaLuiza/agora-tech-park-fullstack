@@ -108,7 +108,7 @@ describe('rate limit na autenticação com API e armazenamento reais', () => {
     expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/auth/login'))).toHaveLength(1);
   });
 
-  it.each([401, 403])('/me %s encerra sessão na restauração', async (status) => {
+  it.each([401])('/me %s encerra sessão na restauração', async (status) => {
     tokenStore.set('invalid-token', true);
     fetchMock.mockResolvedValue(response(status));
     renderLogin();
@@ -117,7 +117,7 @@ describe('rate limit na autenticação com API e armazenamento reais', () => {
     expect(screen.queryByRole('button', { name: /retomar sessão/i })).toBeNull();
   });
 
-  it.each([401, 403])('/me %s após login remove o token recém-emitido', async (status) => {
+  it.each([401])('/me %s após login remove o token recém-emitido', async (status) => {
     fetchMock.mockResolvedValueOnce(response(200, { token: 'invalid-token' }))
       .mockResolvedValue(response(status));
     renderLogin();
@@ -125,6 +125,20 @@ describe('rate limit na autenticação com API e armazenamento reais', () => {
     submitLogin();
     await screen.findByText('E-mail ou senha inválidos.');
     expect(tokenStore.get()).toBeNull();
+  });
+
+  it.each([403, 409, 422, 500, 503])('/me %s após login permite recuperar sem repetir POST /login', async (status) => {
+    fetchMock.mockResolvedValueOnce(response(200, { token: 'valid-token' })).mockResolvedValueOnce(response(status));
+    renderLogin();
+    await screen.findByRole('button', { name: /^entrar/i });
+    submitLogin();
+    const retry = await screen.findByRole('button', { name: /retomar sessão/i });
+    expect(tokenStore.get()).toBe('valid-token');
+    expect(screen.queryByText('E-mail ou senha inválidos.')).toBeNull();
+    fetchMock.mockResolvedValueOnce(response(200, { user }));
+    fireEvent.click(retry);
+    expect(await screen.findByText('Painel autenticado')).toBeTruthy();
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/auth/login'))).toHaveLength(1);
   });
 
   it('429 ao revalidar preserva também o usuário já carregado', async () => {

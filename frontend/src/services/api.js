@@ -32,6 +32,15 @@ export class ApiError extends Error {
   }
 }
 
+const publicAuthPaths = new Set(['/auth/login', '/auth/register-request', '/auth/verify-email', '/auth/resend-verification', '/auth/forgot-password', '/auth/reset-password']);
+function invalidateSession(status, token, path) {
+  // A delayed response for an old token must not clear a newer login.
+  if (status === 401 && token && tokenStore.get() === token && !publicAuthPaths.has(path.split('?')[0])) {
+    tokenStore.clear();
+    window.dispatchEvent(new Event('auth:unauthorized'));
+  }
+}
+
 export async function apiRequest(path, options = {}) {
   const token = tokenStore.get();
   const controller = new AbortController();
@@ -65,10 +74,7 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!response.ok) {
-    if (response.status === 401 && token) {
-      tokenStore.clear();
-      window.dispatchEvent(new Event('auth:unauthorized'));
-    }
+    invalidateSession(response.status, token, path);
     const retryAfterSeconds = Number(data?.retryAfter ?? data?.retryAfterSeconds ?? response.headers.get('Retry-After')) || undefined;
     throw new ApiError(data?.message || 'Não foi possível concluir a operação', response.status, data?.code, {
       retryAfterSeconds,
@@ -258,7 +264,9 @@ export async function downloadOfficialIndicatorWorkbook(payload) {
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new ApiError(data.message || 'Não foi possível gerar a planilha oficial.', response.status, data.code);
+    invalidateSession(response.status, token, '/indicator-imports/export');
+    const retryAfterSeconds = Number(data.retryAfter ?? data.retryAfterSeconds ?? response.headers.get('Retry-After')) || undefined;
+    throw new ApiError(data.message || 'Não foi possível gerar a planilha oficial.', response.status, data.code, { retryAfterSeconds });
   }
   const disposition = response.headers.get('Content-Disposition') || '';
   const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/)?.[1];

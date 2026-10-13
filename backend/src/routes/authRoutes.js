@@ -4,7 +4,7 @@ import { authenticate } from '../middlewares/auth.js';
 import { validateForgotPassword, validateLogin, validatePasswordReset, validateRegisterRequest, validateResend, validateVerification } from '../middlewares/authValidation.js';
 import { createEmailRateLimiter, createRateLimiter, RATE_LIMIT_CONFIG } from '../middlewares/rateLimits.js';
 const router=Router();
-const loginLimit=createRateLimiter(RATE_LIMIT_CONFIG.login,{skipSuccessfulRequests:true});
+const loginLimit=createRateLimiter(RATE_LIMIT_CONFIG.login,{skipSuccessfulRequests:true,scope:'LOGIN'});
 const registrationLimit=createRateLimiter(RATE_LIMIT_CONFIG.register);
 const resendLimit=createRateLimiter(RATE_LIMIT_CONFIG.resend,{
   code:'RESEND_RATE_LIMITED',

@@ -34,6 +34,144 @@ const openReview = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Revisão' }));
 };
 
+describe('conclusão e nova importação', () => {
+  it('retenta a exportação, baixa o XLSX do ano concluído e descarta download após sair da tela', async () => {
+    const draft = { ...eventBatch, year: 2025, draft: { items: [{ ...eventItems[0], included: true, reviewStatus: 'VALIDATED' }] } };
+    api.getIndicatorImportDraft.mockResolvedValueOnce(draft);
+    api.confirmIndicatorImport.mockResolvedValueOnce({ ...draft, status: 'IMPORTED' });
+    api.getOfficialWorkbookStatus.mockRejectedValueOnce(new Error('Não foi possível consultar a planilha.'))
+      .mockResolvedValueOnce({ requiresStrategy: false });
+    const report = { blob: new Blob(['xlsx']), filename: 'indicadores_2025.xlsx' };
+    api.downloadOfficialIndicatorWorkbook.mockResolvedValueOnce(report);
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    const createObjectURL = vi.fn(() => 'blob:indicadores-2025');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Continuar para confirmação' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByText('Importação concluída');
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Planilha de Indicadores' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível consultar a planilha.');
+    expect(screen.queryByRole('heading', { name: 'Gerar Planilha de Indicadores' })).toBeNull();
+    expect(api.downloadOfficialIndicatorWorkbook).not.toHaveBeenCalled();
+    expect(view.container.querySelectorAll('.import-stepper li.done')).toHaveLength(7);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Planilha de Indicadores' }));
+    await screen.findByRole('heading', { name: 'Gerar Planilha de Indicadores' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByLabelText('Mesclar com os dados existentes'));
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar arquivo' }));
+    await screen.findByText('Planilha oficial gerada sem alterar o template original.');
+    expect(api.getOfficialWorkbookStatus).toHaveBeenCalledTimes(2);
+    expect(api.getOfficialWorkbookStatus).toHaveBeenLastCalledWith('center-1', 2025);
+    expect(api.downloadOfficialIndicatorWorkbook).toHaveBeenCalledExactlyOnceWith({ centerId: 'center-1', year: 2025, strategy: 'MERGE' });
+    expect(createObjectURL).toHaveBeenCalledWith(report.blob);
+    expect(download).toHaveBeenCalledOnce();
+    expect(download.mock.instances[0].download).toBe(report.filename);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:indicadores-2025');
+    expect(screen.queryByRole('heading', { name: 'Gerar Planilha de Indicadores' })).toBeNull();
+    expect(view.container.querySelectorAll('.import-stepper li.done')).toHaveLength(7);
+    expect(api.confirmIndicatorImport).toHaveBeenCalledOnce();
+
+    let resolveDownload;
+    api.getOfficialWorkbookStatus.mockResolvedValueOnce({ requiresStrategy: false });
+    api.downloadOfficialIndicatorWorkbook.mockReturnValueOnce(new Promise((resolve) => { resolveDownload = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Planilha de Indicadores' }));
+    await screen.findByRole('heading', { name: 'Gerar Planilha de Indicadores' });
+    fireEvent.click(screen.getByLabelText('Mesclar com os dados existentes'));
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar arquivo' }));
+    expect(api.downloadOfficialIndicatorWorkbook).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Importar novo arquivo' }).disabled).toBe(true);
+    view.unmount();
+    await act(async () => resolveDownload(report));
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(download).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledOnce();
+  });
+
+  it.each(['Eventos', 'Exportação'])('conclui %s e inicia outro arquivo sem modificar a importação persistida', async (sheetName) => {
+    const item = { ...eventItems[0], included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID', issues: [] };
+    const draft = { ...eventBatch, sheetName, fileName: 'primeiro.xlsx', draft: { items: [item] } };
+    let persisted = null;
+    api.uploadIndicatorImport.mockResolvedValue(draft);
+    api.confirmIndicatorImport.mockImplementation(async () => {
+      persisted = structuredClone({ ...draft, status: 'IMPORTED' });
+      return structuredClone(persisted);
+    });
+    const confirmPrompt = vi.spyOn(window, 'confirm');
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
+    const input = screen.getByLabelText(/Selecionar arquivo/);
+    fireEvent.change(input, { target: { files: [new File(['xlsx'], 'primeiro.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
+    fireEvent.change(screen.getByPlaceholderText('Buscar evento'), { target: { value: 'Anônimo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar importação' }));
+    expect((await screen.findByRole('status')).textContent).toBe('Arquivo importado com sucesso. Os indicadores foram atualizados.');
+    const timeline = view.container.querySelector('.import-stepper');
+    expect(timeline.querySelectorAll('li.done')).toHaveLength(7);
+    expect(timeline.querySelectorAll('li.active')).toHaveLength(0);
+    expect(within(timeline).getByText('Concluído')).toBeTruthy();
+    expect(screen.queryByText('Baixar XLSX')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Gerar Planilha de Indicadores' }).disabled).toBe(false);
+    const snapshot = structuredClone(persisted);
+    const apiCalls = Object.fromEntries(Object.entries(api).map(([key, mock]) => [key, mock.mock.calls.length]));
+    fireEvent.click(screen.getByRole('button', { name: 'Importar novo arquivo' }));
+    expect(screen.getByText('Nenhum arquivo selecionado')).toBeTruthy();
+    expect(input.value).toBe('');
+    expect(screen.getByRole('button', { name: 'Validar' }).disabled).toBe(true);
+    expect(timeline.querySelector('li.active').textContent).toBe('1Arquivo');
+    expect(timeline.querySelectorAll('li.done')).toHaveLength(0);
+    expect(view.container.querySelector('.import-summary')).toBeNull();
+    expect(screen.queryByText('Importação concluída')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Salvar revisão' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Gerar Planilha de Indicadores' })).toBeNull();
+    expect(persisted).toEqual(snapshot);
+    for (const [key, count] of Object.entries(apiCalls)) expect(api[key]).toHaveBeenCalledTimes(count);
+    fireEvent.change(input, { target: { files: [new File(['xlsx'], 'segundo.xlsx')] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
+    await openReview();
+    expect(screen.getByPlaceholderText('Buscar evento').value).toBe('');
+    expect(screen.getByText('Evento Anônimo', { selector: 'strong' })).toBeTruthy();
+    expect(api.uploadIndicatorImport).toHaveBeenCalledTimes(2);
+    expect(api.confirmIndicatorImport).toHaveBeenCalledTimes(1);
+    expect(persisted).toEqual(snapshot);
+    view.unmount();
+    api.getIndicatorImportDraft.mockResolvedValue(persisted);
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledTimes(2));
+    expect(confirmPrompt).not.toHaveBeenCalled();
+    expect(screen.getByText('Nenhum arquivo selecionado')).toBeTruthy();
+  });
+
+  it.each(['IMPORTED', 'COMPLETED', 'FAILED', 'PROCESSING'])('não oferece retomada para lote %s, mesmo com draft inválido', async (status) => {
+    api.getIndicatorImportDraft.mockResolvedValue({ ...eventBatch, status, draft: null });
+    const prompt = vi.spyOn(window, 'confirm');
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('EVENTS', 'center-1'));
+    expect(prompt).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('Nenhum arquivo selecionado')).toBeTruthy();
+    expect(view.container.querySelector('.import-stepper li.active').textContent).toBe('1Arquivo');
+  });
+
+  it.each(['REVIEW_PENDING', 'WITH_WARNINGS', 'VALIDATED'])('oferece retomada na revisão para lote %s', async (status) => {
+    api.getIndicatorImportDraft.mockResolvedValue({ ...eventBatch, status });
+    const prompt = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Salvar revisão' });
+    expect(prompt).toHaveBeenCalledExactlyOnceWith('Existe uma importação não finalizada. Deseja continuar de onde parou?');
+    expect(view.container.querySelector('.import-stepper li.active').textContent).toBe('4Revisão');
+    expect(screen.getByText('Evento Anônimo', { selector: 'strong' })).toBeTruthy();
+  });
+});
+
 it('Exportação detectada preserva contagens de linhas/salas e ignora pré-reserva ao salvar, retomar e confirmar', async () => {
   vi.spyOn(window, 'confirm').mockReturnValue(true);
   const valid = { ...eventItems[0], id: 'reservation-valid', sourceRows: [2, 3], duplicateGroup: null, validationStatus: 'VALID', issues: [], grouped: true,
@@ -108,8 +246,8 @@ it('Revisão de Eventos.xlsx: inclui 192 válidos e 43 avisos, salva, retoma e c
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
   await screen.findByText('Importação concluída');
   expect(api.confirmIndicatorImport).toHaveBeenCalledExactlyOnceWith(saved.id);
-  expect(screen.getByText('Importação confirmada e indicadores atualizados.')).toBeTruthy();
-  expect(screen.getByText('Indicadores atualizados', { selector: 'small' }).closest('li').classList.contains('active')).toBe(true);
+  expect(screen.getByText('Arquivo importado com sucesso. Os indicadores foram atualizados.')).toBeTruthy();
+  expect(screen.getByText('Indicadores atualizados', { selector: 'small' }).closest('li').classList.contains('done')).toBe(true);
 }, 15000);
 
 it.each(['EVENTS', 'RESIDENTS'])('Incluir elegíveis preserva aviso não bloqueante e não inclui erro obrigatório em %s', async type => {
@@ -199,7 +337,7 @@ it('Revisão de Clientes.xlsx: salva e retoma a revisão, ignora 20 inválidos e
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
   await screen.findByText('Importação concluída');
   expect(api.confirmIndicatorImport).toHaveBeenCalledExactlyOnceWith(saved.id);
-  expect(screen.getByText('Importação confirmada e indicadores atualizados.')).toBeTruthy();
+  expect(screen.getByText('Arquivo importado com sucesso. Os indicadores foram atualizados.')).toBeTruthy();
   expect(screen.getByRole('link', { name: 'Ver indicadores de residentes' }).getAttribute('href')).toBe('/indicadores/residentes?centerId=center-1&year=2026');
 }, 15000);
 
@@ -478,7 +616,7 @@ describe('inclusão explícita e confirmação da revisão', () => {
     expect(screen.getByRole('button', { name: 'Confirmar importação' }).disabled).toBe(false);
     api.confirmIndicatorImport.mockResolvedValueOnce({ ...saved, status: 'IMPORTED' });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
-    await screen.findByText('Importação confirmada e indicadores atualizados.');
+    await screen.findByText('Arquivo importado com sucesso. Os indicadores foram atualizados.');
     expect(api.confirmIndicatorImport).toHaveBeenCalledWith(saved.id);
   }, 15_000);
 
@@ -1208,9 +1346,9 @@ describe('telas de importação de indicadores', () => {
     expect(api.confirmIndicatorImport).not.toHaveBeenCalled();
     expect(screen.getByText('Resumo final')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
-    await screen.findByText(/Importação confirmada/);
-    expect(screen.getAllByText('Indicadores atualizados').find((element) => element.closest('li')).closest('li').className).toBe('active');
-    expect(screen.getByText('Baixar XLSX').closest('li').className).toBe('');
+    await screen.findByText(/Arquivo importado com sucesso/);
+    expect(screen.getAllByText('Indicadores atualizados').find((element) => element.closest('li')).closest('li').className).toBe('done');
+    expect(screen.getByText('Concluído').closest('li').className).toBe('done');
     fireEvent.click(screen.getByRole('button', { name: /Gerar Planilha de Indicadores/ }));
     await screen.findByRole('heading', { name: 'Gerar Planilha de Indicadores' });
     expect(screen.getByRole('button', { name: 'Gerar arquivo' }).disabled).toBe(true);
@@ -1219,7 +1357,7 @@ describe('telas de importação de indicadores', () => {
     await waitFor(() => expect(api.downloadOfficialIndicatorWorkbook).toHaveBeenCalledWith({ centerId: 'center-1', year: 2026, strategy: 'REPLACE' }));
     expect(createObjectURL).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalled();
-    expect(screen.getByText('Baixar XLSX').closest('li').className).toBe('done');
+    expect(screen.getByText('Concluído').closest('li').className).toBe('done');
 
     api.getOfficialWorkbookStatus.mockResolvedValueOnce({ requiresStrategy: true, eventsOccupied: true, residentsOccupied: false });
     api.downloadOfficialIndicatorWorkbook.mockRejectedValueOnce(new Error('O bloco de residentes excede a capacidade do template.'));
@@ -1361,7 +1499,7 @@ describe('ignorar registro individual na revisão', () => {
     fireEvent.click(within(row()).getByRole('button', { name: 'Ignorar registro' }));
     fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Confirmar importação' }));
-    await screen.findByText('Importação confirmada e indicadores atualizados.');
+    await screen.findByText('Arquivo importado com sucesso. Os indicadores foram atualizados.');
     expect(api.confirmIndicatorImport).toHaveBeenCalledOnce();
     expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, expect.arrayContaining([expect.objectContaining({ id: 'invalid', included: false, reviewStatus: 'EXCLUDED' }), expect.objectContaining({ id: 'valid', included: true })]));
   });
@@ -1593,7 +1731,7 @@ describe('ignorar registros incompletos em lote', () => {
     expect(screen.getByRole('button', { name: 'Continuar para confirmação' }).disabled).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Confirmar importação' }));
-    await screen.findByText('Importação confirmada e indicadores atualizados.');
+    await screen.findByText('Arquivo importado com sucesso. Os indicadores foram atualizados.');
     expect(api.saveIndicatorImportReview).toHaveBeenLastCalledWith(batch.id, expect.arrayContaining([
       expect.objectContaining({ id: '3', included: false, reviewStatus: 'EXCLUDED' }),
       expect.objectContaining({ id: '4', included: false, reviewStatus: 'EXCLUDED' }),

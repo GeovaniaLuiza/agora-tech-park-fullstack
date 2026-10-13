@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, ChevronDown, Download, FileSpreadsheet, RotateCcw, Save, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import ExportDialog from '../components/IndicatorExportDialog.jsx';
 import { IMPORT_FILE_TOO_LARGE_MESSAGE, MAX_IMPORT_BYTES } from '../config/indicatorImport.js';
 import {
@@ -55,6 +56,42 @@ function MonthlyPreview({ values = [], resident = false }) {
   return <section className="panel monthly-preview"><header><h3>Preview mensal</h3><small>{resident ? 'Empresas ativas no mês, sem duplicar contratos ou salas.' : 'Somente eventos selecionados e válidos.'}</small></header><div>{months.map((month, index) => <span key={month}><small>{month}</small><strong>{values[index] ?? 0}</strong></span>)}</div></section>;
 }
 function Status({ value }) { return <span className={`import-status ${String(value || '').toLowerCase()}`}>{statusLabels[value] || value}</span>; }
+
+function PendingImportContext({ batch, onContinue, onDiscard, busy, discarding }) {
+  return <>
+    <h3>Existe uma importação não finalizada.</h3>
+    <dl><dt>Arquivo</dt><dd>{batch.fileName || 'Arquivo não informado'}</dd>
+      <dt>Status</dt><dd>{statusLabels[batch.status]}</dd>
+      <dt>Data</dt><dd>{batch.createdAt ? new Date(batch.createdAt).toLocaleDateString('pt-BR') : 'Data não informada'}</dd></dl>
+    <p id="pending-import-description">Descartar preserva o histórico do lote e não altera indicadores já confirmados.</p>
+    <div className="import-actions">{onContinue && <button className="button primary" disabled={busy} onClick={onContinue}>Continuar importação</button>}
+      <button className="button secondary" disabled={busy} onClick={onDiscard}>{discarding ? 'Descartando…' : 'Descartar e iniciar nova'}</button></div>
+  </>;
+}
+
+function PendingImportDialog({ error, ...props }) {
+  const dialog = useRef(null);
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    dialog.current.querySelector('button').focus();
+    return () => previousFocus?.focus();
+  }, []);
+  const trapFocus = (event) => {
+    if (event.key !== 'Tab') return;
+    const buttons = [...dialog.current.querySelectorAll('button:not(:disabled)')];
+    if (!buttons.length) { event.preventDefault(); return; }
+    if (document.activeElement === (event.shiftKey ? buttons[0] : buttons.at(-1))) {
+      event.preventDefault();
+      (event.shiftKey ? buttons.at(-1) : buttons[0]).focus();
+    }
+  };
+  return createPortal(<div ref={dialog} className="management-modal" role="dialog" aria-modal="true" aria-label="Importação pendente" aria-describedby="pending-import-description" onKeyDown={trapFocus}>
+    <section className="panel export-dialog import-pending">
+      <PendingImportContext {...props} />
+      {error && <div className="error" role="alert">{error}</div>}
+    </section>
+  </div>, document.body);
+}
 
 const reviewDecision = (item, included) => ({
   ...item, included,
@@ -218,7 +255,7 @@ function ImportFlow({ type }) {
     getIndicatorImportDraft(type, centerId).then((draft) => {
       if (!active || fileSelected.current) return;
       setError('');
-      if (resumableStatuses.includes(draft?.status)) setPendingBatch(draft);
+      if (draft?.importType === type && resumableStatuses.includes(draft?.status)) setPendingBatch(draft);
     }).catch((reason) => { if (active && !fileSelected.current) { setError(reason.message); setDraftLookupFailed(true); } })
       .finally(() => { if (active) setCheckingDraft(false); });
     return () => { active = false; };
@@ -339,18 +376,13 @@ function ImportFlow({ type }) {
   };
   const toggleExpanded = (id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
-  return <div className="content indicator-import-page"><header className="import-heading"><div><span>INDICADORES · IMPORTAÇÃO</span><h2>{config.title}</h2><p>{config.subtitle}</p></div>{batch && <Status value={batch.status} />}</header><Stepper active={activeStep} />
-    {error && !exportDialog && !(realFormatFlow && stage === 5 && editable) && <div className="error" role="alert">{error}</div>}{message && <div className="success-message" role="status">{message}</div>}
+  return <div className="content indicator-import-page" inert={Boolean(pendingBatch)}><header className="import-heading"><div><span>INDICADORES · IMPORTAÇÃO</span><h2>{config.title}</h2><p>{config.subtitle}</p></div>{batch && <Status value={batch.status} />}</header><Stepper active={activeStep} />
+    {error && !pendingBatch && !exportDialog && !(realFormatFlow && stage === 5 && editable) && <div className="error" role="alert">{error}</div>}{message && <div className="success-message" role="status">{message}</div>}
     {checkingDraft && <p role="status">Verificando importação pendente…</p>}
     {draftLookupFailed && <button className="button secondary" disabled={busy} onClick={() => { fileSelected.current = false; setDraftAttempt((current) => current + 1); }}>Tentar consultar importação novamente</button>}
-    {activePendingBatch && <section className="panel import-pending" aria-label="Importação pendente">
-      <h3>Existe uma importação não finalizada.</h3>
-      <dl><dt>Arquivo</dt><dd>{activePendingBatch.fileName || 'Arquivo não informado'}</dd>
-        <dt>Status</dt><dd>{statusLabels[activePendingBatch.status]}</dd>
-        <dt>Data</dt><dd>{activePendingBatch.createdAt ? new Date(activePendingBatch.createdAt).toLocaleDateString('pt-BR') : 'Data não informada'}</dd></dl>
-      <p>Descartar preserva o histórico do lote e não altera indicadores já confirmados.</p>
-      <div className="import-actions">{pendingBatch && <button className="button primary" disabled={busy} onClick={continueImport}>Continuar importação</button>}
-        <button className="button secondary" disabled={busy} onClick={discardImport}>{discarding ? 'Descartando…' : 'Descartar e iniciar nova'}</button></div>
+    {pendingBatch && <PendingImportDialog batch={pendingBatch} onContinue={continueImport} onDiscard={discardImport} busy={busy} discarding={discarding} error={error} />}
+    {!pendingBatch && activePendingBatch && <section className="panel import-pending" aria-label="Importação pendente">
+      <PendingImportContext batch={activePendingBatch} onDiscard={discardImport} busy={busy} discarding={discarding} />
     </section>}
     {realFormatFlow && stage === 5 && editable && <section ref={confirmationActions} className="panel import-confirm-actions" aria-label="Confirmação final da importação">
       <div><strong>Etapa 5 · Confirmação final</strong><p>{summary.included} {type === 'EVENTS' ? 'eventos incluídos' : 'empresas incluídas'}. Confirmar importação grava os registros e atualiza os indicadores.</p>{error && !exportDialog && <div className="error" role="alert">{error}</div>}</div>

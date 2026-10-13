@@ -9,7 +9,7 @@ export async function findCenter(id) {
 export async function findPrevious({ fileHash, importType, centerId }) {
   const { rows } = await query(
     `SELECT id,file_name,status,summary,created_at,confirmed_at FROM indicator_import_batches
-     WHERE file_hash=$1 AND import_type=$2 AND innovation_center_id=$3
+     WHERE file_hash=$1 AND import_type=$2 AND innovation_center_id=$3 AND status='IMPORTED'
      ORDER BY created_at DESC LIMIT 1`,
     [fileHash, importType, centerId],
   );
@@ -17,17 +17,38 @@ export async function findPrevious({ fileHash, importType, centerId }) {
 }
 
 export async function createBatch(data) {
-  const { rows } = await query(
-    `INSERT INTO indicator_import_batches(
-       import_type,file_name,file_hash,file_size,mime_type,sheet_name,innovation_center_id,year,status,
-       total_records,total_ignored,total_warnings,summary,warnings,draft,created_by
-     ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16)
-     RETURNING *`,
-    [data.importType, data.fileName, data.fileHash, data.fileSize, data.mimeType, data.sheetName,
-      data.centerId, data.year, data.status, data.totalRecords, data.totalIgnored, data.totalWarnings,
-      JSON.stringify(data.summary), JSON.stringify(data.warnings), JSON.stringify(data.draft), data.userId],
-  );
-  return rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Use the same center lock as confirmation/discard, including other users.
+    await client.query('SELECT id FROM innovation_centers WHERE id=$1 FOR UPDATE', [data.centerId]);
+    const current = await client.query(
+      'SELECT id,status FROM indicator_import_batches WHERE innovation_center_id=$1 AND import_type=$2 AND is_current FOR UPDATE',
+      [data.centerId, data.importType],
+    );
+    if (current.rows[0] && !['IMPORTED', 'CANCELLED', 'FAILED'].includes(current.rows[0].status)) {
+      throw serviceError(409, 'Existe uma importação não finalizada. Continue ou descarte o lote atual antes de iniciar outro.', 'IMPORT_ACTIVE_EXISTS');
+    }
+    await client.query(
+      'UPDATE indicator_import_batches SET is_current=FALSE WHERE innovation_center_id=$1 AND import_type=$2 AND is_current',
+      [data.centerId, data.importType],
+    );
+    const { rows } = await client.query(
+      `INSERT INTO indicator_import_batches(
+         import_type,file_name,file_hash,file_size,mime_type,sheet_name,innovation_center_id,year,status,
+         total_records,total_ignored,total_warnings,summary,warnings,draft,created_by,is_current
+       ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16,TRUE)
+       RETURNING *`,
+      [data.importType, data.fileName, data.fileHash, data.fileSize, data.mimeType, data.sheetName,
+        data.centerId, data.year, data.status, data.totalRecords, data.totalIgnored, data.totalWarnings,
+        JSON.stringify(data.summary), JSON.stringify(data.warnings), JSON.stringify(data.draft), data.userId],
+    );
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
 }
 
 export async function findBatch(id) {
@@ -39,14 +60,14 @@ export async function findBatch(id) {
   return rows[0];
 }
 
-export async function latestDraft({ importType, centerId, userId }) {
+export async function latestDraft({ importType, centerId }) {
   const { rows } = await query(
     `SELECT b.*,c.name AS center_name FROM indicator_import_batches b
      JOIN innovation_centers c ON c.id=b.innovation_center_id
-     WHERE b.import_type=$1 AND b.innovation_center_id=$2 AND b.created_by=$3
+     WHERE b.import_type=$1 AND b.innovation_center_id=$2 AND b.is_current
        AND b.status IN ('REVIEW_PENDING','WITH_WARNINGS','VALIDATED')
-     ORDER BY b.updated_at DESC LIMIT 1`,
-    [importType, centerId, userId],
+     ORDER BY b.created_at DESC,b.updated_at DESC,b.id DESC LIMIT 1`,
+    [importType, centerId],
   );
   return rows[0];
 }
@@ -55,11 +76,32 @@ export async function saveDraft(id, { draft, summary, warnings, status }) {
   const { rows } = await query(
     `UPDATE indicator_import_batches SET draft=$2::jsonb,summary=$3::jsonb,warnings=$4::jsonb,status=$5,
        total_records=$6,total_ignored=$7,total_warnings=$8,updated_at=NOW()
-     WHERE id=$1 AND status IN ('REVIEW_PENDING','WITH_WARNINGS','VALIDATED') RETURNING *`,
+     WHERE id=$1 AND is_current AND status IN ('REVIEW_PENDING','WITH_WARNINGS','VALIDATED') RETURNING *`,
     [id, JSON.stringify(draft), JSON.stringify(summary), JSON.stringify(warnings), status,
       summary.records || 0, summary.excluded || 0, warnings.length],
   );
   return rows[0];
+}
+
+export async function cancelBatch(batch, finalize) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT id FROM innovation_centers WHERE id=$1 FOR UPDATE', [batch.innovation_center_id]);
+    const { rows } = await client.query(
+      `UPDATE indicator_import_batches SET status='CANCELLED',updated_at=NOW()
+       WHERE id=$1 AND is_current AND status IN ('REVIEW_PENDING','WITH_WARNINGS','VALIDATED') RETURNING *`,
+      [batch.id],
+    );
+    if (!rows[0]) throw serviceError(409, 'Esta importação não está mais ativa para descarte. Recarregue a tela.', 'IMPORT_NOT_CANCELLABLE');
+    if (finalize) await finalize(client);
+    // Keep the current marker on the terminal batch so historical drafts never resurface.
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
 }
 
 export async function replaceBatchRecords(batch, records, userId, finalize) {
@@ -68,9 +110,9 @@ export async function replaceBatchRecords(batch, records, userId, finalize) {
     await client.query('BEGIN');
     // Serialize imports for the same center, including different batches.
     await client.query('SELECT id FROM innovation_centers WHERE id=$1 FOR UPDATE', [batch.innovation_center_id]);
-    const locked = await client.query('SELECT status,updated_at FROM indicator_import_batches WHERE id=$1 FOR UPDATE', [batch.id]);
+    const locked = await client.query('SELECT status,updated_at,is_current FROM indicator_import_batches WHERE id=$1 FOR UPDATE', [batch.id]);
     if (locked.rows[0]?.status === 'IMPORTED') throw serviceError(409, 'Esta importação já foi confirmada.', 'IMPORT_ALREADY_CONFIRMED');
-    if (!locked.rows[0] || !['REVIEW_PENDING', 'WITH_WARNINGS', 'VALIDATED'].includes(locked.rows[0].status)
+    if (!locked.rows[0]?.is_current || !['REVIEW_PENDING', 'WITH_WARNINGS', 'VALIDATED'].includes(locked.rows[0].status)
       || new Date(locked.rows[0].updated_at).getTime() !== new Date(batch.updated_at).getTime()) {
       throw serviceError(409, 'A revisão foi alterada. Recarregue a importação antes de confirmar.', 'IMPORT_NOT_CONFIRMABLE');
     }

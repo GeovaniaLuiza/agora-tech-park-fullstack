@@ -43,6 +43,42 @@ Nenhum evento entra no indicador antes da revisão e confirmação final.
 
 ## Consolidação e reprocessamento
 
+### Lote atual e descarte
+
+Cada combinação de centro e tipo (`EVENTS` ou `RESIDENTS`) tem no máximo um
+lote atual, compartilhado entre os gestores. O marcador `is_current` possui
+índice único parcial. A criação de lote e o descarte usam o mesmo bloqueio
+transacional do centro usado na confirmação, impedindo uploads concorrentes
+de criarem dois lotes atuais.
+
+`GET /api/indicator-imports/:type/draft?centerId=...` retorna somente o lote
+atual em `VALIDATED`, `WITH_WARNINGS` ou `REVIEW_PENDING`. Estados terminais
+não são retomáveis. A tela apresenta arquivo, status e data, e exige a escolha
+entre **Continuar importação** e **Descartar e iniciar nova**. Continuar abre
+a revisão do lote exibido com suas decisões salvas.
+
+`POST /api/indicator-imports/batches/:id/cancel` marca o lote pendente atual
+como `CANCELLED` e registra `INDICATOR_IMPORT_CANCELLED` na mesma transação.
+Não exclui o lote, seu draft ou registros/valores de indicadores. Lotes
+confirmados e lotes históricos não podem ser descartados por esse endpoint.
+Novo upload com lote atual pendente retorna `409 IMPORT_ACTIVE_EXISTS`, mesmo
+com `reprocess=true`. Após descarte, é possível iniciar uma nova geração.
+A proteção contra repetir um arquivo já confirmado permanece.
+
+A migration `017_current_indicator_import.sql` mantém todos os lotes e status
+existentes. Marca somente o lote mais recente por `created_at`, com desempate
+por `updated_at` e ID, para cada centro/tipo. Os pendentes mais antigos ficam
+preservados para auditoria, sem serem promovidos ao concluir ou descartar o
+atual. O marcador permanece no lote terminal até a criação da próxima geração.
+Revisão e confirmação também recusam lotes históricos.
+
+A migration precisa ser aplicada antes de iniciar o backend desta versão.
+No primeiro rollout, evitar novos uploads entre a aplicação da migration e a
+troca do backend: a versão anterior não preenche `is_current`. A aplicação em
+produção e qualquer janela operacional devem seguir o procedimento de deploy.
+
+### Reprocessamento dos registros confirmados
+
 A chave de atividade combina, em JSON e com hash SHA-256:
 
 1. Cliente, ou Empresa quando Cliente está vazio;

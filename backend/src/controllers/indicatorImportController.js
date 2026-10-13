@@ -20,6 +20,7 @@ export const draft = async (req, res, next) => { try { res.json(await service.ge
 export const review = async (req, res, next) => { try { res.json(await service.saveReview(req.params.id, req.body, req.user)); } catch (error) { next(error); } };
 export const groupEvents = async (req, res, next) => { try { res.json(await service.groupEvents(req.params.id, req.body, req.user)); } catch (error) { next(error); } };
 export const confirm = async (req, res, next) => { try { res.json(await service.confirm(req.params.id, req.user)); } catch (error) { next(error); } };
+export const cancel = async (req, res, next) => { try { res.json(await service.cancel(req.params.id, req.user)); } catch (error) { next(error); } };
 export const exportStatus = async (req, res, next) => { try { res.json(await workbookStatus(req.query, req.user)); } catch (error) { next(error); } };
 export const exportWorkbook = async (req, res, next) => {
   try {

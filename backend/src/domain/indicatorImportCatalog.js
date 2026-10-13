@@ -2,7 +2,7 @@ export const IMPORT_TYPES = Object.freeze({ EVENTS: 'EVENTS', RESIDENTS: 'RESIDE
 export const IMPORT_TYPE_VALUES = Object.freeze(Object.values(IMPORT_TYPES));
 export const IMPORT_STATUS = Object.freeze({
   NOT_IMPORTED: 'NOT_IMPORTED', PROCESSING: 'PROCESSING', REVIEW_PENDING: 'REVIEW_PENDING',
-  WITH_WARNINGS: 'WITH_WARNINGS', VALIDATED: 'VALIDATED', IMPORTED: 'IMPORTED', FAILED: 'FAILED',
+  WITH_WARNINGS: 'WITH_WARNINGS', VALIDATED: 'VALIDATED', IMPORTED: 'IMPORTED', FAILED: 'FAILED', CANCELLED: 'CANCELLED',
 });
 
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';

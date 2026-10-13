@@ -78,8 +78,16 @@ export async function preview({ type, fileName, mimeType, buffer, centerId, repr
 export async function getBatch(id, user) { ensureManager(user); return presentBatch(await ensureBatch(id)); }
 export async function getLatestDraft({ type, centerId }, user) {
   ensureManager(user); const importType = ensureType(type);
-  const batch = await repository.latestDraft({ importType, centerId, userId: user.sub });
+  const batch = await repository.latestDraft({ importType, centerId });
   return batch ? presentBatch(batch) : null;
+}
+
+export async function cancel(id, user) {
+  ensureManager(user);
+  const batch = await ensureBatch(id);
+  const saved = await repository.cancelBatch(batch, (client) => audit({ userId: user.sub, action: 'INDICATOR_IMPORT_CANCELLED', entity: 'indicator_import_batch', entityId: id,
+    details: { importType: batch.import_type, fileName: batch.file_name, previousStatus: batch.status } }, client));
+  return presentBatch({ ...saved, center_name: batch.center_name });
 }
 
 function reviewedEvents(original, submitted) {
@@ -181,6 +189,7 @@ export async function groupEvents(id, { itemIds, participantStrategy = 'MANUAL',
   const items = [...remaining, merged];
   const summary = summarizeEvents(items, batch.year);
   const saved = await repository.saveDraft(id, { draft: { ...batch.draft, items }, summary, warnings: batch.warnings, status: batch.warnings.length ? IMPORT_STATUS.WITH_WARNINGS : IMPORT_STATUS.VALIDATED });
+  if (!saved) throw serviceError(409, 'Esta importação não pode mais ser revisada.', 'IMPORT_NOT_EDITABLE');
   return presentBatch({ ...saved, center_name: batch.center_name });
 }
 

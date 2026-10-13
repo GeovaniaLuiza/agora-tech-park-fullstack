@@ -12,7 +12,8 @@ const TYPES = {
   EVENTS: { title: 'Importar Indicadores de Eventos', subtitle: 'Importe uma planilha de Eventos ou Exportação de Reservas e revise quais registros serão considerados eventos.' },
   RESIDENTS: { title: 'Importar Empresas Residentes', subtitle: 'Importe Clientes.xlsx e revise as empresas e suas ocupações no HUB, MOB e UNI.' },
 };
-const steps = ['Arquivo', 'Validação', 'Preview', 'Revisão', 'Confirmar', 'Indicadores atualizados', 'Baixar XLSX'];
+const steps = ['Arquivo', 'Validação', 'Preview', 'Revisão', 'Confirmar', 'Indicadores atualizados', 'Concluído'];
+const resumableStatuses = ['REVIEW_PENDING', 'WITH_WARNINGS', 'VALIDATED'];
 const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const PAGE_SIZE = 20;
 const statusLabels = { VALID: 'Válido', WARNING: 'Aviso', REVIEW_REQUIRED: 'Revisão necessária', IGNORED: 'Ignorado', PENDING: 'Pendente de revisão', REVIEW_PENDING: 'Pendente de revisão', VALIDATED: 'Validado', WITH_WARNINGS: 'Com alertas', IMPORTED: 'Importado', PROCESSING: 'Processando', FAILED: 'Erro', EXCLUDED: 'Excluído', ACTIVE: 'Ativa', ENDED: 'Encerrada', FUTURE: 'Futura' };
@@ -175,7 +176,7 @@ function ImportFlow({ type }) {
   const [options, setOptions] = useState({ eventModes: [], eventTypes: [], maxBytes: MAX_IMPORT_BYTES });
   const [file, setFile] = useState(null), [batch, setBatch] = useState(null), [items, setItems] = useState([]);
   const [processing, setProcessing] = useState(false), [saving, setSaving] = useState(false), [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState(''), [message, setMessage] = useState(''), [dirty, setDirty] = useState(false), [exported, setExported] = useState(false);
+  const [error, setError] = useState(''), [message, setMessage] = useState(''), [dirty, setDirty] = useState(false);
   const [selected, setSelected] = useState(new Set()), [expanded, setExpanded] = useState(new Set());
   const [eventFilters, setEventFilters] = useState({ date: '', location: '', name: '', status: '', inclusion: '', participants: '', duplicate: false });
   const [residentFilters, setResidentFilters] = useState({ onlyBlocks: false, name: '', status: '', review: '' });
@@ -186,6 +187,7 @@ function ImportFlow({ type }) {
   const [ignoreDialog, setIgnoreDialog] = useState(false);
   const mounted = useRef(false);
   const fileSelected = useRef(false);
+  const fileInput = useRef(null);
   const confirmationActions = useRef(null);
 
   useEffect(() => {
@@ -210,7 +212,7 @@ function ImportFlow({ type }) {
     if (!centerId) return;
     let active = true;
     getIndicatorImportDraft(type, centerId).then((draft) => {
-      if (!active || fileSelected.current || !draft) return;
+      if (!active || fileSelected.current || !resumableStatuses.includes(draft?.status)) return;
       const restoredItems = readItems(draft, type);
       if (window.confirm('Existe uma importação não finalizada. Deseja continuar de onde parou?')) { setError(''); setBatch(draft); setItems(restoredItems); setStage(4); }
     }).catch((reason) => { if (active && !fileSelected.current) setError(reason.message); });
@@ -221,7 +223,7 @@ function ImportFlow({ type }) {
   const setReviewedItems = (updater) => { setError(''); setStage(4); setItems(updater); setDirty(true); setMessage(''); };
   const updateEventFilters = (updater) => { setEventFilters(updater); setPage(1); };
   const updateResidentFilters = (updater) => { setResidentFilters(updater); setPage(1); };
-  const activeStep = realFormatFlow ? (exported ? steps.length + 1 : stage) : (exported ? steps.length + 1 : batch?.status === 'IMPORTED' ? 7 : batch ? (dirty ? 4 : 3) : processing || file ? 2 : 1);
+  const activeStep = batch?.status === 'IMPORTED' ? steps.length + 1 : realFormatFlow ? stage : batch ? (dirty ? 4 : 3) : processing || file ? 2 : 1;
   const editable = batch && batch.status !== 'IMPORTED';
   const busy = processing || saving || confirming;
   // Row selection is temporary; only included decisions are persisted in the draft.
@@ -268,7 +270,7 @@ function ImportFlow({ type }) {
     setError((current) => current === IMPORT_FILE_TOO_LARGE_MESSAGE ? '' : current);
     setStage(5);
   };
-  const confirm = async () => { setConfirming(true); setError(''); try { if (dirty) await saveIndicatorImportReview(batch.id, items); if (!mounted.current) return; const loaded = await confirmIndicatorImport(batch.id); if (!mounted.current) return; const loadedItems = readItems(loaded, type); setError(''); setBatch(loaded); setItems(loadedItems); setDirty(false); setStage(6); setMessage('Importação confirmada e indicadores atualizados.'); } catch (reason) { if (mounted.current) {
+  const confirm = async () => { setConfirming(true); setError(''); try { if (dirty) await saveIndicatorImportReview(batch.id, items); if (!mounted.current) return; const loaded = await confirmIndicatorImport(batch.id); if (!mounted.current) return; const loadedItems = readItems(loaded, type); setError(''); setBatch(loaded); setItems(loadedItems); setDirty(false); setStage(7); setMessage('Arquivo importado com sucesso. Os indicadores foram atualizados.'); } catch (reason) { if (mounted.current) {
     setError(reason.message);
     if (reason.code === 'REVIEW_REQUIRED' && Array.isArray(reason.issues)) {
       setItems((current) => current.map((item) => {
@@ -292,8 +294,21 @@ function ImportFlow({ type }) {
     setSelected(new Set());
   };
   const group = async () => { setError(''); try { if (dirty && !await save()) return; const loaded = await groupImportedEvents(batch.id, { itemIds: [...selected], participantStrategy: groupStrategy, participants: groupParticipants }); if (!mounted.current) return; const loadedItems = readItems(loaded, type); setError(''); setBatch(loaded); setItems(loadedItems); setSelected(new Set()); setDirty(false); setMessage('Reservas agrupadas em um único evento.'); } catch (reason) { if (mounted.current) setError(reason.message); } };
-  const openExport = async () => { setStage(7); setError(''); try { const status = await getOfficialWorkbookStatus(centerId, batch?.year || 2026); if (!mounted.current) return; setExportDialog({ status, strategy: 'CANCEL' }); } catch (reason) { if (mounted.current) setError(reason.message); } };
-  const generate = async () => { setGenerating(true); try { const report = await downloadOfficialIndicatorWorkbook({ centerId, year: batch?.year || 2026, strategy: exportDialog.strategy }); if (!mounted.current) return; downloadBlob(report); setExported(true); setExportDialog(null); setMessage('Planilha oficial gerada sem alterar o template original.'); } catch (reason) { if (mounted.current) setError(reason.message); } finally { if (mounted.current) setGenerating(false); } };
+  const openExport = async () => { setError(''); try { const status = await getOfficialWorkbookStatus(centerId, batch?.year || 2026); if (!mounted.current) return; setExportDialog({ status, strategy: 'CANCEL' }); } catch (reason) { if (mounted.current) setError(reason.message); } };
+  const generate = async () => { setGenerating(true); try { const report = await downloadOfficialIndicatorWorkbook({ centerId, year: batch?.year || 2026, strategy: exportDialog.strategy }); if (!mounted.current) return; downloadBlob(report); setExportDialog(null); setMessage('Planilha oficial gerada sem alterar o template original.'); } catch (reason) { if (mounted.current) setError(reason.message); } finally { if (mounted.current) setGenerating(false); } };
+  const startNewImport = () => {
+    // This only clears the current view; imported records and audit stay persisted.
+    // Ignore a pending draft response once the user explicitly starts a new file.
+    fileSelected.current = true;
+    if (fileInput.current) fileInput.current.value = '';
+    setFile(null); setBatch(null); setItems([]); setDirty(false);
+    setSelected(new Set()); setExpanded(new Set()); setPage(1); setStage(1);
+    setEventFilters({ date: '', location: '', name: '', status: '', inclusion: '', participants: '', duplicate: false });
+    setResidentFilters({ onlyBlocks: false, name: '', status: '', review: '' });
+    setGroupStrategy('MANUAL'); setGroupParticipants('');
+    setExportDialog(null); setIgnoreDialog(false); setError(''); setMessage('');
+    fileInput.current?.focus();
+  };
   const toggleExpanded = (id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   return <div className="content indicator-import-page"><header className="import-heading"><div><span>INDICADORES · IMPORTAÇÃO</span><h2>{config.title}</h2><p>{config.subtitle}</p></div>{batch && <Status value={batch.status} />}</header><Stepper active={activeStep} />
@@ -313,7 +328,7 @@ function ImportFlow({ type }) {
     <FormatGuide type={type} maxBytes={MAX_IMPORT_BYTES} />
     {type === 'EVENTS' && batch && <p>Formato detectado: {batch.sheetName === 'Exportação' ? 'Exportação de Reservas' : 'Planilha de Eventos'}</p>}
     {batch?.warnings?.some((warning) => warning.code === 'NO_CONFIRMED_RESERVATIONS') && <p>Não foram encontradas reservas confirmadas para importação.</p>}
-    <section className="panel import-upload"><div><FileSpreadsheet /><div><strong>{file?.name || batch?.fileName || 'Nenhum arquivo selecionado'}</strong><small>Somente XLSX · limite de {Math.round(MAX_IMPORT_BYTES / 1024 / 1024)} MB · os dados não serão importados antes da confirmação</small>{realFormatFlow && (file || batch) && <small>Tamanho: {((file?.size ?? batch?.fileSize ?? 0) / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} KB · Aba detectada: {batch?.sheetName || 'aguardando validação'} · Linhas: {batch?.summary?.rowsRead ?? 'aguardando validação'}</small>}</div></div><label>Centro<select value={centerId} onChange={(event) => { setCenterId(event.target.value); if (realFormatFlow) { setBatch(null); setItems([]); } }} disabled={busy || (realFormatFlow && Boolean(batch))}>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label><label className="button secondary file-button"><Upload />Selecionar arquivo<input disabled={busy} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { fileSelected.current = true; const nextFile = event.target.files?.[0] || null; setFile(nextFile); if (nextFile && nextFile.size <= MAX_IMPORT_BYTES) setError((current) => current === IMPORT_FILE_TOO_LARGE_MESSAGE ? '' : current); if (realFormatFlow) { setBatch(null); setItems([]); setStage(1); setDirty(false); setExported(false); } }} /></label><button className="button primary" disabled={!file || !centerId || busy} onClick={() => validate(false)}>{processing ? 'Processando...' : 'Validar'}</button></section>
+    <section className="panel import-upload"><div><FileSpreadsheet /><div><strong>{file?.name || batch?.fileName || 'Nenhum arquivo selecionado'}</strong><small>Somente XLSX · limite de {Math.round(MAX_IMPORT_BYTES / 1024 / 1024)} MB · os dados não serão importados antes da confirmação</small>{realFormatFlow && (file || batch) && <small>Tamanho: {((file?.size ?? batch?.fileSize ?? 0) / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} KB · Aba detectada: {batch?.sheetName || 'aguardando validação'} · Linhas: {batch?.summary?.rowsRead ?? 'aguardando validação'}</small>}</div></div><label>Centro<select value={centerId} onChange={(event) => { setCenterId(event.target.value); if (realFormatFlow) { setBatch(null); setItems([]); } }} disabled={busy || (realFormatFlow && Boolean(batch))}>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label><label className="button secondary file-button"><Upload />Selecionar arquivo<input ref={fileInput} disabled={busy} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { fileSelected.current = true; const nextFile = event.target.files?.[0] || null; setFile(nextFile); if (nextFile && nextFile.size <= MAX_IMPORT_BYTES) setError((current) => current === IMPORT_FILE_TOO_LARGE_MESSAGE ? '' : current); if (realFormatFlow) { setBatch(null); setItems([]); setStage(1); setDirty(false); } }} /></label><button className="button primary" disabled={!file || !centerId || busy} onClick={() => validate(false)}>{processing ? 'Processando...' : 'Validar'}</button></section>
     {batch && <>{editable && realFormatFlow && <nav className="import-actions" aria-label="Etapas da importação">{[2, 3, 4, 5].map((step) => <button key={step} disabled={busy || stage === step || (step === 5 && !canConfirm)} aria-current={stage === step ? 'step' : undefined} className={stage === step ? 'button primary' : 'button secondary'} onClick={() => step === 5 ? advanceToConfirmation() : setStage(step)}>{step === 5 ? 'Ir para confirmação' : steps[step - 1]}</button>)}</nav>}<SummaryCards type={type} summary={{ ...summary, invalidIncluded }} />{(!realFormatFlow || (stage >= 3 && stage <= 4)) && <>{type === 'EVENTS' ? <EventFilters filters={eventFilters} setFilters={updateEventFilters} /> : <ResidentFilters filters={residentFilters} setFilters={updateResidentFilters} />}
       {editable && (!realFormatFlow || stage === 4) && <section className="panel import-review-actions" aria-label="Decisões da revisão"><h3>Decisões da revisão</h3><p>Inclua os registros válidos e com avisos. Corrija ou ignore os registros com erros obrigatórios antes de confirmar.</p><div className="import-actions"><button className="button primary" disabled={busy || !eligibleItems.length} onClick={includeEligible}>Incluir elegíveis</button><button className="button secondary" disabled={busy || !incompleteItems.length} onClick={() => setIgnoreDialog(true)}>Ignorar registros incorretos</button></div></section>}
       {editable && (!realFormatFlow || stage === 4) && <div className="import-actions"><span>{selected.size} selecionado(s)</span>{type === 'EVENTS' ? <><select value={groupStrategy} onChange={(event) => setGroupStrategy(event.target.value)}><option value="MANUAL">Participantes: informar manualmente</option><option value="MAX">Participantes: maior valor</option><option value="SUM">Participantes: somar valores</option></select>{groupStrategy === 'MANUAL' && <input type="number" min="0" value={groupParticipants} onChange={(event) => setGroupParticipants(event.target.value)} placeholder="Participantes" />}<button className="button secondary" disabled={selected.size < 2} onClick={group}>Agrupar selecionados</button></> : <button className="button secondary" onClick={() => setMessage('Empresas já consolidadas por CNPJ; todas as ocupações são preservadas. CNPJ ausente ou inválido exige revisão.')}>Consolidar duplicidades</button>}<button className="button secondary" disabled={busy || !selected.size} onClick={() => bulk(true)}>Incluir selecionados</button><button className="button danger" disabled={!selected.size} onClick={() => bulk(false)}>Excluir dos indicadores</button><button aria-label="Restaurar selecionados" className="button secondary" disabled={!selected.size} onClick={() => bulk(true)}><RotateCcw />Restaurar</button></div>}
@@ -330,6 +345,6 @@ function ImportFlow({ type }) {
           <strong>{item.name || 'Não informado'} · Linha(s): {item.sourceRows.join(', ')}</strong><Status value="IGNORED" /><ReviewAlerts issues={item.issues} />
         </div>)}
       </section>}
-      <footer className="import-footer">{editable && (!realFormatFlow || stage >= 4) && <><button className="button secondary" disabled={busy} onClick={() => save()}><Save />{saving ? 'Salvando...' : 'Salvar revisão'}</button>{(!realFormatFlow || stage !== 5) && <button className="button primary" disabled={!canConfirm} onClick={realFormatFlow ? advanceToConfirmation : confirm}>{confirming ? 'Confirmando...' : !realFormatFlow ? 'Confirmar importação' : 'Continuar para confirmação'}</button>}</>}<button className="button secondary" disabled={batch.status !== 'IMPORTED'} onClick={openExport}><Download />Gerar Planilha de Indicadores</button></footer>
+      <footer className="import-footer">{batch.status === 'IMPORTED' && <button className="button primary" disabled={busy || generating} onClick={startNewImport}>Importar novo arquivo</button>}{editable && (!realFormatFlow || stage >= 4) && <><button className="button secondary" disabled={busy} onClick={() => save()}><Save />{saving ? 'Salvando...' : 'Salvar revisão'}</button>{(!realFormatFlow || stage !== 5) && <button className="button primary" disabled={!canConfirm} onClick={realFormatFlow ? advanceToConfirmation : confirm}>{confirming ? 'Confirmando...' : !realFormatFlow ? 'Confirmar importação' : 'Continuar para confirmação'}</button>}</>}<button className="button secondary" disabled={batch.status !== 'IMPORTED'} onClick={openExport}><Download />Gerar Planilha de Indicadores</button></footer>
     </>}{ignoreDialog && <IgnoreIncompleteDialog count={ignoreCandidates.length} onCancel={() => setIgnoreDialog(false)} onIgnore={ignoreIncomplete} disabled={busy} />}<ExportDialog state={exportDialog} setState={setExportDialog} onGenerate={generate} generating={generating} error={error} /></div>;
 }

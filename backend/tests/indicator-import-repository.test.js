@@ -2,11 +2,33 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ connect: vi.fn(), query: vi.fn(), release: vi.fn(), read: vi.fn() }));
 vi.mock('../src/db/pool.js', () => ({ pool: { connect: mocks.connect }, query: mocks.read }));
-import { confirmedRecords, replaceBatchRecords } from '../src/repositories/indicatorImportRepository.js';
+import { confirmedRecords, latestDraft, replaceBatchRecords } from '../src/repositories/indicatorImportRepository.js';
 
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.connect.mockResolvedValue({ query: mocks.query, release: mocks.release });
+});
+
+describe('retomada de importações', () => {
+  it.each(['EVENTS', 'RESIDENTS'])('busca apenas lotes revisáveis de %s do usuário e centro selecionados', async (importType) => {
+    mocks.read.mockResolvedValue({ rows: [{ id: 'pending', status: 'VALIDATED' }] });
+    expect(await latestDraft({ importType, centerId: 'center', userId: 'admin' })).toEqual({ id: 'pending', status: 'VALIDATED' });
+    const [sql, params] = mocks.read.mock.calls[0];
+    expect(sql).toContain('b.import_type=$1 AND b.innovation_center_id=$2 AND b.created_by=$3');
+    expect(sql).toContain("b.status IN ('REVIEW_PENDING','WITH_WARNINGS','VALIDATED')");
+    expect(sql).not.toMatch(/IMPORTED|COMPLETED/);
+    expect(sql).toContain('ORDER BY b.updated_at DESC LIMIT 1');
+    expect(params).toEqual([importType, 'center', 'admin']);
+    expect(mocks.connect).not.toHaveBeenCalled();
+  });
+
+  it('retorna vazio quando não existe lote pendente, sem modificar dados importados', async () => {
+    mocks.read.mockResolvedValue({ rows: [] });
+    expect(await latestDraft({ importType: 'EVENTS', centerId: 'center', userId: 'admin' })).toBeUndefined();
+    expect(mocks.read).toHaveBeenCalledOnce();
+    expect(mocks.read.mock.calls[0][0]).toMatch(/^SELECT/);
+    expect(mocks.connect).not.toHaveBeenCalled();
+  });
 });
 
 describe('confirmação com revisão bloqueada na transação', () => {

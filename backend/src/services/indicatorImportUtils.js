@@ -53,9 +53,9 @@ export const overlaps = (startDate, endDate, start, end) => (!startDate || start
 
 const headerKey = (value) => normalizedKey(value).replace(/\s/g, '');
 
-export async function readExpectedSheet(buffer, { sheetName, headerRow, headers, exactHeaders = false }) {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+export async function readExpectedSheet(buffer, { sheetName, headerRow, headers, exactHeaders = false, workbook: existingWorkbook }) {
+  const workbook = existingWorkbook || new ExcelJS.Workbook();
+  if (!existingWorkbook) await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) return { error: { code: 'SHEET_NOT_FOUND', message: `Aba "${sheetName}" não encontrada.` } };
   const key = exactHeaders ? cleanText : headerKey;

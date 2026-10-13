@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import ExcelJS from 'exceljs';
+import { parseReservationSheet } from './reservationImportParser.js';
 import { EVENT_HEADERS, EVENT_MODES, EVENT_SHEET, IMPORT_YEAR, modeLabels } from '../domain/indicatorImportCatalog.js';
 import { cleanText, countByMonth, isoDateTime, normalizedKey, parseDateValue, parseNumberValue, readExpectedSheet, validationSummary } from './indicatorImportUtils.js';
 
@@ -15,11 +17,26 @@ export function validateEvent(item) {
     if (cleanText(item[field]) && parseNumberValue(item[field], { integer: true }) === null) issue(field, field === 'participants' ? 'Participantes inválidos' : 'Empresas participantes inválidas');
   }
   if (item.mode && !EVENT_MODES.includes(normalizeEventMode(item.mode))) issue('mode', 'Modo desconhecido');
+  if (item.sourceFormat === 'RESERVATIONS') {
+    if (!item.reservationConfirmed) issue('reservationStatus', 'Reserva não confirmada');
+    if (item.sourceIdConflict) issue('sourceId', 'ID da reserva repetido em atividades distintas');
+    if (!item.reservations.every((reservation) => reservation.sourceId)) issue('sourceId', 'ID da reserva ausente');
+    if (!/^([01]\d|2[0-3]):[0-5]\d\s*-\s*([01]\d|2[0-3]):[0-5]\d$/.test(item.schedule)) issue('schedule', 'Horário inválido ou ausente');
+    if (item.endDateRaw && !parseDateValue(item.endDateRaw)) issue('endAt', 'Data de término inválida');
+    if (item.endAt && item.startAt && item.endAt < item.startAt) issue('endAt', 'Data de término anterior ao início');
+  }
   return issues;
 }
 
 export async function parseEventWorkbook(buffer, { year = IMPORT_YEAR } = {}) {
-  const loaded = await readExpectedSheet(buffer, { sheetName: EVENT_SHEET, headerRow: 1, headers: EVENT_HEADERS, exactHeaders: true });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  if (!workbook.getWorksheet(EVENT_SHEET)) {
+    const reservations = workbook.getWorksheet('Exportação');
+    if (reservations) return parseReservationSheet(reservations, year);
+    return { errors: [{ code: 'UNRECOGNIZED_EVENT_FORMAT', message: "Formato de planilha não reconhecido. Utilize uma aba 'Eventos' ou uma exportação válida de reservas com aba 'Exportação'." }], warnings: [], items: [], summary: {} };
+  }
+  const loaded = await readExpectedSheet(buffer, { sheetName: EVENT_SHEET, headerRow: 1, headers: EVENT_HEADERS, exactHeaders: true, workbook });
   if (loaded.error) return { errors: [loaded.error], warnings: [], items: [], summary: {} };
   const items = [], warnings = [];
   loaded.worksheet.eachRow((row, rowNumber) => {
@@ -53,9 +70,10 @@ export async function parseEventWorkbook(buffer, { year = IMPORT_YEAR } = {}) {
 }
 
 export function summarizeEvents(items, year = IMPORT_YEAR) {
-  const included = items.filter((item) => item.included);
+  const included = items.filter((item) => item.included && !item.ignored && item.reviewStatus !== 'EXCLUDED');
   return {
-    ...validationSummary(items), records: items.length, rowsRead: items.length,
+    ...validationSummary(items), records: items.length, rowsRead: items.reduce((count, item) => count + item.sourceRows.length, 0),
+    invalidIncluded: included.filter((item) => validateEvent(item).length).length,
     possibleEvents: items.filter((item) => item.possibleEvent).length,
     included: included.length, reviewed: items.filter((item) => item.included || item.reviewStatus === 'EXCLUDED').length, excluded: items.filter((item) => item.reviewStatus === 'EXCLUDED').length,
     pending: items.filter((item) => item.reviewStatus === 'PENDING').length,

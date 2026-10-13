@@ -100,7 +100,7 @@ describe('importação de indicadores (RF-009)', () => {
     workbook.getWorksheet('Eventos').name = 'Outra';
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     await expect(service.preview({ type: 'EVENTS', fileName: 'Eventos.xlsx', mimeType: XLSX_MIME, buffer, centerId: 'center-1' }, admin))
-      .rejects.toMatchObject({ code: 'SHEET_NOT_FOUND', message: 'Aba "Eventos" não encontrada.' });
+      .rejects.toMatchObject({ code: 'UNRECOGNIZED_EVENT_FORMAT', message: expect.stringContaining('Formato de planilha não reconhecido') });
     expect(mocks.createBatch).not.toHaveBeenCalled();
     expect(mocks.replaceBatchRecords).not.toHaveBeenCalled();
     expect(mocks.recompute).not.toHaveBeenCalled();

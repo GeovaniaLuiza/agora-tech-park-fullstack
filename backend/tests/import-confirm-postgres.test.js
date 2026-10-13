@@ -4,7 +4,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import ExcelJS from 'exceljs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { eventWorkbookFixture, residentWorkbookFixture, residentHomologationWorkbookFixture, eventHomologationWorkbookFixture } from './fixtures/indicator-import-workbooks.js';
+import { eventWorkbookFixture, residentWorkbookFixture, residentHomologationWorkbookFixture, eventHomologationWorkbookFixture, reservationWorkbookFixture } from './fixtures/indicator-import-workbooks.js';
 import { XLSX_MIME } from '../src/domain/indicatorImportCatalog.js';
 
 dotenv.config({ quiet: true });
@@ -103,6 +103,53 @@ async function assertScreens(code, value, month = null, officialValue = value) {
 }
 
 describe('Confirmar → fonte oficial → Indicadores e Dashboard (PostgreSQL real)', () => {
+  it('Exportação → revisão persistida → PostgreSQL → indicador mensal/anual, preserva Eventos e Residentes e reprocessa arquivos diferentes', async () => {
+    const residents = await review(await preview('RESIDENTS', await residentWorkbookFixture()), item => item.sourceRows.includes(3));
+    expect((await confirm(residents.id)).status).toBe(200);
+    const residentRecords = (await setup.query("SELECT * FROM indicator_records WHERE record_type='RESIDENT_COMPANY' ORDER BY id")).rows;
+    const residentValues = (await setup.query("SELECT v.* FROM indicator_values v JOIN indicator_definitions d ON d.id=v.indicator_id WHERE d.code='EMPRESAS_RESIDENTES' ORDER BY v.id")).rows;
+    const old = await review(await preview('EVENTS', await eventWorkbookFixture()), (_item, index) => index === 0);
+    expect((await confirm(old.id)).status).toBe(200);
+    const oldRecords = (await setup.query("SELECT * FROM indicator_records WHERE record_type='EVENT' AND import_batch_id=$1", [old.id])).rows;
+    const buffer = await reservationWorkbookFixture();
+    const batch = await preview('EVENTS', buffer);
+    expect(batch).toMatchObject({ sheetName: 'Exportação', summary: { rowsRead: 115, possibleEvents: 98, ignored: 3 } });
+    const saved = await review(batch, item => item.validationStatus === 'VALID');
+    const reloaded = await http('get', `/api/indicator-imports/batches/${batch.id}`);
+    expect(reloaded.body.draft).toEqual(saved.draft);
+    expect((await confirm(batch.id)).status).toBe(200);
+    const imported = (await setup.query("SELECT * FROM indicator_records WHERE record_type='EVENT' AND active AND deleted_at IS NULL AND extra->>'sourceFormat'='RESERVATIONS'")).rows;
+    expect(imported).toHaveLength(98);
+    expect(imported.flatMap(record => record.extra.reservations)).toHaveLength(112);
+    expect(imported.flatMap(record => record.extra.reservations).every(reservation => reservation.status === 'Confirmada')).toBe(true);
+    expect(Number((await official('EVENTOS_REALIZADOS', 10)).numeric_value)).toBe(98);
+    expect(Number((await official('EVENTOS_REALIZADOS', null)).numeric_value)).toBe(99);
+    await assertScreens('EVENTOS_REALIZADOS', 98, 10);
+    await assertScreens('EVENTOS_REALIZADOS', 99);
+    const endpoint = '/api/indicator-imports/EVENTS/indicators';
+    const october = await http('get', endpoint).query({ centerId, year: 2026, month: 10 });
+    expect(october.body.records).toHaveLength(98);
+    expect(october.body.total).toBe(99);
+    expect((await http('get', endpoint).query({ centerId, year: 2026, month: 3 })).body.records).toHaveLength(1);
+    expect((await http('get', endpoint).query({ centerId, year: 2025 })).body.records).toEqual([]);
+    const otherCenter = randomUUID();
+    await setup.query("INSERT INTO innovation_centers(id,code,name) VALUES($1,'OTHER_IMPORT','Outro centro')", [otherCenter]);
+    expect((await http('get', endpoint).query({ centerId: otherCenter, year: 2026 })).body.records).toEqual([]);
+    const same = await review(await preview('EVENTS', buffer, true), item => item.validationStatus === 'VALID');
+    expect((await confirm(same.id)).status).toBe(200);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.getWorksheet('Exportação');
+    const rows = sheet.getRows(2, 115).map(row => row.values.slice(1)).reverse();
+    sheet.spliceRows(2, 115, ...rows);
+    const reordered = await review(await preview('EVENTS', Buffer.from(await workbook.xlsx.writeBuffer())), item => item.validationStatus === 'VALID');
+    expect((await confirm(reordered.id)).status).toBe(200);
+    expect((await setup.query("SELECT id FROM indicator_records WHERE record_type='EVENT' AND active AND deleted_at IS NULL")).rows).toHaveLength(99);
+    expect((await setup.query("SELECT * FROM indicator_records WHERE import_batch_id=$1", [old.id])).rows).toEqual(oldRecords);
+    expect((await setup.query("SELECT * FROM indicator_records WHERE record_type='RESIDENT_COMPANY' ORDER BY id")).rows).toEqual(residentRecords);
+    expect((await setup.query("SELECT v.* FROM indicator_values v JOIN indicator_definitions d ON d.id=v.indicator_id WHERE d.code='EMPRESAS_RESIDENTES' ORDER BY v.id")).rows).toEqual(residentValues);
+    await assertScreens('EVENTOS_REALIZADOS', 99);
+  }, 20000);
   it('a visão oficial inclui os dois cálculos importados e preserva a origem dos demais indicadores', async () => {
     await setup.query(`INSERT INTO indicator_values(indicator_id,innovation_center_id,year,month,period_start,period_end,numeric_value,source_type)
       SELECT d.id,$1,2026,NULL,'2026-01-01','2026-12-31',v.value,v.source

@@ -4,6 +4,21 @@ import { describe, expect, it } from 'vitest';
 import { createEmailRateLimiter, createRateLimiter } from '../src/middlewares/rateLimits.js';
 
 describe('rate limit por IP', () => {
+  it('647 segundos representam o restante da janela do limiter, sem relação com expiração JWT', async () => {
+    const app = express();
+    app.use(createRateLimiter({ windowMs: 900_000, limit: 1 }, {
+      scope: 'LOGIN',
+      store: {
+        increment: async () => ({ totalHits: 2, resetTime: new Date(Date.now() + 647_000) }),
+        decrement: async () => {}, resetKey: async () => {},
+      },
+    }));
+    app.post('/login', (_req, res) => res.sendStatus(200));
+    const response = await request(app).post('/login');
+    expect(response.status).toBe(429);
+    expect(response.body).toMatchObject({ retryAfterSeconds: 647, rateLimitScope: 'LOGIN' });
+    expect(response.headers['retry-after']).toBe('647');
+  });
   it('retorna JSON padronizado, Retry-After e bloqueia após o limite', async () => {
     const app = express();
     app.use(createRateLimiter({ windowMs: 60_000, limit: 2 }));

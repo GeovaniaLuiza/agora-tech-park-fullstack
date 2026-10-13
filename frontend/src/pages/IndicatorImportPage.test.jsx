@@ -35,6 +35,64 @@ const openReview = async () => {
 };
 
 describe('conclusão e nova importação', () => {
+  it('retenta a exportação, baixa o XLSX do ano concluído e descarta download após sair da tela', async () => {
+    const draft = { ...eventBatch, year: 2025, draft: { items: [{ ...eventItems[0], included: true, reviewStatus: 'VALIDATED' }] } };
+    api.getIndicatorImportDraft.mockResolvedValueOnce(draft);
+    api.confirmIndicatorImport.mockResolvedValueOnce({ ...draft, status: 'IMPORTED' });
+    api.getOfficialWorkbookStatus.mockRejectedValueOnce(new Error('Não foi possível consultar a planilha.'))
+      .mockResolvedValueOnce({ requiresStrategy: false });
+    const report = { blob: new Blob(['xlsx']), filename: 'indicadores_2025.xlsx' };
+    api.downloadOfficialIndicatorWorkbook.mockResolvedValueOnce(report);
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    const createObjectURL = vi.fn(() => 'blob:indicadores-2025');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Continuar para confirmação' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar importação' }));
+    await screen.findByText('Importação concluída');
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Planilha de Indicadores' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível consultar a planilha.');
+    expect(screen.queryByRole('heading', { name: 'Gerar Planilha de Indicadores' })).toBeNull();
+    expect(api.downloadOfficialIndicatorWorkbook).not.toHaveBeenCalled();
+    expect(view.container.querySelectorAll('.import-stepper li.done')).toHaveLength(7);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Planilha de Indicadores' }));
+    await screen.findByRole('heading', { name: 'Gerar Planilha de Indicadores' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByLabelText('Mesclar com os dados existentes'));
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar arquivo' }));
+    await screen.findByText('Planilha oficial gerada sem alterar o template original.');
+    expect(api.getOfficialWorkbookStatus).toHaveBeenCalledTimes(2);
+    expect(api.getOfficialWorkbookStatus).toHaveBeenLastCalledWith('center-1', 2025);
+    expect(api.downloadOfficialIndicatorWorkbook).toHaveBeenCalledExactlyOnceWith({ centerId: 'center-1', year: 2025, strategy: 'MERGE' });
+    expect(createObjectURL).toHaveBeenCalledWith(report.blob);
+    expect(download).toHaveBeenCalledOnce();
+    expect(download.mock.instances[0].download).toBe(report.filename);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:indicadores-2025');
+    expect(screen.queryByRole('heading', { name: 'Gerar Planilha de Indicadores' })).toBeNull();
+    expect(view.container.querySelectorAll('.import-stepper li.done')).toHaveLength(7);
+    expect(api.confirmIndicatorImport).toHaveBeenCalledOnce();
+
+    let resolveDownload;
+    api.getOfficialWorkbookStatus.mockResolvedValueOnce({ requiresStrategy: false });
+    api.downloadOfficialIndicatorWorkbook.mockReturnValueOnce(new Promise((resolve) => { resolveDownload = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Planilha de Indicadores' }));
+    await screen.findByRole('heading', { name: 'Gerar Planilha de Indicadores' });
+    fireEvent.click(screen.getByLabelText('Mesclar com os dados existentes'));
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar arquivo' }));
+    expect(api.downloadOfficialIndicatorWorkbook).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Importar novo arquivo' }).disabled).toBe(true);
+    view.unmount();
+    await act(async () => resolveDownload(report));
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(download).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledOnce();
+  });
+
   it.each(['Eventos', 'Exportação'])('conclui %s e inicia outro arquivo sem modificar a importação persistida', async (sheetName) => {
     const item = { ...eventItems[0], included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID', issues: [] };
     const draft = { ...eventBatch, sheetName, fileName: 'primeiro.xlsx', draft: { items: [item] } };

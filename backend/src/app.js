@@ -14,7 +14,7 @@ import healthRoutes from './routes/healthRoutes.js';
 import indicatorManagementRoutes from './routes/indicatorManagementRoutes.js';
 import indicatorImportRoutes from './routes/indicatorImportRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
-import { configureTrustProxy, createRateLimiter, RATE_LIMIT_CONFIG } from './middlewares/rateLimits.js';
+import { configureTrustProxy, createGlobalRateLimiters } from './middlewares/rateLimits.js';
 import { requestLogger } from './middlewares/requestLogger.js';
 import { metricsHandler, metricsMiddleware } from './observability/metrics.js';
 const app = express();
@@ -25,7 +25,7 @@ app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5174', method
 app.use(requestLogger);
 app.use(metricsMiddleware);
 app.get('/metrics', metricsHandler);
-app.use(createRateLimiter(RATE_LIMIT_CONFIG.global));
+app.use(createGlobalRateLimiters());
 app.use('/api/auth/me/avatar', express.json({ limit: '3mb' }));
 // Import routes authenticate before parsing their larger review bodies.
 app.use('/api/indicator-imports', indicatorImportRoutes);

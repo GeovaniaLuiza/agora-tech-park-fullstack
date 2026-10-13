@@ -108,19 +108,19 @@ describe('lote atual e auditoria com PostgreSQL real', () => {
     } finally { await setup.query('ROLLBACK'); }
   });
 
-  it.each(['VALIDATED', 'WITH_WARNINGS', 'REVIEW_PENDING'])('retoma %s preservando decisões', async (status) => {
-    const current = await preview('EVENTS', await eventWorkbookFixture());
+  it.each(['EVENTS', 'RESIDENTS'].flatMap((type) => ['VALIDATED', 'WITH_WARNINGS', 'REVIEW_PENDING'].map((status) => [type, status])))('retoma %s / %s preservando decisões', async (type, status) => {
+    const current = await preview(type, await (type === 'EVENTS' ? eventWorkbookFixture() : residentWorkbookFixture()));
     await setup.query('UPDATE indicator_import_batches SET status=$2 WHERE id=$1', [current.id, status]);
-    const response = await draft();
+    const response = await draft(type);
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ id: current.id, status, draft: current.draft });
   });
 
-  it.each(['IMPORTED', 'CANCELLED', 'FAILED'])('estado final %s não ressuscita drafts históricos', async (status) => {
-    const current = await preview('EVENTS', await eventWorkbookFixture());
+  it.each(['EVENTS', 'RESIDENTS'].flatMap((type) => ['IMPORTED', 'CANCELLED', 'FAILED'].map((status) => [type, status])))('estado final %s / %s não ressuscita drafts históricos', async (type, status) => {
+    const current = await preview(type, await (type === 'EVENTS' ? eventWorkbookFixture() : residentWorkbookFixture()));
     await historicalBatch(current);
     await setup.query('UPDATE indicator_import_batches SET status=$2 WHERE id=$1', [current.id, status]);
-    expect((await draft()).body).toBeNull();
+    expect((await draft(type)).body).toBeNull();
     expect((await setup.query('SELECT * FROM indicator_import_batches')).rows).toHaveLength(2);
   });
 
@@ -137,29 +137,31 @@ describe('lote atual e auditoria com PostgreSQL real', () => {
     expect((await setup.query("SELECT * FROM indicator_import_batches WHERE status IN ('REVIEW_PENDING','WITH_WARNINGS','VALIDATED')")).rows).toHaveLength(3);
   });
 
-  it('bloqueia novo upload, permite após descarte e preserva registros e valores confirmados', async () => {
-    const buffer = await eventWorkbookFixture();
-    const confirmed = await review(await preview('EVENTS', buffer), (_item, index) => index === 0);
+  it.each(['EVENTS', 'RESIDENTS'])('%s bloqueia novo upload, permite após descarte e preserva registros e valores confirmados', async (type) => {
+    const buffer = await (type === 'EVENTS' ? eventWorkbookFixture() : residentWorkbookFixture());
+    const confirmed = await review(await preview(type, buffer), (item, index) => type === 'EVENTS' ? index === 0 : item.sourceRows.includes(3));
     expect((await confirm(confirmed.id)).status).toBe(200);
     const recordsBefore = (await setup.query('SELECT * FROM indicator_records ORDER BY id')).rows;
     const valuesBefore = (await setup.query('SELECT * FROM indicator_values ORDER BY id')).rows;
-    const current = await preview('EVENTS', buffer, true);
-    const blocked = await http('post', '/api/indicator-imports/EVENTS/preview').query({ centerId, fileName: 'Outro.xlsx', reprocess: true }).set('Content-Type', XLSX_MIME).send(buffer);
+    expect(recordsBefore.length).toBeGreaterThan(0);
+    expect(valuesBefore.length).toBeGreaterThan(0);
+    const current = await preview(type, buffer, true);
+    const blocked = await http('post', `/api/indicator-imports/${type}/preview`).query({ centerId, fileName: 'Outro.xlsx', reprocess: true }).set('Content-Type', XLSX_MIME).send(buffer);
     expect(blocked.status).toBe(409); expect(blocked.body.code).toBe('IMPORT_ACTIVE_EXISTS');
     expect((await cancel(current.id)).body.status).toBe('CANCELLED');
-    expect((await draft()).body).toBeNull();
+    expect((await draft(type)).body).toBeNull();
     expect((await setup.query('SELECT * FROM indicator_records ORDER BY id')).rows).toEqual(recordsBefore);
     expect((await setup.query('SELECT * FROM indicator_values ORDER BY id')).rows).toEqual(valuesBefore);
-    const next = await preview('EVENTS', buffer, true);
+    const next = await preview(type, buffer, true);
     expect(next.id).not.toBe(current.id);
-    expect((await draft()).body.id).toBe(next.id);
+    expect((await draft(type)).body.id).toBe(next.id);
     expect((await cancel(confirmed.id)).status).toBe(409);
     expect((await setup.query("SELECT * FROM audit_logs WHERE action='INDICATOR_IMPORT_CANCELLED'")).rows).toHaveLength(1);
   });
 
-  it('duas criações concorrentes deixam apenas um lote atual', async () => {
-    const buffer = await eventWorkbookFixture();
-    const upload = () => http('post', '/api/indicator-imports/EVENTS/preview').query({ centerId, fileName: 'Eventos.xlsx' }).set('Content-Type', XLSX_MIME).send(buffer);
+  it.each(['EVENTS', 'RESIDENTS'])('duas criações concorrentes de %s deixam apenas um lote atual', async (type) => {
+    const buffer = await (type === 'EVENTS' ? eventWorkbookFixture() : residentWorkbookFixture());
+    const upload = () => http('post', `/api/indicator-imports/${type}/preview`).query({ centerId, fileName: type === 'EVENTS' ? 'Eventos.xlsx' : 'Clientes.xlsx' }).set('Content-Type', XLSX_MIME).send(buffer);
     const responses = await Promise.all([upload(), upload()]);
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     expect((await setup.query('SELECT * FROM indicator_import_batches WHERE is_current')).rows).toHaveLength(1);

@@ -39,33 +39,56 @@ const continuePendingImport = async () => {
 };
 
 describe('gerenciamento explícito do lote ativo', () => {
-  it.each(['VALIDATED', 'WITH_WARNINGS', 'REVIEW_PENDING'])('mostra contexto de %s e só retoma após escolha, preservando decisões', async (status) => {
-    const item = { ...eventItems[0], included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID' };
-    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...eventBatch, status, fileName: 'Eventos.xlsx', createdAt: '2026-10-09T12:00:00Z', draft: { items: [item] } });
+  it('lote EVENTS não interfere na consulta de RESIDENTS', async () => {
+    api.getIndicatorImportDraft.mockResolvedValueOnce(eventBatch);
+    const view = render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
+    expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('RESIDENTS', 'center-1');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByText('Nenhum arquivo selecionado')).toBeTruthy();
+    expect(view.container.querySelector('.import-stepper li.active').textContent).toBe('1Arquivo');
+  });
+
+  it.each(['EVENTS', 'RESIDENTS'].flatMap((type) => ['VALIDATED', 'WITH_WARNINGS', 'REVIEW_PENDING'].map((status) => [type, status])))('mostra contexto de %s / %s e só retoma após escolha, preservando decisões', async (type, status) => {
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    const item = { ...base.draft.items[0], included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID' };
+    const fileName = type === 'EVENTS' ? 'Eventos.xlsx' : 'Clientes.xlsx';
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...base, status, fileName, createdAt: '2026-10-09T12:00:00Z', draft: { items: [item] } });
+    api.saveIndicatorImportReview.mockImplementation(async () => ({ ...base, draft: { items: [item] } }));
     const prompt = vi.spyOn(window, 'confirm');
-    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
-    const panel = await screen.findByRole('region', { name: 'Importação pendente' });
-    expect(within(panel).getByText('Eventos.xlsx')).toBeTruthy();
+    const view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    const panel = await screen.findByRole('dialog', { name: 'Importação pendente' });
+    expect(within(panel).getByText(fileName)).toBeTruthy();
     expect(within(panel).getByText('09/10/2026')).toBeTruthy();
+    expect(within(panel).getByText({ VALIDATED: 'Validado', WITH_WARNINGS: 'Com alertas', REVIEW_PENDING: 'Pendente de revisão' }[status])).toBeTruthy();
+    const resume = within(panel).getByRole('button', { name: 'Continuar importação' });
+    expect(document.activeElement).toBe(resume);
+    fireEvent.keyDown(resume, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(within(panel).getByRole('button', { name: 'Descartar e iniciar nova' }));
+    fireEvent.keyDown(document.activeElement, { key: 'Tab' });
+    expect(document.activeElement).toBe(resume);
     expect(screen.queryByRole('button', { name: 'Salvar revisão' })).toBeNull();
     expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(true);
     await continuePendingImport();
+    expect(screen.queryByRole('dialog', { name: 'Importação pendente' })).toBeNull();
     expect(view.container.querySelector('.import-stepper li.active').textContent).toBe('4Revisão');
     expect(screen.getByText(/1 incluído\(s\) nos indicadores/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
     await screen.findByText('Revisão salva com sucesso.');
-    expect(api.saveIndicatorImportReview).toHaveBeenCalledWith(eventBatch.id, [item]);
+    expect(api.saveIndicatorImportReview).toHaveBeenCalledWith(base.id, [item]);
     expect(api.uploadIndicatorImport).not.toHaveBeenCalled();
     expect(prompt).not.toHaveBeenCalled();
   });
 
-  it('descarta exatamente o lote exibido e libera o passo 1 para um novo XLSX', async () => {
-    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...eventBatch, id: 'current-batch', fileName: 'Antigo.xlsx' });
-    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+  it.each(['EVENTS', 'RESIDENTS'])('descarta exatamente o lote de %s exibido e libera o passo 1 para um novo XLSX', async (type) => {
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    api.getIndicatorImportDraft.mockResolvedValueOnce({ ...base, id: 'current-batch', fileName: 'Antigo.xlsx' });
+    api.uploadIndicatorImport.mockResolvedValueOnce(base);
+    const view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     fireEvent.click(await screen.findByRole('button', { name: 'Descartar e iniciar nova' }));
     await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
     expect(api.cancelIndicatorImport).toHaveBeenCalledExactlyOnceWith('current-batch');
-    expect(screen.queryByRole('region', { name: 'Importação pendente' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Importação pendente' })).toBeNull();
     expect(view.container.querySelector('.import-stepper li.active').textContent).toBe('1Arquivo');
     await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'Novo.xlsx')] } });
@@ -171,9 +194,11 @@ describe('conclusão e nova importação', () => {
     expect(revokeObjectURL).toHaveBeenCalledOnce();
   });
 
-  it.each(['Eventos', 'Exportação'])('conclui %s e inicia outro arquivo sem modificar a importação persistida', async (sheetName) => {
-    const item = { ...eventItems[0], included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID', issues: [] };
-    const draft = { ...eventBatch, sheetName, fileName: 'primeiro.xlsx', draft: { items: [item] } };
+  it.each(['Eventos', 'Exportação', 'Clientes'])('conclui %s e inicia outro arquivo sem modificar a importação persistida', async (sheetName) => {
+    const type = sheetName === 'Clientes' ? 'RESIDENTS' : 'EVENTS';
+    const base = type === 'EVENTS' ? eventBatch : residentBatch;
+    const item = { ...base.draft.items[0], included: true, reviewStatus: 'VALIDATED', validationStatus: 'VALID', issues: [] };
+    const draft = { ...base, sheetName, fileName: 'primeiro.xlsx', draft: { items: [item] } };
     let persisted = null;
     api.uploadIndicatorImport.mockResolvedValue(draft);
     api.confirmIndicatorImport.mockImplementation(async () => {
@@ -181,18 +206,21 @@ describe('conclusão e nova importação', () => {
       return structuredClone(persisted);
     });
     const confirmPrompt = vi.spyOn(window, 'confirm');
-    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    const view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
     const input = screen.getByLabelText(/Selecionar arquivo/);
     await waitFor(() => expect(input.disabled).toBe(false));
     fireEvent.change(input, { target: { files: [new File(['xlsx'], 'primeiro.xlsx')] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
     await openReview();
-    fireEvent.change(screen.getByPlaceholderText('Buscar evento'), { target: { value: 'Anônimo' } });
+    const searchPlaceholder = type === 'EVENTS' ? 'Buscar evento' : 'Buscar empresa';
+    fireEvent.change(screen.getByPlaceholderText(searchPlaceholder), { target: { value: 'Anônim' } });
     fireEvent.click(screen.getByRole('button', { name: 'Continuar para confirmação' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Confirmar importação' }));
     expect((await screen.findByRole('status')).textContent).toBe('Arquivo importado com sucesso. Os indicadores foram atualizados.');
     const timeline = view.container.querySelector('.import-stepper');
+    expect([...timeline.querySelectorAll('li small')].map((node) => node.textContent)).toEqual(['Arquivo', 'Validação', 'Preview', 'Revisão', 'Confirmar', 'Indicadores atualizados', 'Concluído']);
+    expect(screen.getByText('Importado')).toBeTruthy();
     expect(timeline.querySelectorAll('li.done')).toHaveLength(7);
     expect(timeline.querySelectorAll('li.active')).toHaveLength(0);
     expect(within(timeline).getByText('Concluído')).toBeTruthy();
@@ -216,24 +244,25 @@ describe('conclusão e nova importação', () => {
     fireEvent.change(input, { target: { files: [new File(['xlsx'], 'segundo.xlsx')] } });
     fireEvent.click(screen.getByRole('button', { name: 'Validar' }));
     await openReview();
-    expect(screen.getByPlaceholderText('Buscar evento').value).toBe('');
-    expect(screen.getByText('Evento Anônimo', { selector: 'strong' })).toBeTruthy();
+    expect(screen.getByPlaceholderText(searchPlaceholder).value).toBe('');
+    expect(screen.getByText(item.name, { selector: 'strong' })).toBeTruthy();
     expect(api.uploadIndicatorImport).toHaveBeenCalledTimes(2);
     expect(api.confirmIndicatorImport).toHaveBeenCalledTimes(1);
     expect(persisted).toEqual(snapshot);
     view.unmount();
     api.getIndicatorImportDraft.mockResolvedValue(persisted);
-    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledTimes(2));
     expect(confirmPrompt).not.toHaveBeenCalled();
     expect(screen.getByText('Nenhum arquivo selecionado')).toBeTruthy();
   });
 
-  it.each(['IMPORTED', 'COMPLETED', 'CANCELLED', 'FAILED', 'PROCESSING'])('não oferece retomada para lote %s, mesmo com draft inválido', async (status) => {
-    api.getIndicatorImportDraft.mockResolvedValue({ ...eventBatch, status, draft: null });
+  it.each(['EVENTS', 'RESIDENTS'].flatMap((type) => ['IMPORTED', 'COMPLETED', 'CANCELLED', 'FAILED', 'PROCESSING'].map((status) => [type, status])))('não oferece retomada para lote %s / %s, mesmo com draft inválido', async (type, status) => {
+    api.getIndicatorImportDraft.mockResolvedValue({ ...(type === 'EVENTS' ? eventBatch : residentBatch), status, draft: null });
     const prompt = vi.spyOn(window, 'confirm');
-    const view = render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
-    await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalledWith('EVENTS', 'center-1'));
+    const view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
+    expect(api.getIndicatorImportDraft).toHaveBeenCalledWith(type, 'center-1');
     expect(prompt).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByText('Nenhum arquivo selecionado')).toBeTruthy();
@@ -1195,7 +1224,7 @@ describe('telas de importação de indicadores', () => {
     await waitFor(() => expect(api.getIndicatorImportDraft).toHaveBeenCalled());
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [new File(['xlsx'], 'Clientes.xlsx')] } });
     await act(async () => resolveDraft(residentBatch));
-    expect(screen.getByRole('region', { name: 'Importação pendente' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Importação pendente' })).toBeTruthy();
     expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(true);
     expect(confirm).not.toHaveBeenCalled();
     expect(screen.queryByText('Empresa Anônima')).toBeNull();

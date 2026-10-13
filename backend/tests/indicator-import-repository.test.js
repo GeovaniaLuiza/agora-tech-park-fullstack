@@ -106,24 +106,26 @@ describe('confirmação com revisão bloqueada na transação', () => {
 describe('ciclo de vida do lote atual', () => {
   const data = { centerId: 'center', importType: 'EVENTS', draft: { items: [] }, summary: {}, warnings: [] };
 
-  it.each(['REVIEW_PENDING', 'WITH_WARNINGS', 'VALIDATED', 'PROCESSING'])('bloqueia novo upload com lote %s sem alterar o atual', async (status) => {
+  it.each(['EVENTS', 'RESIDENTS'].flatMap((type) => ['REVIEW_PENDING', 'WITH_WARNINGS', 'VALIDATED', 'PROCESSING'].map((status) => [type, status])))('bloqueia novo upload de %s com lote %s sem alterar o atual', async (importType, status) => {
     mocks.query.mockResolvedValue({ rows: [] })
       .mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 'center' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'active', status }] });
-    await expect(createBatch(data)).rejects.toMatchObject({ status: 409, code: 'IMPORT_ACTIVE_EXISTS' });
+    await expect(createBatch({ ...data, importType })).rejects.toMatchObject({ status: 409, code: 'IMPORT_ACTIVE_EXISTS' });
+    expect(mocks.query.mock.calls[2][1]).toEqual(['center', importType]);
     expect(mocks.query.mock.calls.some(([sql]) => /^(INSERT|UPDATE)/.test(sql))).toBe(false);
     expect(mocks.query).toHaveBeenLastCalledWith('ROLLBACK');
     expect(mocks.release).toHaveBeenCalledOnce();
   });
 
-  it.each(['IMPORTED', 'CANCELLED', 'FAILED'])('abre nova geração depois de %s em uma transação', async (status) => {
+  it.each(['EVENTS', 'RESIDENTS'].flatMap((type) => ['IMPORTED', 'CANCELLED', 'FAILED'].map((status) => [type, status])))('abre nova geração de %s depois de %s em uma transação', async (importType, status) => {
     mocks.query.mockResolvedValue({ rows: [] })
       .mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 'center' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'old', status }] })
       .mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 'new', is_current: true }] });
-    expect(await createBatch(data)).toEqual({ id: 'new', is_current: true });
+    expect(await createBatch({ ...data, importType })).toEqual({ id: 'new', is_current: true });
     expect(mocks.query.mock.calls[1]).toEqual(['SELECT id FROM innovation_centers WHERE id=$1 FOR UPDATE', ['center']]);
     expect(mocks.query.mock.calls[3][0]).toContain('SET is_current=FALSE');
+    expect(mocks.query.mock.calls[3][1]).toEqual(['center', importType]);
     expect(mocks.query.mock.calls[4][0]).toContain('created_by,is_current');
     expect(mocks.query).toHaveBeenLastCalledWith('COMMIT');
   });

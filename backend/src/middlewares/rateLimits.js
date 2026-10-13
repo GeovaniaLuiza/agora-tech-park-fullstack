@@ -36,6 +36,7 @@ const resendMaximumPerHour = positiveInteger('EMAIL_RESEND_MAX_PER_HOUR', 5);
 
 export const RATE_LIMIT_CONFIG = Object.freeze({
   global: configured('GLOBAL', defaults.global),
+  globalRead: configured('GLOBAL_READ', { windowMs: defaults.global.windowMs, limit: 1000 }),
   login: configured('LOGIN', defaults.login),
   register: configured('REGISTER', defaults.register),
   resend: configured('RESEND', defaults.resend),
@@ -92,6 +93,16 @@ export function createEmailRateLimiter(config) {
       .update(request.body?.email || '')
       .digest('hex'),
   });
+}
+
+// Reads have their own budget: loading a page cannot exhaust sensitive actions,
+// and exhausted write protection cannot prevent a user from consulting a draft.
+export function createGlobalRateLimiters(config = RATE_LIMIT_CONFIG) {
+  const isRead = (request) => ['GET', 'HEAD', 'OPTIONS'].includes(request.method);
+  return [
+    createRateLimiter(config.globalRead, { skip: (request) => !isRead(request) }),
+    createRateLimiter(config.global, { skip: isRead }),
+  ];
 }
 
 export function configureTrustProxy(app) {

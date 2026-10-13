@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import dotenv from 'dotenv';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
@@ -73,6 +74,124 @@ async function review(batch, select) {
   return response.body;
 }
 const confirm = (id) => http('post', `/api/indicator-imports/batches/${id}/confirm`);
+const draft = (type = 'EVENTS') => http('get', `/api/indicator-imports/${type}/draft`).query({ centerId });
+const cancel = (id) => http('post', `/api/indicator-imports/batches/${id}/cancel`).send({});
+async function historicalBatch(current, status = 'VALIDATED') {
+  const { rows } = await setup.query(`INSERT INTO indicator_import_batches(
+    import_type,file_name,file_hash,file_size,mime_type,sheet_name,innovation_center_id,year,status,draft,created_by,created_at,is_current)
+    SELECT import_type,'Historico.xlsx',file_hash,file_size,mime_type,sheet_name,innovation_center_id,year,$2,draft,created_by,
+      created_at - interval '1 day',FALSE FROM indicator_import_batches WHERE id=$1 RETURNING *`, [current.id, status]);
+  return rows[0];
+}
+
+describe('lote atual e auditoria com PostgreSQL real', () => {
+  it('migration escolhe somente o mais recente e preserva status, decisões e lotes antigos', async () => {
+    const current = await preview('EVENTS', await eventWorkbookFixture());
+    const migration = await readFile(new URL('../../database/migrations/017_current_indicator_import.sql', import.meta.url), 'utf8');
+    await setup.query('BEGIN');
+    try {
+      await setup.query('CREATE TEMP TABLE indicator_import_batches (LIKE public.indicator_import_batches INCLUDING ALL) ON COMMIT DROP');
+      await setup.query('ALTER TABLE indicator_import_batches DROP COLUMN is_current');
+      for (const [status, day] of [['VALIDATED', 1], ['WITH_WARNINGS', 2], ['REVIEW_PENDING', 3]]) {
+        await setup.query(`INSERT INTO indicator_import_batches(import_type,file_name,file_hash,file_size,mime_type,sheet_name,innovation_center_id,year,status,draft,created_by,created_at,updated_at)
+          SELECT import_type,file_name,file_hash,file_size,mime_type,sheet_name,innovation_center_id,year,$2,draft,created_by,
+            make_timestamptz(2026,10,$3,12,0,0,'UTC'),make_timestamptz(2026,10,9,12,0,0,'UTC')
+          FROM ${schema}.indicator_import_batches WHERE id=$1`, [current.id, status, day]);
+      }
+      const before = (await setup.query('SELECT id,status,draft,created_at FROM indicator_import_batches ORDER BY created_at')).rows;
+      await setup.query(migration);
+      expect((await setup.query('SELECT id,status,draft,created_at FROM indicator_import_batches ORDER BY created_at')).rows).toEqual(before);
+      const marked = (await setup.query('SELECT id,status FROM indicator_import_batches WHERE is_current')).rows;
+      expect(marked).toEqual([{ id: before[2].id, status: 'REVIEW_PENDING' }]);
+      await setup.query("UPDATE indicator_import_batches SET status='IMPORTED' WHERE is_current");
+      expect((await draft()).body).toBeNull();
+    } finally { await setup.query('ROLLBACK'); }
+  });
+
+  it.each(['VALIDATED', 'WITH_WARNINGS', 'REVIEW_PENDING'])('retoma %s preservando decisões', async (status) => {
+    const current = await preview('EVENTS', await eventWorkbookFixture());
+    await setup.query('UPDATE indicator_import_batches SET status=$2 WHERE id=$1', [current.id, status]);
+    const response = await draft();
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ id: current.id, status, draft: current.draft });
+  });
+
+  it.each(['IMPORTED', 'CANCELLED', 'FAILED'])('estado final %s não ressuscita drafts históricos', async (status) => {
+    const current = await preview('EVENTS', await eventWorkbookFixture());
+    await historicalBatch(current);
+    await setup.query('UPDATE indicator_import_batches SET status=$2 WHERE id=$1', [current.id, status]);
+    expect((await draft()).body).toBeNull();
+    expect((await setup.query('SELECT * FROM indicator_import_batches')).rows).toHaveLength(2);
+  });
+
+  it('vários pendentes históricos retornam somente a geração atual, mesmo após atualizar um antigo', async () => {
+    const current = await preview('EVENTS', await eventWorkbookFixture());
+    const old = await historicalBatch(current, 'REVIEW_PENDING');
+    await historicalBatch(current, 'WITH_WARNINGS');
+    await historicalBatch(current, 'VALIDATED');
+    await setup.query("UPDATE indicator_import_batches SET updated_at=NOW()+interval '1 day' WHERE id=$1", [old.id]);
+    expect((await draft()).body.id).toBe(current.id);
+    expect((await setup.query('SELECT * FROM indicator_import_batches')).rows).toHaveLength(4);
+    expect((await cancel(current.id)).status).toBe(200);
+    expect((await draft()).body).toBeNull();
+    expect((await setup.query("SELECT * FROM indicator_import_batches WHERE status IN ('REVIEW_PENDING','WITH_WARNINGS','VALIDATED')")).rows).toHaveLength(3);
+  });
+
+  it('bloqueia novo upload, permite após descarte e preserva registros e valores confirmados', async () => {
+    const buffer = await eventWorkbookFixture();
+    const confirmed = await review(await preview('EVENTS', buffer), (_item, index) => index === 0);
+    expect((await confirm(confirmed.id)).status).toBe(200);
+    const recordsBefore = (await setup.query('SELECT * FROM indicator_records ORDER BY id')).rows;
+    const valuesBefore = (await setup.query('SELECT * FROM indicator_values ORDER BY id')).rows;
+    const current = await preview('EVENTS', buffer, true);
+    const blocked = await http('post', '/api/indicator-imports/EVENTS/preview').query({ centerId, fileName: 'Outro.xlsx', reprocess: true }).set('Content-Type', XLSX_MIME).send(buffer);
+    expect(blocked.status).toBe(409); expect(blocked.body.code).toBe('IMPORT_ACTIVE_EXISTS');
+    expect((await cancel(current.id)).body.status).toBe('CANCELLED');
+    expect((await draft()).body).toBeNull();
+    expect((await setup.query('SELECT * FROM indicator_records ORDER BY id')).rows).toEqual(recordsBefore);
+    expect((await setup.query('SELECT * FROM indicator_values ORDER BY id')).rows).toEqual(valuesBefore);
+    const next = await preview('EVENTS', buffer, true);
+    expect(next.id).not.toBe(current.id);
+    expect((await draft()).body.id).toBe(next.id);
+    expect((await cancel(confirmed.id)).status).toBe(409);
+    expect((await setup.query("SELECT * FROM audit_logs WHERE action='INDICATOR_IMPORT_CANCELLED'")).rows).toHaveLength(1);
+  });
+
+  it('duas criações concorrentes deixam apenas um lote atual', async () => {
+    const buffer = await eventWorkbookFixture();
+    const upload = () => http('post', '/api/indicator-imports/EVENTS/preview').query({ centerId, fileName: 'Eventos.xlsx' }).set('Content-Type', XLSX_MIME).send(buffer);
+    const responses = await Promise.all([upload(), upload()]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    expect((await setup.query('SELECT * FROM indicator_import_batches WHERE is_current')).rows).toHaveLength(1);
+  });
+
+  it('isola centro/tipo e compartilha a mesma retomada entre gestores', async () => {
+    const events = await preview('EVENTS', await eventWorkbookFixture());
+    const residents = await preview('RESIDENTS', await residentWorkbookFixture());
+    const otherCenter = randomUUID();
+    await setup.query("INSERT INTO innovation_centers(id,code,name) VALUES($1,'OTHER_IMPORT_CENTER','Outro centro')", [otherCenter]);
+    const other = await http('post', '/api/indicator-imports/EVENTS/preview').query({ centerId: otherCenter, fileName: 'Eventos.xlsx' }).set('Content-Type', XLSX_MIME).send(await eventWorkbookFixture());
+    expect(other.status).toBe(201);
+    const otherManager = randomUUID();
+    await setup.query(`INSERT INTO users(id,name,email,password_hash,role,status,email_verified_at)
+      VALUES($1,'Outro gestor','other-import-manager@test.invalid','hash','ADMIN','ACTIVE',NOW())`, [otherManager]);
+    const otherToken = jwt.sign({ sub: otherManager }, process.env.JWT_SECRET);
+    for (const [type, id] of [['EVENTS', events.id], ['RESIDENTS', residents.id]]) {
+      const response = await request(app).get(`/api/indicator-imports/${type}/draft`).query({ centerId }).set('Authorization', `Bearer ${otherToken}`);
+      expect(response.status).toBe(200); expect(response.body.id).toBe(id);
+    }
+    expect((await draft()).body.id).toBe(events.id);
+    expect((await draft('RESIDENTS')).body.id).toBe(residents.id);
+    expect((await setup.query('SELECT * FROM indicator_import_batches WHERE is_current')).rows).toHaveLength(3);
+  });
+
+  it('índice único recusa marcar dois lotes como atuais no mesmo centro/tipo', async () => {
+    const current = await preview('EVENTS', await eventWorkbookFixture());
+    const old = await historicalBatch(current);
+    await expect(setup.query('UPDATE indicator_import_batches SET is_current=TRUE WHERE id=$1', [old.id])).rejects.toMatchObject({ code: '23505' });
+    expect((await draft()).body.id).toBe(current.id);
+  });
+});
 async function official(code, month) {
   const { rows } = await setup.query(`SELECT v.* FROM indicator_values v
     JOIN indicator_definitions d ON d.id=v.indicator_id

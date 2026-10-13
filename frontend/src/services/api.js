@@ -242,6 +242,7 @@ export const getIndicatorImportDraft = (type, centerId) => apiRequest(`/indicato
 export const saveIndicatorImportReview = (id, items) => apiRequest(`/indicator-imports/batches/${id}/review`, { method: 'PUT', body: JSON.stringify({ items }) });
 export const groupImportedEvents = (id, payload) => apiRequest(`/indicator-imports/batches/${id}/group-events`, { method: 'POST', body: JSON.stringify(payload) });
 export const confirmIndicatorImport = (id) => apiRequest(`/indicator-imports/batches/${id}/confirm`, { method: 'POST', body: '{}' });
+export const cancelIndicatorImport = (id) => apiRequest(`/indicator-imports/batches/${id}/cancel`, { method: 'POST', body: '{}' });
 export const getOfficialWorkbookStatus = (centerId, year = 2026) => apiRequest(`/indicator-imports/export/status?${new URLSearchParams({ centerId, year })}`);
 
 export const uploadIndicatorImport = (type, centerId, file, reprocess = false) => apiRequest(

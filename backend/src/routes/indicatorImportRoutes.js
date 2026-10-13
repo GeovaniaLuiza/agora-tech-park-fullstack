@@ -17,4 +17,5 @@ router.post('/:type/preview', express.raw({ type: '*/*', limit: MAX_IMPORT_BYTES
 router.get('/batches/:id', controller.batch);
 router.post('/batches/:id/group-events', controller.groupEvents);
 router.post('/batches/:id/confirm', controller.confirm);
+router.post('/batches/:id/cancel', controller.cancel);
 export default router;

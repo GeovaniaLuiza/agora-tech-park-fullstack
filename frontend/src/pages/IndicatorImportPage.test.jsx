@@ -41,6 +41,61 @@ const continuePendingImport = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Continuar importação' }));
 };
 
+it('apresenta todos os metadados, colunas e regras de residentes em blocos separados', async () => {
+  render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
+  const guide = screen.getByRole('heading', { level: 3, name: 'Formato esperado' }).closest('section');
+  const blocks = guide.querySelectorAll('.import-format-block');
+  expect(blocks).toHaveLength(3);
+  expect(Array.from(guide.children)).toEqual([guide.querySelector('.import-format-header'), ...blocks]);
+  expect(Array.from(blocks[0].querySelectorAll('p'), (element) => element.textContent)).toEqual([
+    'Arquivo: Clientes.xlsx', 'Aba: Clientes', 'Cabeçalho: linha 2', 'Formato: XLSX', 'Limite: 200 MB',
+  ]);
+  expect(within(blocks[1]).getByRole('heading', { level: 4, name: 'Colunas esperadas' })).toBeTruthy();
+  expect(within(blocks[1]).getByText('Legenda · Locador · Bloco · Bloco e Módulo · Área · EMPRESA · CNPJ · Vigência · Fim · Atividades · Nacionalidade')).toBeTruthy();
+  expect(within(blocks[2]).getByRole('heading', { level: 4, name: 'Regras de consolidação' })).toBeTruthy();
+  expect(Array.from(blocks[2].querySelectorAll('p'), (element) => element.textContent)).toEqual([
+    'Empresas com o mesmo CNPJ serão consolidadas.',
+    'Múltiplas salas/módulos serão preservadas.',
+    'Registros com "Disponível" e "Áreas Comuns" não geram residentes.',
+  ]);
+});
+
+it('mantém o guia de residentes em coluna vertical alinhada à esquerda com quebra de texto', async () => {
+  const globalCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../styles/global.css'), 'utf8');
+  const stylesheet = document.createElement('style');
+  stylesheet.textContent = globalCss.replace(/@import\s+url\([^;]+;/g, '');
+  document.head.appendChild(stylesheet);
+  try {
+    render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
+    const guide = screen.getByRole('heading', { level: 3, name: 'Formato esperado' }).closest('section');
+    const blocks = guide.querySelectorAll('.import-format-block');
+    for (const container of [guide, guide.querySelector('.import-format-header'), ...blocks]) {
+      const style = getComputedStyle(container);
+      expect(style.display).toBe('flex');
+      expect(style.flexDirection).toBe('column');
+      expect(style.alignItems).toBe('stretch');
+      expect(style.textAlign).toBe('left');
+      expect(style.minWidth).toBe('0px');
+    }
+    expect(getComputedStyle(guide).gap).toBe('16px');
+    expect(getComputedStyle(guide).width).toBe('100%');
+    for (const block of blocks) expect(getComputedStyle(block).gap).toBe('8px');
+    const paragraphRule = Array.from(stylesheet.sheet.cssRules).find((rule) => rule.selectorText === '.import-format-residents p');
+    expect(paragraphRule.style.getPropertyValue('max-width')).toBe('72ch');
+    for (const paragraph of guide.querySelectorAll('p')) {
+      const style = getComputedStyle(paragraph);
+      expect(Number.parseFloat(style.maxWidth)).toBeGreaterThan(0);
+      expect(style.whiteSpace).toBe('normal');
+      expect(style.overflowWrap).toBe('break-word');
+      expect(style.margin).toBe('0px');
+    }
+  } finally {
+    stylesheet.remove();
+  }
+});
+
 it('apresenta os formatos de eventos em blocos verticais com títulos e campos completos', async () => {
   render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
   await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
@@ -1191,7 +1246,7 @@ describe('telas de importação de indicadores', () => {
     api.uploadIndicatorImport.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
     render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
-    expect(screen.getByText(/Formato: XLSX · Limite: 200 MB/)).toBeTruthy();
+    expect(screen.getByText(/Limite: 200 MB/)).toBeTruthy();
     const file = new File([new Uint8Array(15_759)], 'planilha.xlsx');
     await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
     fireEvent.change(screen.getByLabelText(/Selecionar arquivo/), { target: { files: [file] } });
@@ -1252,7 +1307,7 @@ describe('telas de importação de indicadores', () => {
   it.each(['EVENTS', 'RESIDENTS'])('mostra 200 MB e bloqueia arquivo acima do limite antes do upload de %s', async (type) => {
     const { container } = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText('Centro').value).toBe('center-1'));
-    expect(screen.getByText(/Formato: XLSX · Limite: 200 MB/)).toBeTruthy();
+    expect(screen.getByText(/Limite: 200 MB/)).toBeTruthy();
     expect(screen.getByText(/Somente XLSX · limite de 200 MB/)).toBeTruthy();
     expect(container.textContent).not.toMatch(/\b(?:50|100) MB\b/);
     const file = new File(['xlsx'], 'planilha.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -1731,7 +1786,7 @@ it('mostra preview consolidado, áreas, revisão por ocupação e ignorados', as
   api.saveIndicatorImportReview.mockImplementationOnce(async (_id, items) => ({ ...loaded, draft: { items } }));
   render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
   expect(screen.getByText(/Cabeçalho: linha 2/)).toBeTruthy();
-  expect(screen.getByText(/Bloco e Modúlo/)).toBeTruthy();
+  expect(screen.getByText(/Bloco e Módulo/)).toBeTruthy();
   expect(screen.getByText(/Múltiplas salas\/módulos serão preservadas/)).toBeTruthy();
   await screen.findByRole('option', { name: 'Centro de Inovação' });
   await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));

@@ -48,7 +48,28 @@ function readItems(batch, type) {
 }
 function FormatGuide({ type, maxBytes }) {
   if (type === 'RESIDENTS') return <section className="panel import-format"><h3>Formato esperado</h3><p>Aba: Clientes · Cabeçalho: linha 2 · Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB</p><p>{residentColumns.join(' · ')}</p><p>Empresas com o mesmo CNPJ serão consolidadas. Múltiplas salas/módulos serão preservadas. Disponível e Áreas Comuns não geram residentes.</p></section>;
-  return <section className="panel import-format"><h3>Formatos aceitos</h3><p>Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB · Cabeçalho: linha 1</p><strong>1. Planilha de Eventos · Aba: Eventos</strong><div className="import-column-groups"><div><strong>Campos principais</strong><p>{eventColumns.slice(0, 3).join(' · ')}</p></div><div><strong>Campos complementares</strong><p>{eventColumns.slice(3).join(' · ')}</p></div></div><p>Mantenha as oito colunas de Eventos na ordem indicada. Os campos complementares podem ficar vazios.</p><strong>2. Exportação de Reservas · Aba: Exportação</strong><p>Use a exportação da operação, sem reorganizar colunas. Somente reservas confirmadas são elegíveis. Reservas do mesmo evento em várias salas são consolidadas quando os dados da atividade coincidem.</p></section>;
+  return <section className="panel import-format import-format-events">
+    <header className="import-format-header">
+      <h3>Formatos aceitos</h3>
+      <p className="import-format-meta">Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB · Cabeçalho: linha 1</p>
+    </header>
+    <div className="import-format-block">
+      <h4>1. Planilha de Eventos · Aba: Eventos</h4>
+      <div className="import-format-field">
+        <strong>Campos principais</strong>
+        <p>{eventColumns.slice(0, 3).join(' · ')}</p>
+      </div>
+      <div className="import-format-field">
+        <strong>Campos complementares</strong>
+        <p>{eventColumns.slice(3).join(' · ')}</p>
+      </div>
+      <p className="import-format-note">Mantenha as oito colunas de Eventos na ordem indicada. Os campos complementares podem ficar vazios.</p>
+    </div>
+    <div className="import-format-block">
+      <h4>2. Exportação de Reservas · Aba: Exportação</h4>
+      <p>Use a exportação da operação, sem reorganizar colunas. Somente reservas confirmadas são elegíveis. Reservas do mesmo evento em várias salas são consolidadas quando os dados da atividade coincidem.</p>
+    </div>
+  </section>;
 }
 function ReviewAlerts({ issues = [] }) {
   return issues?.length ? <ul className="import-review-alerts">{issues.map((issue, index) => <li key={index}><AlertTriangle />{issue.message}</li>)}</ul> : null;

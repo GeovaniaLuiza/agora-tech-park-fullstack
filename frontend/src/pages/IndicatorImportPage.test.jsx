@@ -45,6 +45,8 @@ it('apresenta os formatos de eventos em blocos verticais com títulos e campos c
   render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
   await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
   const guide = screen.getByRole('heading', { level: 3, name: 'Formatos aceitos' }).closest('section');
+  expect(guide.classList.contains('import-format-guide')).toBe(true);
+  expect(guide.classList.contains('import-format-events')).toBe(true);
   const meta = within(guide).getByText('Formato: XLSX · Limite: 200 MB · Cabeçalho: linha 1');
   expect(meta.className).toBe('import-format-meta');
   const blocks = guide.querySelectorAll('.import-format-block');
@@ -66,15 +68,50 @@ it('apresenta os formatos de eventos em blocos verticais com títulos e campos c
   expect(within(blocks[1]).getByText('Use a exportação da operação, sem reorganizar colunas. Somente reservas confirmadas são elegíveis. Reservas do mesmo evento em várias salas são consolidadas quando os dados da atividade coincidem.')).toBeTruthy();
 });
 
-it('aplica fluxo vertical e a mesma borda esquerda a todos os blocos do guia de eventos', async () => {
+it('apresenta o formato de residentes com campos e regras em blocos compartilhados com eventos', async () => {
+  render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
+  const guide = screen.getByRole('heading', { level: 3, name: 'Formato esperado' }).closest('section');
+  expect(guide.classList.contains('import-format-guide')).toBe(true);
+  expect(guide.classList.contains('import-format-residents')).toBe(true);
+  const header = guide.querySelector('.import-format-header');
+  expect(Array.from(header.children)).toEqual([
+    within(header).getByRole('heading', { level: 3, name: 'Formato esperado' }),
+    within(header).getByText('Formato: XLSX · Limite: 200 MB · Cabeçalho: linha 2', { selector: '.import-format-meta' }),
+  ]);
+  const blocks = guide.querySelectorAll('.import-format-block');
+  expect(blocks).toHaveLength(1);
+  const title = within(blocks[0]).getByRole('heading', { level: 4, name: '1. Planilha de Residentes · Aba: Clientes' });
+  const fields = blocks[0].querySelectorAll('.import-format-field');
+  expect(fields).toHaveLength(2);
+  expect(Array.from(guide.children)).toEqual([header, blocks[0]]);
+  expect(Array.from(blocks[0].children)).toEqual([title, ...fields]);
+  expect(Array.from(fields[0].children)).toEqual([
+    within(fields[0]).getByText('Campos esperados', { selector: 'strong' }),
+    within(fields[0]).getByText('Legenda · Locador · Bloco · Bloco e Módulo · Área · EMPRESA · CNPJ · Vigência · Fim · Atividades · Nacionalidade', { selector: 'p' }),
+  ]);
+  expect(Array.from(fields[1].children)).toEqual([
+    within(fields[1]).getByText('Regras de consolidação', { selector: 'strong' }),
+    within(fields[1]).getByText('Empresas com o mesmo CNPJ serão consolidadas.', { selector: 'p' }),
+    within(fields[1]).getByText('Múltiplas salas/módulos serão preservadas.', { selector: 'p' }),
+    within(fields[1]).getByText('Registros com "Disponível" e "Áreas Comuns" não geram residentes.', { selector: 'p' }),
+  ]);
+  expect(guide.querySelector('.import-column-groups')).toBeNull();
+  expect(within(guide).queryByText('Formatos aceitos')).toBeNull();
+});
+
+it.each([
+  ['EVENTS', 'Formatos aceitos'],
+  ['RESIDENTS', 'Formato esperado'],
+])('aplica fluxo vertical e a mesma borda esquerda a todos os blocos do guia de %s', async (type, title) => {
   const globalCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../styles/global.css'), 'utf8');
   const stylesheet = document.createElement('style');
   stylesheet.textContent = globalCss.replace(/@import\s+url\([^;]+;/g, '');
   document.head.appendChild(stylesheet);
   try {
-    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
-    const guide = screen.getByRole('heading', { level: 3, name: 'Formatos aceitos' }).closest('section');
+    const guide = screen.getByRole('heading', { level: 3, name: title }).closest('section');
     const containers = [guide, ...guide.querySelectorAll('.import-format-header, .import-format-block, .import-format-field')];
     for (const container of containers) {
       const style = getComputedStyle(container);
@@ -82,12 +119,20 @@ it('aplica fluxo vertical e a mesma borda esquerda a todos os blocos do guia de 
       expect(style.flexDirection).toBe('column');
       expect(style.alignItems).toBe('stretch');
       expect(style.textAlign).toBe('left');
+      expect(style.minWidth).toBe('0px');
       if (container !== guide) {
         expect(style.marginLeft).toBe('0px');
         expect(style.paddingLeft).toBe('0px');
       }
     }
     expect(getComputedStyle(guide).overflowWrap).toBe('anywhere');
+    expect(getComputedStyle(guide).width).toBe('100%');
+    expect(getComputedStyle(guide).gap).toBe('16px');
+    expect(getComputedStyle(guide.querySelector('.import-format-header')).gap).toBe('8px');
+    expect(getComputedStyle(guide.querySelector('.import-format-block')).gap).toBe('12px');
+    for (const field of guide.querySelectorAll('.import-format-field')) {
+      expect(getComputedStyle(field).gap).toBe('4px');
+    }
     expect(globalCss).not.toContain('.import-column-groups');
   } finally {
     stylesheet.remove();
@@ -1731,7 +1776,7 @@ it('mostra preview consolidado, áreas, revisão por ocupação e ignorados', as
   api.saveIndicatorImportReview.mockImplementationOnce(async (_id, items) => ({ ...loaded, draft: { items } }));
   render(<MemoryRouter><IndicatorImportPage type="RESIDENTS" /></MemoryRouter>);
   expect(screen.getByText(/Cabeçalho: linha 2/)).toBeTruthy();
-  expect(screen.getByText(/Bloco e Modúlo/)).toBeTruthy();
+  expect(screen.getByText(/Bloco e Módulo/)).toBeTruthy();
   expect(screen.getByText(/Múltiplas salas\/módulos serão preservadas/)).toBeTruthy();
   await screen.findByRole('option', { name: 'Centro de Inovação' });
   await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));

@@ -34,7 +34,7 @@ function SummaryCards({ type, summary = {} }) {
 }
 const eventColumns = ['Lista', 'Data', 'Local', 'Temática', 'Modo', 'Tipo de Evento', 'Nº de Participantes', 'Nº de Empresas Participantes'];
 const validationOf = (item) => item.ignored || item.reviewStatus === 'EXCLUDED' ? 'IGNORED' : item.validationStatus || (item.reviewStatus === 'WITH_WARNINGS' ? 'WARNING' : item.reviewStatus === 'PENDING' ? 'REVIEW_REQUIRED' : 'VALID');
-const residentColumns = ['Legenda', 'Locador', 'Bloco', 'Bloco e Modúlo', 'Área', 'EMPRESA', 'CNPJ', 'Vigência', 'Fim', 'Atividades', 'Nacionalidade'];
+const residentColumns = ['Legenda', 'Locador', 'Bloco', 'Bloco e Módulo', 'Área', 'EMPRESA', 'CNPJ', 'Vigência', 'Fim', 'Atividades', 'Nacionalidade'];
 const areaLabel = (area) => area === null || area === undefined ? 'Não informado' : Number(area).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' m²';
 function readItems(batch, type) {
   if (batch?.importType !== type || !Array.isArray(batch?.draft?.items) || batch.draft.items.some((item) => !item || !Array.isArray(item.sourceRows)
@@ -47,8 +47,26 @@ function readItems(batch, type) {
   return batch.draft.items;
 }
 function FormatGuide({ type, maxBytes }) {
-  if (type === 'RESIDENTS') return <section className="panel import-format"><h3>Formato esperado</h3><p>Aba: Clientes · Cabeçalho: linha 2 · Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB</p><p>{residentColumns.join(' · ')}</p><p>Empresas com o mesmo CNPJ serão consolidadas. Múltiplas salas/módulos serão preservadas. Disponível e Áreas Comuns não geram residentes.</p></section>;
-  return <section className="panel import-format import-format-events">
+  if (type === 'RESIDENTS') return <section className="panel import-format import-format-guide import-format-residents">
+    <header className="import-format-header">
+      <h3>Formato esperado</h3>
+      <p className="import-format-meta">Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB · Cabeçalho: linha 2</p>
+    </header>
+    <div className="import-format-block">
+      <h4>1. Planilha de Residentes · Aba: Clientes</h4>
+      <div className="import-format-field">
+        <strong>Campos esperados</strong>
+        <p>{residentColumns.join(' · ')}</p>
+      </div>
+      <div className="import-format-field">
+        <strong>Regras de consolidação</strong>
+        <p>Empresas com o mesmo CNPJ serão consolidadas.</p>
+        <p>Múltiplas salas/módulos serão preservadas.</p>
+        <p>Registros com "Disponível" e "Áreas Comuns" não geram residentes.</p>
+      </div>
+    </div>
+  </section>;
+  return <section className="panel import-format import-format-guide import-format-events">
     <header className="import-format-header">
       <h3>Formatos aceitos</h3>
       <p className="import-format-meta">Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB · Cabeçalho: linha 1</p>

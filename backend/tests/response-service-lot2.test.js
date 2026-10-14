@@ -15,7 +15,7 @@ const formId = 'form-1';
 const organizationId = 'organization-1';
 const resident = { sub: 'resident-1', role: 'RESIDENTE' };
 const manager = { sub: 'manager-1', role: 'PESQUISADOR' };
-const activeForm = { id: formId, status: 'ACTIVE', start_date: '2020-01-01', end_date: '2099-12-31', targeted: true, innovation_center_id: 'center-1', indicator_year: 2026, indicator_month: 2 };
+const activeForm = { id: formId, organization_id: organizationId, status: 'ACTIVE', start_date: '2020-01-01', end_date: '2099-12-31', targeted: true, innovation_center_id: 'center-1', indicator_year: 2026, indicator_month: 2 };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -75,7 +75,7 @@ describe('responseService lote 2', () => {
   it('salva rascunho normalizado e registra auditoria', async () => {
     const result = await saveDraft(formId, { organizationId, answers: [{ questionId: 'text', value: ' Ana ' }, { questionId: 'number', value: '' }] }, resident);
     expect(result.status).toBe('DRAFT');
-    expect(mocks.responses.saveDraft).toHaveBeenCalledWith(expect.objectContaining({ answers: [{ questionId: 'text', value: 'Ana', indicator_id: null }] }));
+    expect(mocks.responses.saveDraft).toHaveBeenCalledWith(expect.objectContaining({ answers: [{ questionId: 'text', value: 'Ana', indicator_id: null, questionType: 'TEXT' }] }));
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'RESPONSE_DRAFT_SAVED' }));
   });
 
@@ -103,7 +103,8 @@ describe('responseService lote 2', () => {
 
   it('reabre apenas resposta enviada e registra auditoria', async () => {
     await expect(reopen('response-1', manager)).resolves.toMatchObject({ status: 'REOPENED' });
-    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'RESPONSE_REOPENED' }));
+    await mocks.responses.reopen.mock.calls[0][2]({ organization_id: organizationId, innovation_center_id: 'center-1', indicator_year: 2026, indicator_month: 2 }, 'transaction-client');
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'RESPONSE_REOPENED' }), 'transaction-client');
     mocks.responses.reopen.mockResolvedValueOnce(null);
     await expect(reopen('response-1', manager)).rejects.toMatchObject({ code: 'RESPONSE_NOT_SUBMITTED' });
   });

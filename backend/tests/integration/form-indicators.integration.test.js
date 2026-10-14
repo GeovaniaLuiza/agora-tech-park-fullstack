@@ -12,12 +12,16 @@ describe('formulário alimenta indicadores', () => {
       const center = (await client.query("SELECT id FROM innovation_centers WHERE code='CI_JOINVILLE'")).rows[0];
       const indicator = (await client.query("SELECT id FROM indicator_definitions WHERE code='CAPACITACOES_REALIZADAS'")).rows[0];
       const organization = (await client.query("INSERT INTO organizations(name,status) VALUES('Organização Teste Formulário','ACTIVE') RETURNING id")).rows[0];
-      const responseId = (await client.query('SELECT gen_random_uuid() AS id')).rows[0].id;
+      const user = (await client.query("INSERT INTO users(name,email,password_hash,role,status) VALUES('Test','form-indicator@integration.invalid','unused','RESIDENTE','ACTIVE') RETURNING id")).rows[0];
+      const form = (await client.query("INSERT INTO forms(title,created_by) VALUES('Test',$1) RETURNING id", [user.id])).rows[0];
+      const question = (await client.query("INSERT INTO questions(form_id,label,type) VALUES($1,'Test','NUMBER') RETURNING id", [form.id])).rows[0];
+      const responseId = (await client.query("INSERT INTO responses(form_id,organization_id,answered_by,status) VALUES($1,$2,$3,'SUBMITTED') RETURNING id", [form.id, organization.id, user.id])).rows[0].id;
       const base = { responseId, organizationId: organization.id, centerId: center.id,
         year: 2199, month: 5, userId: null };
 
-      await processLinkedAnswers({ ...base, answers: [{ questionId: responseId, indicator_id: indicator.id, value: '30' }] }, client);
-      await processLinkedAnswers({ ...base, answers: [{ questionId: responseId, indicator_id: indicator.id, value: '35' }] }, client);
+      await processLinkedAnswers({ ...base, answers: [{ questionId: question.id, questionType: 'NUMBER', indicator_id: indicator.id, value: '30' }] }, client);
+      await processLinkedAnswers({ ...base, answers: [{ questionId: question.id, questionType: 'NUMBER', indicator_id: indicator.id, value: '35' }] }, client);
+      await processLinkedAnswers({ ...base, answers: [{ questionId: question.id, questionType: 'NUMBER', indicator_id: indicator.id, value: '35' }] }, client);
 
       const values = await client.query(
         `SELECT month,numeric_value,source_type,source_id FROM indicator_values
@@ -28,7 +32,8 @@ describe('formulário alimenta indicadores', () => {
       expect(values.rows).toHaveLength(2);
       expect(Number(values.rows.find((row) => row.month === 5).numeric_value)).toBe(35);
       expect(Number(values.rows.find((row) => row.month === null).numeric_value)).toBe(35);
-      expect(values.rows.every((row) => row.source_id === responseId)).toBe(true);
+      expect(values.rows.every((row) => row.source_id === null)).toBe(true);
+      expect((await client.query('SELECT id FROM indicator_records WHERE response_id=$1', [responseId])).rows).toHaveLength(1);
     } finally {
       await client.query('ROLLBACK');
       client.release();

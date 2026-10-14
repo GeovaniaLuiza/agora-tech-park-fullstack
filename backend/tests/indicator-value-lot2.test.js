@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ repository: { findDefinition: vi.fn(), upsertFormValue: vi.fn(), upsertAnnualValue: vi.fn(), valueByCode: vi.fn(), upsertDerivedResult: vi.fn() }, audit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ repository: { clearDerivedResult: vi.fn(), hasLegacyFormValues: vi.fn(), lockFormPeriod: vi.fn(), deactivateMissingContributions: vi.fn(), findDefinition: vi.fn(), upsertFormValue: vi.fn(), upsertAnnualValue: vi.fn(), valueByCode: vi.fn(), upsertDerivedResult: vi.fn() }, audit: vi.fn() }));
 vi.mock('../src/repositories/indicatorValueRepository.js', () => mocks.repository);
 vi.mock('../src/repositories/auditRepository.js', () => ({ record: mocks.audit }));
+vi.mock('../src/services/indicatorCalculationService.js', () => ({ recompute: vi.fn() }));
 
 import { processLinkedAnswers } from '../src/services/indicatorValueService.js';
 
@@ -11,7 +12,7 @@ const client = { query: vi.fn() };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.repository.findDefinition.mockResolvedValue({ id: 'indicator-1', active: true, calculation_type: 'MANUAL', value_type: 'DECIMAL', name: 'Receita', code: 'RECEITA_TOTAL_CENTRO' });
+  mocks.repository.findDefinition.mockResolvedValue({ id: 'indicator-1', active: true, calculation_type: 'MANUAL', value_type: 'DECIMAL', aggregation_type: 'SUM', annual_aggregation: 'SUM', name: 'Receita', code: 'RECEITA_TOTAL_CENTRO' });
   mocks.repository.upsertFormValue.mockResolvedValue({ id: 'value-1', created: true });
   mocks.repository.upsertAnnualValue.mockResolvedValue();
   mocks.repository.valueByCode.mockResolvedValue(null);
@@ -29,17 +30,17 @@ describe('processamento de valores de indicadores vinculados', () => {
 
   it('rejeita vínculo de indicador inexistente ou inativo', async () => {
     mocks.repository.findDefinition.mockResolvedValueOnce(null);
-    await expect(processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', indicator_id: 'indicator-1', value: '10' }] }, client)).rejects.toMatchObject({ code: 'INVALID_INDICATOR_LINK' });
+    await expect(processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', questionType: 'DECIMAL', indicator_id: 'indicator-1', value: '10' }] }, client)).rejects.toMatchObject({ code: 'INVALID_INDICATOR_LINK' });
     expect(mocks.repository.upsertFormValue).not.toHaveBeenCalled();
   });
 
   it('rejeita indicador calculado em resposta manual', async () => {
     mocks.repository.findDefinition.mockResolvedValueOnce({ active: true, calculation_type: 'AUTOMATIC', name: 'Resultado' });
-    await expect(processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', indicator_id: 'indicator-1', value: '10' }] }, client)).rejects.toMatchObject({ code: 'READ_ONLY_INDICATOR' });
+    await expect(processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', questionType: 'DECIMAL', indicator_id: 'indicator-1', value: '10' }] }, client)).rejects.toMatchObject({ code: 'READ_ONLY_INDICATOR' });
   });
 
   it('persiste valor manual, período mensal, anual e auditoria de criação', async () => {
-    const changed = await processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', indicator_id: 'indicator-1', value: '12,5' }] }, client);
+    const changed = await processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', questionType: 'DECIMAL', indicator_id: 'indicator-1', value: '12,5' }] }, client);
     expect(changed).toBe(1);
     expect(mocks.repository.upsertFormValue).toHaveBeenCalledWith(expect.objectContaining({ numericValue: 12.5, periodStart: '2026-02-01', periodEnd: '2026-02-28' }), client);
     expect(mocks.repository.upsertAnnualValue).toHaveBeenCalledWith(expect.objectContaining({ sourceType: 'FORM_RESPONSE' }), client);
@@ -48,14 +49,14 @@ describe('processamento de valores de indicadores vinculados', () => {
 
   it('audita atualização quando o valor existente é sobrescrito', async () => {
     mocks.repository.upsertFormValue.mockResolvedValueOnce({ id: 'value-1', created: false });
-    await processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', indicator_id: 'indicator-1', value: '10' }] }, client);
+    await processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', questionType: 'DECIMAL', indicator_id: 'indicator-1', value: '10' }] }, client);
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'INDICATOR_VALUE_UPDATED' }), client);
   });
 
   it('recalcula resultado quando receita e despesa existem', async () => {
     mocks.repository.valueByCode.mockResolvedValueOnce(100).mockResolvedValueOnce(35);
     mocks.repository.upsertDerivedResult.mockResolvedValueOnce({ id: 'derived-1' });
-    const changed = await processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', indicator_id: 'indicator-1', value: '100' }] }, client);
+    const changed = await processLinkedAnswers({ ...input, answers: [{ questionId: 'q1', questionType: 'DECIMAL', indicator_id: 'indicator-1', value: '100' }] }, client);
     expect(changed).toBe(2);
     expect(mocks.repository.upsertDerivedResult).toHaveBeenCalledWith(expect.objectContaining({ value: 65, periodEnd: '2026-02-28' }), client);
     expect(mocks.repository.upsertAnnualValue).toHaveBeenCalledWith(expect.objectContaining({ indicatorId: 'annual-result', sourceType: 'SYSTEM_CALCULATION' }), client);

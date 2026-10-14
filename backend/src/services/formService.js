@@ -44,6 +44,11 @@ async function prepareIndicatorQuestion(data, formId, questionId = null) {
   if (!definition?.active || definition.calculation_type !== 'MANUAL') {
     throw serviceError(422, 'Indicador inexistente, inativo ou não coletável', 'INVALID_INDICATOR');
   }
+  const strategies = ['SUM', 'COUNT', 'AVERAGE', 'LAST_VALUE'];
+  if (['TEXT', 'BOOLEAN', 'JSON'].includes(definition.value_type)
+      || !strategies.includes(definition.aggregation_type) || !strategies.includes(definition.annual_aggregation)) {
+    throw serviceError(422, 'Indicador sem regra numérica de agregação suportada', 'UNSUPPORTED_FORM_AGGREGATION');
+  }
   if (await repository.indicatorAlreadyLinked(formId, data.indicatorId, questionId)) {
     throw serviceError(409, 'Este indicador já está vinculado ao formulário', 'INDICATOR_ALREADY_LINKED');
   }

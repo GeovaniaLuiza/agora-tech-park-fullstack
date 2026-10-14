@@ -27,7 +27,7 @@ beforeEach(() => {
   mocks.forms.updateQuestion.mockResolvedValue({ id: 'question-1' });
   mocks.forms.removeQuestion.mockResolvedValue(true);
   mocks.forms.addQuestionOption.mockResolvedValue({ id: 'option-1', value: 'Sim' });
-  mocks.forms.findDefinitionById.mockResolvedValue({ id: 'indicator-1', active: true, calculation_type: 'MANUAL', value_type: 'INTEGER', name: 'Empregos' });
+  mocks.forms.findDefinitionById.mockResolvedValue({ id: 'indicator-1', active: true, calculation_type: 'MANUAL', value_type: 'INTEGER', aggregation_type: 'SUM', annual_aggregation: 'SUM', name: 'Empregos' });
   mocks.forms.indicatorAlreadyLinked.mockResolvedValue(false);
   mocks.sendFormInvitation.mockResolvedValue();
   mocks.audit.mockResolvedValue();

@@ -1,6 +1,9 @@
 import { MAX_IMPORT_BYTES } from '../config/indicatorImport.js';
 import residentImportDraft from '../test/fixtures/resident-import-draft.json';
 import eventImportDraft from '../test/fixtures/event-import-draft.json';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -49,6 +52,11 @@ it('apresenta os formatos de eventos em blocos verticais com títulos e campos c
   expect(within(blocks[0]).getByRole('heading', { level: 4, name: '1. Planilha de Eventos · Aba: Eventos' })).toBeTruthy();
   const fields = blocks[0].querySelectorAll('.import-format-field');
   expect(fields).toHaveLength(2);
+  expect(guide.querySelector('.import-column-groups')).toBeNull();
+  expect(Array.from(guide.children)).toEqual([guide.querySelector('.import-format-header'), ...blocks]);
+  expect(Array.from(blocks[0].children)).toEqual([blocks[0].querySelector('h4'), ...fields, blocks[0].querySelector('.import-format-note')]);
+  expect(fields[0].parentElement).toBe(blocks[0]);
+  expect(fields[1].parentElement).toBe(blocks[0]);
   expect(within(fields[0]).getByText('Campos principais', { selector: 'strong' })).toBeTruthy();
   expect(within(fields[0]).getByText('Lista · Data · Local', { selector: 'p' })).toBeTruthy();
   expect(within(fields[1]).getByText('Campos complementares', { selector: 'strong' })).toBeTruthy();
@@ -56,6 +64,34 @@ it('apresenta os formatos de eventos em blocos verticais com títulos e campos c
   expect(within(blocks[0]).getByText('Mantenha as oito colunas de Eventos na ordem indicada. Os campos complementares podem ficar vazios.')).toBeTruthy();
   expect(within(blocks[1]).getByRole('heading', { level: 4, name: '2. Exportação de Reservas · Aba: Exportação' })).toBeTruthy();
   expect(within(blocks[1]).getByText('Use a exportação da operação, sem reorganizar colunas. Somente reservas confirmadas são elegíveis. Reservas do mesmo evento em várias salas são consolidadas quando os dados da atividade coincidem.')).toBeTruthy();
+});
+
+it('aplica fluxo vertical e a mesma borda esquerda a todos os blocos do guia de eventos', async () => {
+  const globalCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../styles/global.css'), 'utf8');
+  const stylesheet = document.createElement('style');
+  stylesheet.textContent = globalCss.replace(/@import\s+url\([^;]+;/g, '');
+  document.head.appendChild(stylesheet);
+  try {
+    render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
+    const guide = screen.getByRole('heading', { level: 3, name: 'Formatos aceitos' }).closest('section');
+    const containers = [guide, ...guide.querySelectorAll('.import-format-header, .import-format-block, .import-format-field')];
+    for (const container of containers) {
+      const style = getComputedStyle(container);
+      expect(style.display, container.className).toBe('flex');
+      expect(style.flexDirection).toBe('column');
+      expect(style.alignItems).toBe('stretch');
+      expect(style.textAlign).toBe('left');
+      if (container !== guide) {
+        expect(style.marginLeft).toBe('0px');
+        expect(style.paddingLeft).toBe('0px');
+      }
+    }
+    expect(getComputedStyle(guide).overflowWrap).toBe('anywhere');
+    expect(globalCss).not.toContain('.import-column-groups');
+  } finally {
+    stylesheet.remove();
+  }
 });
 
 describe('gerenciamento explícito do lote ativo', () => {

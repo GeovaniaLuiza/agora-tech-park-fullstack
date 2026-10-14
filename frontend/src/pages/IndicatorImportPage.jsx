@@ -47,46 +47,42 @@ function readItems(batch, type) {
   return batch.draft.items;
 }
 function FormatGuide({ type, maxBytes }) {
-  if (type === 'RESIDENTS') return <section className="panel import-format import-format-guide import-format-residents">
+  const resident = type === 'RESIDENTS';
+  return <section className={`panel import-format import-format-guide ${resident ? 'import-format-residents' : 'import-format-events'}`}>
     <header className="import-format-header">
-      <h3>Formato esperado</h3>
-      <p className="import-format-meta">Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB · Cabeçalho: linha 2</p>
+      <h3>{resident ? 'Formato esperado' : 'Formatos aceitos'}</h3>
+      <p className="import-format-meta">Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB · Cabeçalho: linha {resident ? 2 : 1}</p>
     </header>
-    <div className="import-format-block">
+    {resident ? <div className="import-format-block">
       <h4>1. Planilha de Residentes · Aba: Clientes</h4>
       <div className="import-format-field">
         <strong>Campos esperados</strong>
-        <p>{residentColumns.join(' · ')}</p>
+        <p className="import-format-description">{residentColumns.join(' · ')}</p>
       </div>
       <div className="import-format-field">
         <strong>Regras de consolidação</strong>
-        <p>Empresas com o mesmo CNPJ serão consolidadas.</p>
-        <p>Múltiplas salas/módulos serão preservadas.</p>
-        <p>Registros com "Disponível" e "Áreas Comuns" não geram residentes.</p>
+        <p className="import-format-description">Empresas com o mesmo CNPJ serão consolidadas.</p>
+        <p className="import-format-description">Múltiplas salas/módulos serão preservadas.</p>
+        <p className="import-format-description">Registros com "Disponível" e "Áreas Comuns" não geram residentes.</p>
       </div>
-    </div>
-  </section>;
-  return <section className="panel import-format import-format-guide import-format-events">
-    <header className="import-format-header">
-      <h3>Formatos aceitos</h3>
-      <p className="import-format-meta">Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB · Cabeçalho: linha 1</p>
-    </header>
+    </div> : <>
     <div className="import-format-block">
       <h4>1. Planilha de Eventos · Aba: Eventos</h4>
       <div className="import-format-field">
         <strong>Campos principais</strong>
-        <p>{eventColumns.slice(0, 3).join(' · ')}</p>
+        <p className="import-format-description">{eventColumns.slice(0, 3).join(' · ')}</p>
       </div>
       <div className="import-format-field">
         <strong>Campos complementares</strong>
-        <p>{eventColumns.slice(3).join(' · ')}</p>
+        <p className="import-format-description">{eventColumns.slice(3).join(' · ')}</p>
       </div>
-      <p className="import-format-note">Mantenha as oito colunas de Eventos na ordem indicada. Os campos complementares podem ficar vazios.</p>
+      <p className="import-format-description import-format-note">Mantenha as oito colunas de Eventos na ordem indicada. Os campos complementares podem ficar vazios.</p>
     </div>
     <div className="import-format-block">
       <h4>2. Exportação de Reservas · Aba: Exportação</h4>
-      <p>Use a exportação da operação, sem reorganizar colunas. Somente reservas confirmadas são elegíveis. Reservas do mesmo evento em várias salas são consolidadas quando os dados da atividade coincidem.</p>
+      <p className="import-format-description">Use a exportação da operação, sem reorganizar colunas. Somente reservas confirmadas são elegíveis. Reservas do mesmo evento em várias salas são consolidadas quando os dados da atividade coincidem.</p>
     </div>
+    </>}
   </section>;
 }
 function ReviewAlerts({ issues = [] }) {

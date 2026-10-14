@@ -133,6 +133,32 @@ it.each([
     for (const field of guide.querySelectorAll('.import-format-field')) {
       expect(getComputedStyle(field).gap).toBe('4px');
     }
+    const descriptions = [...guide.querySelectorAll('p')];
+    expect(descriptions).toHaveLength(5);
+    for (const description of descriptions) {
+      expect(description.matches('.import-format-meta, .import-format-description')).toBe(true);
+      const style = getComputedStyle(description);
+      expect(style.color, description.textContent).toBe('var(--muted)');
+      expect(style.fontWeight).toBe('400');
+      expect(style.marginLeft).toBe('0px');
+      expect(style.fontSize).toBe('11px');
+      expect(style.lineHeight).toBe('1.7');
+    }
+    for (const heading of guide.querySelectorAll('h3, h4, strong')) {
+      expect(heading.matches('.import-format-meta, .import-format-description')).toBe(false);
+      const style = getComputedStyle(heading);
+      expect(style.color, heading.textContent).toBe('var(--navy)');
+      expect(style.fontWeight).toBe('700');
+    }
+    const checkSharedColors = (rules) => {
+      for (const rule of rules) {
+        if (rule.cssRules) checkSharedColors(rule.cssRules);
+        if (rule.style?.getPropertyValue('color')) {
+          expect(rule.selectorText).not.toMatch(/\.import-format-(events|residents)\b/);
+        }
+      }
+    };
+    checkSharedColors(stylesheet.sheet.cssRules);
     expect(globalCss).not.toContain('.import-column-groups');
   } finally {
     stylesheet.remove();

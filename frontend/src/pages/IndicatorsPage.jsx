@@ -7,6 +7,7 @@ import { annualRule, hasValue, indicatorBlocks, months, numericValue, overviewCo
 import { formatIndicatorValue } from '../utils/formatters.js';
 import MonthlyIndicatorChart from '../components/indicators/MonthlyIndicatorChart.jsx';
 import '../styles/indicators.css';
+import { useInnovationCenterSelection } from '../hooks/useInnovationCenterSelection.js';
 
 const officialFilters = { sourceType: 'SPREADSHEET_IMPORT', officialDashboard: 'true' };
 const displayValue = (item, value) => !hasValue(value) ? 'Sem dados' : typeof value === 'object' ? JSON.stringify(value) : formatIndicatorValue(value, item.value_type, item.unit);
@@ -40,13 +41,13 @@ export default function IndicatorsPage() {
   const [exportError, setExportError] = useState('');
   const [exporting, setExporting] = useState(false);
   const centers = metadata?.centers || [];
-  const centerId = params.get('centerId') || centers[0]?.id || '';
+  const [centerId, setCenterId] = useInnovationCenterSelection(centers);
   const year = params.get('year') || String(new Date().getFullYear());
   const month = params.get('month') || '';
   const category = params.get('category') || '';
   const requestKey = `${centerId}:${year}`;
   const current = response?.key === requestKey ? response : null;
-  const change = (key, value) => { const next = new URLSearchParams(params); next.set('centerId', centerId); next.set('year', year); if (value) next.set(key, value); else next.delete(key); setParams(next); };
+  const change = (key, value) => { const next = new URLSearchParams(params); next.set('centerId', centerId); next.set('year', year); if (value) next.set(key, value); else next.delete(key); if (key === 'centerId') setCenterId(value, next); else setParams(next); };
 
   useEffect(() => {
     let active = true;
@@ -94,7 +95,7 @@ export default function IndicatorsPage() {
   };
 
   return <div className="content official-indicators-page">
-    <div className="official-filters"><label>Centro<select value={centerId} onChange={(event) => change('centerId', event.target.value)}>{centers.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}</select></label><label>Ano<select value={year} onChange={(event) => change('year', event.target.value)}>{years.map((value) => <option key={value}>{value}</option>)}</select></label><label>Período<select value={month} onChange={(event) => change('month', event.target.value)}><option value="">Consolidado anual</option>{months.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><label>Categoria<select value={category} onChange={(event) => change('category', event.target.value)}><option value="">Todas</option>{availableCategories.map((block) => <option key={block.name}>{block.name}</option>)}</select></label>
+    <div className="official-filters"><label>Centro<select value={centerId} onChange={(event) => change('centerId', event.target.value)}>{!centerId && <option value="">Selecione um centro</option>}{centers.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}</select></label><label>Ano<select value={year} onChange={(event) => change('year', event.target.value)}>{years.map((value) => <option key={value}>{value}</option>)}</select></label><label>Período<select value={month} onChange={(event) => change('month', event.target.value)}><option value="">Consolidado anual</option>{months.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><label>Categoria<select value={category} onChange={(event) => change('category', event.target.value)}><option value="">Todas</option>{availableCategories.map((block) => <option key={block.name}>{block.name}</option>)}</select></label>
       {user?.role !== 'RESIDENTE' && <div className="official-exports">{['pdf', 'excel', 'csv'].map((format) => <button key={format} className="button secondary" disabled={loading || !items.length || exporting} onClick={() => download(format)}><Download />{format === 'excel' ? 'Excel' : format.toUpperCase()}</button>)}</div>}
     </div>
     <p className="official-source">Indicadores oficiais · Valores importados da planilha oficial · Campos não preenchidos aparecem como “Sem dados”.</p>

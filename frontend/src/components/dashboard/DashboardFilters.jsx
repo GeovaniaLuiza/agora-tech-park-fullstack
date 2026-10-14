@@ -8,7 +8,7 @@ export default function DashboardFilters({ filters, centers = [], categories = [
   const set = (name) => (event) => onChange({ ...filters, [name]: event.target.value });
   return <section className="dashboard-filters" aria-label="Filtros do dashboard">
     <span><Filter />Filtros</span>
-    <label>Centro<select value={filters.centerId || ''} onChange={set('centerId')}>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label>
+    <label>Centro<select value={filters.centerId || ''} onChange={set('centerId')}>{!filters.centerId && <option value="">Selecione um centro</option>}{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label>
     <label>Ano<select value={filters.year} onChange={set('year')}>{years.map((year) => <option value={year} key={year}>{year}</option>)}</select></label>
     <label>Período<select value={filters.month} onChange={set('month')}><option value="">Ano completo</option>{months.map((month, index) => <option key={month} value={index + 1}>{month}</option>)}</select></label>
     <label>Categoria<select value={filters.category} onChange={set('category')}><option value="">Todas as categorias</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>

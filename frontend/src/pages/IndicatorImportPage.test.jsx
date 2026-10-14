@@ -123,6 +123,16 @@ describe('gerenciamento explícito do lote ativo', () => {
     const prompt = vi.spyOn(window, 'confirm');
     const view = render(<MemoryRouter><IndicatorImportPage type={type} /></MemoryRouter>);
     const panel = await screen.findByRole('dialog', { name: 'Importação pendente' });
+    const details = panel.querySelector('dl.import-pending-details');
+    const expectedDetails = [
+      ['Arquivo', fileName],
+      ['Status', { VALIDATED: 'Validado', WITH_WARNINGS: 'Com alertas', REVIEW_PENDING: 'Pendente de revisão' }[status]],
+      ['Data', '09/10/2026'],
+    ];
+    expect(details).toBeTruthy();
+    expect([...details.children].map((element) => [element.tagName, element.textContent])).toEqual(
+      expectedDetails.flatMap(([label, value]) => [['DT', label], ['DD', value]]),
+    );
     expect(within(panel).getByText(fileName)).toBeTruthy();
     expect(within(panel).getByText('09/10/2026')).toBeTruthy();
     expect(within(panel).getByText({ VALIDATED: 'Validado', WITH_WARNINGS: 'Com alertas', REVIEW_PENDING: 'Pendente de revisão' }[status])).toBeTruthy();
@@ -137,6 +147,11 @@ describe('gerenciamento explícito do lote ativo', () => {
     await continuePendingImport();
     expect(screen.queryByRole('dialog', { name: 'Importação pendente' })).toBeNull();
     expect(view.container.querySelector('.import-stepper li.active').textContent).toBe('4Revisão');
+    const activeDetails = view.container.querySelector('.import-pending dl.import-pending-details');
+    expect(activeDetails).toBeTruthy();
+    expect([...activeDetails.children].map((element) => [element.tagName, element.textContent])).toEqual(
+      expectedDetails.flatMap(([label, value]) => [['DT', label], ['DD', value]]),
+    );
     expect(screen.getByText(/1 incluído\(s\) nos indicadores/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar revisão' }));
     await screen.findByText('Revisão salva com sucesso.');

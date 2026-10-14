@@ -61,7 +61,7 @@ function Status({ value }) { return <span className={`import-status ${String(val
 function PendingImportContext({ batch, onContinue, onDiscard, busy, discarding }) {
   return <>
     <h3>Existe uma importação não finalizada.</h3>
-    <dl><dt>Arquivo</dt><dd>{batch.fileName || 'Arquivo não informado'}</dd>
+    <dl className="import-pending-details"><dt>Arquivo</dt><dd>{batch.fileName || 'Arquivo não informado'}</dd>
       <dt>Status</dt><dd>{statusLabels[batch.status]}</dd>
       <dt>Data</dt><dd>{batch.createdAt ? new Date(batch.createdAt).toLocaleDateString('pt-BR') : 'Data não informada'}</dd></dl>
     <p id="pending-import-description">Descartar preserva o histórico do lote e não altera indicadores já confirmados.</p>

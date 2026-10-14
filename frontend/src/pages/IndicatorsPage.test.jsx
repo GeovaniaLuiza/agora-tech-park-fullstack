@@ -22,7 +22,7 @@ const card = (name) => screen.getByRole('article', { name });
 
 beforeEach(() => {
   vi.resetAllMocks();
-  api.getInnovationCenters.mockResolvedValue([{ id: 'a', name: 'Centro A' }, { id: 'b', name: 'Centro B' }]);
+  api.getInnovationCenters.mockResolvedValue([{ id: 'a', code: 'CI_JOINVILLE', name: 'Centro A' }, { id: 'b', name: 'Centro B' }]);
   api.getIndicatorHistory.mockResolvedValue(['2026', '2025']);
   api.getIndicators.mockImplementation(async ({ year }) => year === '2026' ? rows : []);
 });
@@ -186,7 +186,7 @@ describe('dashboard de indicadores oficiais', () => {
     api.getInnovationCenters.mockRejectedValue(new Error('Falha nos centros'));
     mount(); expect((await screen.findByRole('alert')).textContent).toBe('Falha nos centros');
     expect(api.getIndicators).not.toHaveBeenCalled();
-    cleanup(); api.getInnovationCenters.mockResolvedValue([{ id: 'a', name: 'Centro A' }]);
+    cleanup(); api.getInnovationCenters.mockResolvedValue([{ id: 'a', code: 'CI_JOINVILLE', name: 'Centro A' }]);
     api.getIndicators.mockRejectedValue(new Error('Falha nos indicadores'));
     mount(); expect((await screen.findByRole('alert')).textContent).toBe('Falha nos indicadores');
     expect(screen.queryByRole('article', { name: 'Nº de Novas Startups' })).toBeNull();

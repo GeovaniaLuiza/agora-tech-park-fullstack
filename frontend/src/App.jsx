@@ -8,6 +8,7 @@ import Header from './components/Header';
 import StatCard from './components/StatCard';
 import FormCard from './components/FormCard';
 import { useForms } from './hooks/useForms';
+import { useInnovationCenterSelection } from './hooks/useInnovationCenterSelection.js';
 import {
   addFormQuestion, addQuestionOption, archiveForm, clearAudit,
   createForm, duplicateForm, getAudit, getEligibleFormRecipients, getForm,
@@ -94,6 +95,7 @@ function Create() {
   const [questions, setQuestions] = useState([emptyQuestion('NUMBER')]);
   const [indicatorDefinitions, setIndicatorDefinitions] = useState([]);
   const [centers, setCenters] = useState([]);
+  const [centerId, setCenterId] = useInnovationCenterSelection(centers, form.innovationCenterId);
   const [indicatorCategory, setIndicatorCategory] = useState('');
   const [organizations, setOrganizations] = useState([]);
   const [targets, setTargets] = useState([]);
@@ -105,7 +107,7 @@ function Create() {
   const [error, setError] = useState('');
   useEffect(() => {
     getOrganizations().then(setOrganizations).catch((reason) => setError(reason.message));
-    getInnovationCenters().then((items) => { setCenters(items); setForm((current) => ({ ...current, innovationCenterId: current.innovationCenterId || items[0]?.id || '' })); }).catch((reason) => setError(reason.message));
+    getInnovationCenters().then(setCenters).catch((reason) => setError(reason.message));
     getFormIndicatorDefinitions().then(setIndicatorDefinitions).catch((reason) => setError(reason.message));
     getEligibleFormRecipients().then(setResidents).catch((reason) => setError(reason.message));
     if (formId) {
@@ -167,7 +169,7 @@ function Create() {
       return;
     }
     if (shouldPublish && filledQuestions.some((question) => question.indicatorId)
-        && (!form.innovationCenterId || !form.indicatorYear || !form.indicatorMonth)) {
+        && (!centerId || !form.indicatorYear || !form.indicatorMonth)) {
       setError('Para coletar indicadores, informe o Centro de Inovação, o ano e o mês de referência.');
       return;
     }
@@ -175,7 +177,7 @@ function Create() {
     try {
       const hasIndicatorPeriod = Boolean(form.indicatorMonth);
       const payloadForm = { ...form, title,
-        innovationCenterId: hasIndicatorPeriod ? form.innovationCenterId : null,
+        innovationCenterId: hasIndicatorPeriod ? centerId : null,
         indicatorYear: hasIndicatorPeriod ? Number(form.indicatorYear) : null,
         indicatorMonth: hasIndicatorPeriod ? Number(form.indicatorMonth) : null };
       const saved = formId ? await updateForm(formId, payloadForm) : await createForm(payloadForm);
@@ -226,7 +228,7 @@ function Create() {
       <div className="indicator-selection-summary"><strong>{selectedIndicatorCount}</strong><span>indicador(es) selecionado(s)</span></div>
       <div className="indicator-catalog">{availableIndicators.map((definition) => { const selected = questions.some((question) => question.indicatorId === definition.id); return <label className={`indicator-option ${selected ? 'selected' : ''}`} key={definition.id}><input type="checkbox" checked={selected} onChange={() => toggleIndicator(definition)} /><span><strong>{definition.name}</strong><small>{definition.category} · {definition.unit} · {definition.aggregation_type}</small></span></label>; })}</div>
       <hr /><h4>PERÍODO DOS DADOS</h4>
-      <label>Centro<select value={form.innovationCenterId} onChange={(event) => setForm({ ...form, innovationCenterId: event.target.value })}><option value="">Selecione</option>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label>
+      <label>Centro<select value={centerId} onChange={(event) => { setCenterId(event.target.value); setForm({ ...form, innovationCenterId: event.target.value }); }}><option value="">Selecione</option>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label>
       <div className="date-grid"><label>Ano<input type="number" min="2000" max="2200" step="1" value={form.indicatorYear} onChange={(event) => setForm({ ...form, indicatorYear: event.target.value })} /></label><label>Mês<select value={form.indicatorMonth} onChange={(event) => setForm({ ...form, indicatorMonth: event.target.value })}><option value="">Nenhum</option>{Array.from({ length: 12 }, (_, index) => <option value={index + 1} key={index + 1}>{index + 1}</option>)}</select></label></div>
       <small>Este período representa os dados coletados e pode ser diferente do prazo de resposta.</small>
     </aside>
@@ -355,6 +357,7 @@ function Unauthorized() { const { user } = useAuth(); const navigate = useNaviga
 function UnknownProfile() { const { logout } = useAuth(); const navigate = useNavigate(); return <main className="route-state" role="alert"><h1>Perfil não reconhecido</h1><p>Sua conta está autenticada, mas não possui um perfil válido.</p><Button onClick={() => { logout(); navigate('/login', { replace: true }); }}>Voltar ao login</Button></main>; }
 function NotFound() { const { user } = useAuth(); const navigate = useNavigate(); return <main className="route-state"><h1>Página não encontrada</h1><p>O endereço informado não existe ou foi removido.</p><Button onClick={() => navigate(user ? homeForRole(user.role) : '/login', { replace: true })}>{user ? 'Voltar ao meu painel' : 'Ir para o login'}</Button></main>; }
 function HomeRedirect() { const { user } = useAuth(); return <Navigate to={user ? homeForRole(user.role) : '/login'} replace />; }
+function IndicatorsRedirect() { const location = useLocation(); return <Navigate to={`/indicators${location.search}`} state={location.state} replace />; }
 
 export default function App() {
   return <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><Routes>
@@ -364,7 +367,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/dashboard" element={<DashboardPage />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/pesquisa" element={<Navigate to="/forms" replace />} /><Route path="/forms" element={<Forms />} /><Route path="/forms/new" element={<Create />} /><Route path="/forms/:formId/edit" element={<Create />} /></Route>
-        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/indicators" element={<IndicatorsPage />} /><Route path="/indicadores" element={<Navigate to="/indicators" replace />} /></Route><Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR']} />}><Route path="/organizations" element={<Residents />} /></Route>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/indicators" element={<IndicatorsPage />} /><Route path="/indicadores" element={<IndicatorsRedirect />} /></Route><Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR']} />}><Route path="/organizations" element={<Residents />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicators/catalog" element={<IndicatorCatalogPage />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicadores/importar-eventos" element={<IndicatorImportPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/importar-residentes" element={<IndicatorImportPage key="RESIDENTS" type="RESIDENTS" />} /><Route path="/indicadores/eventos" element={<ImportedIndicatorsPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/residentes" element={<ImportedIndicatorsPage key="RESIDENTS" type="RESIDENTS" />} /></Route>
         <Route path="/perfil" element={<ProfilePage />} />

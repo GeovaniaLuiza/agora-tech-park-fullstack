@@ -8,6 +8,7 @@ import OperationalSummary from '../components/dashboard/OperationalSummary.jsx';
 import CapacitationChart from '../components/dashboard/CapacitationChart.jsx';
 import { EmptyState, ErrorState, LoadingState } from '../components/dashboard/DashboardStates.jsx';
 import { formatDate } from '../utils/formatters.js';
+import { useInnovationCenterSelection } from '../hooks/useInnovationCenterSelection.js';
 import {
   downloadDashboardSpreadsheet, getDashboardCompanies, getDashboardEngagement,
   getDashboardFinancial, getDashboardProjects, getInstitutionalDashboard,
@@ -37,8 +38,9 @@ export default function DashboardPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [centers, setCenters] = useState([]);
+  const [centerId, setCenterId] = useInnovationCenterSelection(centers, filters.centerId);
 
-  const query = useMemo(() => Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== '')), [filters]);
+  const query = useMemo(() => Object.fromEntries(Object.entries({ ...filters, centerId }).filter(([, value]) => value !== '')), [filters, centerId]);
   const loadOperational = useCallback(() => {
     setOperational(sectionInitial);
     getOperationalDashboard().then((data) => setOperational({ loading: false, data, error: '' })).catch((error) => setOperational({ loading: false, data: null, error: error.message }));
@@ -59,11 +61,10 @@ export default function DashboardPage() {
   useEffect(() => {
     void Promise.resolve().then(() => getInnovationCenters().then((items) => {
       setCenters(items);
-      setFilters((current) => ({ ...current, centerId: current.centerId || items[0]?.id || '' }));
     }).catch(() => {}));
   }, []);
   useEffect(() => {
-    if (!filters.centerId) return;
+    if (!centerId) return;
     void Promise.resolve().then(() => {
       loadInstitutional();
       loadCompanies();
@@ -71,9 +72,13 @@ export default function DashboardPage() {
       loadProjects();
       loadEngagement();
     });
-  }, [filters.centerId, loadInstitutional, loadCompanies, loadFinancial, loadProjects, loadEngagement]);
+  }, [centerId, loadInstitutional, loadCompanies, loadFinancial, loadProjects, loadEngagement]);
 
-  const clearFilters = () => setFilters(initialFilters);
+  const clearFilters = () => setFilters({ ...initialFilters, centerId });
+  const changeFilters = (next) => {
+    if (next.centerId !== centerId) setCenterId(next.centerId);
+    setFilters(next);
+  };
   const exportReport = async () => {
     setExporting(true);
     setExportError('');
@@ -90,8 +95,8 @@ export default function DashboardPage() {
   const projects = sections.projects.data?.series || [];
   const engagement = sections.engagement.data?.series || [];
   return <div className="content executive-dashboard">
-    <div className="dashboard-page-head"><div><span>PAINEL EXECUTIVO</span><h2>{centers.find((center) => center.id === filters.centerId)?.name || 'Centro de Inovação'}</h2><p>Resultados institucionais consolidados e operação da plataforma.</p></div><div className="dashboard-head-actions"><small>Última atualização: {formatDate(sections.institutional.data?.lastUpdate)}</small><button className="button secondary" disabled={exporting} onClick={exportReport}><Download />{exporting ? 'Exportando...' : 'Exportar relatório'}</button></div></div>
-    <DashboardFilters filters={filters} centers={centers} categories={sections.institutional.data?.categories || []} onChange={setFilters} onClear={clearFilters} />
+    <div className="dashboard-page-head"><div><span>PAINEL EXECUTIVO</span><h2>{centers.find((center) => center.id === centerId)?.name || 'Centro de Inovação'}</h2><p>Resultados institucionais consolidados e operação da plataforma.</p></div><div className="dashboard-head-actions"><small>Última atualização: {formatDate(sections.institutional.data?.lastUpdate)}</small><button className="button secondary" disabled={exporting} onClick={exportReport}><Download />{exporting ? 'Exportando...' : 'Exportar relatório'}</button></div></div>
+    <DashboardFilters filters={{ ...filters, centerId }} centers={centers} categories={sections.institutional.data?.categories || []} onChange={changeFilters} onClear={clearFilters} />
     {exportError && <div className="error" role="alert">{exportError}</div>}
 
     {operational.loading ? <LoadingState /> : operational.error ? <ErrorState message={operational.error} onRetry={loadOperational} /> : <OperationalSummary data={operational.data} />}

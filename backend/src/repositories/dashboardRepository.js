@@ -60,7 +60,7 @@ export async function series(codes, { year, month = null, category = null, sourc
        v.period_start,v.period_end,v.source_type,v.consolidated_at
      FROM indicator_definitions d JOIN ranked_values v ON v.indicator_id=d.id
      WHERE d.code=ANY($1::text[]) AND d.active AND v.year=$2 AND v.month IS NOT NULL AND v.source_rank=1
-       AND v.innovation_center_id=COALESCE($8::uuid,(SELECT id FROM innovation_centers WHERE active ORDER BY name LIMIT 1))
+       AND v.innovation_center_id=COALESCE($8::uuid,(SELECT id FROM innovation_centers WHERE active AND code='CI_JOINVILLE'))
        AND ($4::text IS NULL OR d.category=$4)
        AND ($5::date IS NULL OR v.period_end >= $5::date)
        AND ($6::date IS NULL OR v.period_start <= $6::date)
@@ -106,7 +106,7 @@ export async function indicatorReportRows({ year, month = null, category = null,
      JOIN indicator_definitions d ON d.id=v.indicator_id
      JOIN innovation_centers c ON c.id=v.innovation_center_id
      WHERE v.source_rank=1 AND d.active
-       AND v.innovation_center_id=COALESCE($7::uuid,(SELECT id FROM innovation_centers WHERE active ORDER BY name LIMIT 1))
+       AND v.innovation_center_id=COALESCE($7::uuid,(SELECT id FROM innovation_centers WHERE active AND code='CI_JOINVILLE'))
        AND ($4::text IS NULL OR d.category=$4)
        AND ($5::date IS NULL OR v.period_end IS NULL OR v.period_end >= $5::date)
        AND ($6::date IS NULL OR v.period_start IS NULL OR v.period_start <= $6::date)

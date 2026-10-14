@@ -17,7 +17,7 @@ const points = (values) => values.map((value, index) => ({ month: index + 1, val
 const series = (code, name, values, unit = 'UNIDADE') => ({ code, name, unit, valueType: unit === 'BRL' ? 'CURRENCY' : 'NUMBER', points: points(values) });
 
 beforeEach(() => {
-  api.getInnovationCenters.mockResolvedValue([{ id: 'center-1', name: 'Centro de Inovação de Joinville' }]);
+  api.getInnovationCenters.mockResolvedValue([{ id: 'center-1', code: 'CI_JOINVILLE', name: 'Centro de Inovação de Joinville' }]);
   api.getOperationalDashboard.mockResolvedValue({ active_organizations: 4, active_forms: 2, response_rate: 50, monitored_indicators: 42 });
   api.getInstitutionalDashboard.mockResolvedValue({ lastUpdate: '2026-08-04T12:00:00Z', categories: ['Financeiro'], source: { fileName: 'Indicadores Rede de Centros de Inovação 2025_Joinville.xlsx' }, cards: [{ code: 'RECEITA_TOTAL_CENTRO', title: 'Receita Total do Centro', description: 'Receita anual', value: 1829191, valueType: 'CURRENCY', unit: 'BRL', period: '2025', updatedAt: '2026-08-04T12:00:00Z', variationPercent: null }, { code: 'EMPRESAS_RESIDENTES', title: 'Nº de Empresas Residentes', value: 74, valueType: 'NUMBER', unit: 'EMPRESA', period: '2026', updatedAt: '2026-09-01T12:00:00Z', variationPercent: null }] });
   api.getDashboardCompanies.mockResolvedValue({ series: [series('EMPRESAS_ATIVAS_TOTAL', 'Empresas ativas', [39, 41]), series('NOVAS_EMPRESAS_ATIVAS', 'Novas empresas', [1, 2]), series('EMPRESAS_RESIDENTES', 'Empresas residentes', [72, 74])] });

@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   getIndicators: vi.fn(),
   getIndicatorHistory: vi.fn(),
   getInnovationCenters: vi.fn(),
+  getFormIndicatorDefinitions: vi.fn(),
   downloadIndicatorReport: vi.fn(),
   getOrganizations: vi.fn(),
   getUsers: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('./services/api', async (original) => ({
   getIndicators: api.getIndicators,
   getIndicatorHistory: api.getIndicatorHistory,
   getInnovationCenters: api.getInnovationCenters,
+  getFormIndicatorDefinitions: api.getFormIndicatorDefinitions,
   downloadIndicatorReport: api.downloadIndicatorReport,
   getOrganizations: api.getOrganizations,
   getUsers: api.getUsers,
@@ -46,6 +48,7 @@ beforeEach(() => {
   api.getIndicators.mockResolvedValue([]);
   api.getIndicatorHistory.mockResolvedValue([]);
   api.getInnovationCenters.mockResolvedValue([]);
+  api.getFormIndicatorDefinitions.mockResolvedValue([]);
   api.getOrganizations.mockResolvedValue([]);
   api.getUsers.mockResolvedValue([]);
   api.getEligibleFormRecipients.mockResolvedValue([]);
@@ -61,8 +64,33 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('roteamento principal', () => {
+  it('preserva centerId ao redirecionar a rota /indicadores', async () => {
+    api.getInnovationCenters.mockResolvedValue([
+      { id: 'blumenau', code: 'CI_BLUMENAU', name: 'Centro de Inovação de Blumenau' },
+      { id: 'joinville', code: 'CI_JOINVILLE', name: 'Centro de Inovação de Joinville' },
+    ]);
+    window.history.replaceState({}, '', '/indicadores?centerId=blumenau&year=2026');
+    render(<App />);
+    await waitFor(() => expect(api.getIndicators).toHaveBeenCalledWith(expect.objectContaining({ centerId: 'blumenau', year: '2026' })));
+    expect(window.location.pathname).toBe('/indicators');
+    expect(new URLSearchParams(window.location.search).get('centerId')).toBe('blumenau');
+  });
+  it.each(['', '?centerId=blumenau', '?centerId=invalid'])('preserva o default e a seleção explícita no cadastro de indicadores: %s', async (query) => {
+    const names = (await import('../../backend/tests/fixtures/innovation-center-names.json')).default;
+    const centers = names.map((name, index) => ({ id: index === 10 ? 'joinville-original' : index === 2 ? 'blumenau' : `center-${index}`, code: index === 10 ? 'CI_JOINVILLE' : `CI_${index}`, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    api.getInnovationCenters.mockResolvedValue(centers);
+    window.history.replaceState({}, '', `/forms/new${query}`);
+    render(<App />);
+    const select = await screen.findByLabelText('Centro');
+    await waitFor(() => expect(select.value).toBe(query === '?centerId=blumenau' ? 'blumenau' : 'joinville-original'));
+    expect(Array.from(select.options).filter((option) => option.value).map((option) => option.textContent)).toEqual(centers.map((center) => center.name));
+    fireEvent.change(select, { target: { value: 'center-1' } });
+    expect(select.value).toBe('center-1');
+    expect(new URLSearchParams(window.location.search).get('centerId')).toBe('center-1');
+  });
   it.each(['/indicadores', '/indicators'])('abre o dashboard oficial em %s', async (path) => {
-    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', name: 'Centro A' }]);
+    api.getInnovationCenters.mockResolvedValue([{ id: 'center-a', code: 'CI_JOINVILLE', name: 'Centro A' }]);
     api.getIndicators.mockResolvedValue([{ code: 'EVENTOS_REALIZADOS', name: 'Nº de Eventos Realizados', value: null, monthly_values: [] }]);
     window.history.replaceState({}, '', path);
     render(<App />);

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({ getInnovationCenters: vi.fn(), getConfirmedImportIndicators: vi.fn(), getOfficialWorkbookStatus: vi.fn(), downloadOfficialIndicatorWorkbook: vi.fn() }));
 vi.mock('../services/api.js', () => api);
 import ImportedIndicatorsPage from './ImportedIndicatorsPage.jsx';
+import centerNames from '../../../backend/tests/fixtures/innovation-center-names.json';
 const events = { monthly: [1, 0, 2, ...Array(9).fill(0)], total: 3, records: [
   { id: 'e1', name: 'Evento confirmado', event_at: '2026-03-15', location: 'Auditório', theme: 'Tecnologia', mode: 'PRESENTIAL', participants: 25, participating_companies: 4, subtype: 'Workshop' },
 ] };
@@ -11,9 +12,29 @@ function QueryLocation() {
   const location = useLocation();
   return <output data-testid="query-location">{location.search}</output>;
 }
-beforeEach(() => { vi.resetAllMocks(); api.getInnovationCenters.mockResolvedValue([{ id: 'c1', name: 'Centro A' }]); api.getConfirmedImportIndicators.mockResolvedValue(events); });
+beforeEach(() => { vi.resetAllMocks(); api.getInnovationCenters.mockResolvedValue([{ id: 'c1', code: 'CI_JOINVILLE', name: 'Centro A' }]); api.getConfirmedImportIndicators.mockResolvedValue(events); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 describe('telas específicas de indicadores confirmados', () => {
+  it.each(['EVENTS', 'RESIDENTS'])('exibe os 16 centros da API e consulta um centro vazio normalmente em %s', async (type) => {
+    const centers = centerNames.map((name, index) => ({ id: `center-${index}`, code: index === 10 ? 'CI_JOINVILLE' : `CI_${index}`, name }));
+    api.getInnovationCenters.mockResolvedValue(centers);
+    api.getConfirmedImportIndicators.mockImplementation(async (_type, filters) => filters.centerId === 'center-10'
+      ? events : { monthly: Array(12).fill(0), total: 0, records: [] });
+    render(<MemoryRouter initialEntries={['/?centerId=center-10&year=2026']}><ImportedIndicatorsPage type={type} /><QueryLocation /></MemoryRouter>);
+    await screen.findByText('Evento confirmado');
+    const select = screen.getByLabelText('Centro');
+    expect(within(select).getAllByRole('option')).toHaveLength(16);
+    for (const name of centerNames) expect(within(select).getByRole('option', { name })).toBeTruthy();
+    fireEvent.change(select, { target: { value: 'center-1' } });
+    await waitFor(() => expect(api.getConfirmedImportIndicators).toHaveBeenLastCalledWith(type, { centerId: 'center-1', year: '2026' }));
+    await screen.findByText('Nenhum registro confirmado para o período.');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('Evento confirmado')).toBeNull();
+    expect(screen.getByTestId('query-location').textContent).toBe('?centerId=center-1&year=2026');
+    fireEvent.change(select, { target: { value: 'center-10' } });
+    await screen.findByText('Evento confirmado');
+    expect(api.getConfirmedImportIndicators).toHaveBeenLastCalledWith(type, { centerId: 'center-10', year: '2026' });
+  });
   it.each(['EVENTS', 'RESIDENTS'])('permite baixar XLSX após consultar %s com a estratégia existente', async (type) => {
     api.getOfficialWorkbookStatus.mockResolvedValue({ requiresStrategy: true });
     api.downloadOfficialIndicatorWorkbook.mockResolvedValue({ blob: new Blob(['xlsx']), filename: 'indicadores.xlsx' });
@@ -74,7 +95,7 @@ describe('telas específicas de indicadores confirmados', () => {
     expect(records).toEqual(snapshot);
   });
   it('mantem month na query e na consulta ao trocar centro e ano', async () => {
-    api.getInnovationCenters.mockResolvedValue([{ id: 'c1', name: 'Centro A' }, { id: 'c2', name: 'Centro B' }]);
+    api.getInnovationCenters.mockResolvedValue([{ id: 'c1', code: 'CI_JOINVILLE', name: 'Centro A' }, { id: 'c2', name: 'Centro B' }]);
     render(<MemoryRouter initialEntries={['/?centerId=c1&year=2026&month=7']}><ImportedIndicatorsPage type="EVENTS" /><QueryLocation /></MemoryRouter>);
     await screen.findByText('Evento confirmado');
     fireEvent.change(screen.getByLabelText('Centro'), { target: { value: 'c2' } });

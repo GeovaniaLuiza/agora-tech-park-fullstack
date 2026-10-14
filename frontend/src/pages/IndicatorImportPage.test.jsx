@@ -21,7 +21,7 @@ const residentBatch = { id: 'batch-2', importType: 'RESIDENTS', status: 'REVIEW_
 
 beforeEach(() => {
   vi.resetAllMocks();
-  api.getInnovationCenters.mockResolvedValue([{ id: 'center-1', name: 'Centro de Inovação' }]);
+  api.getInnovationCenters.mockResolvedValue([{ id: 'center-1', code: 'CI_JOINVILLE', name: 'Centro de Inovação' }]);
   api.getIndicatorImportOptions.mockResolvedValue({ eventModes: ['PRESENTIAL', 'HYBRID', 'ONLINE', 'NOT_INFORMED'], eventTypes: ['Evento', 'Workshop'], maxBytes: MAX_IMPORT_BYTES });
   api.getIndicatorImportDraft.mockResolvedValue(null);
   api.cancelIndicatorImport.mockResolvedValue({ status: 'CANCELLED' });
@@ -73,7 +73,7 @@ describe('gerenciamento explícito do lote ativo', () => {
   });
 
   it('consulta EVENTS novamente ao trocar o centro e ignora resposta tardia do centro anterior', async () => {
-    api.getInnovationCenters.mockResolvedValue([{ id: 'center-1', name: 'Primeiro' }, { id: 'center-2', name: 'Segundo' }]);
+    api.getInnovationCenters.mockResolvedValue([{ id: 'center-1', code: 'CI_JOINVILLE', name: 'Primeiro' }, { id: 'center-2', name: 'Segundo' }]);
     let resolvePrevious;
     api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((resolve) => { resolvePrevious = resolve; }))
       .mockResolvedValueOnce({ ...eventBatch, id: 'second-batch', centerId: 'center-2', fileName: 'Segundo.xlsx' });
@@ -127,7 +127,7 @@ describe('gerenciamento explícito do lote ativo', () => {
     expect(within(panel).getByText('09/10/2026')).toBeTruthy();
     expect(within(panel).getByText({ VALIDATED: 'Validado', WITH_WARNINGS: 'Com alertas', REVIEW_PENDING: 'Pendente de revisão' }[status])).toBeTruthy();
     const resume = within(panel).getByRole('button', { name: 'Continuar importação' });
-    expect(document.activeElement).toBe(resume);
+    await waitFor(() => expect(document.activeElement).toBe(resume));
     fireEvent.keyDown(resume, { key: 'Tab', shiftKey: true });
     expect(document.activeElement).toBe(within(panel).getByRole('button', { name: 'Descartar e iniciar nova' }));
     fireEvent.keyDown(document.activeElement, { key: 'Tab' });
@@ -1035,7 +1035,7 @@ describe('telas de importação de indicadores', () => {
   });
 
   it.each(['EVENTS', 'RESIDENTS'])('limpa erro local quando a recuperação seguinte retorna draft válido em %s', async (type) => {
-    api.getInnovationCenters.mockResolvedValueOnce([{ id: 'center-1', name: 'Centro 1' }, { id: 'center-2', name: 'Centro 2' }]);
+    api.getInnovationCenters.mockResolvedValueOnce([{ id: 'center-1', code: 'CI_JOINVILLE', name: 'Centro 1' }, { id: 'center-2', name: 'Centro 2' }]);
     api.getIndicatorImportDraft.mockRejectedValueOnce(new Error('A planilha excede o limite de 200 MB.'));
     api.getIndicatorImportDraft.mockResolvedValueOnce(type === 'EVENTS' ? eventBatch : residentBatch);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -1268,7 +1268,7 @@ describe('telas de importação de indicadores', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('dados inválidos');
   });
   it('descarta o rascunho do centro anterior quando a resposta chega fora de ordem', async () => {
-    api.getInnovationCenters.mockResolvedValueOnce([{ id: 'center-1', name: 'Centro A' }, { id: 'center-2', name: 'Centro B' }]);
+    api.getInnovationCenters.mockResolvedValueOnce([{ id: 'center-1', code: 'CI_JOINVILLE', name: 'Centro A' }, { id: 'center-2', name: 'Centro B' }]);
     let resolvePrevious;
     api.getIndicatorImportDraft.mockReturnValueOnce(new Promise((resolve) => { resolvePrevious = resolve; })).mockResolvedValueOnce(residentBatch);
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);

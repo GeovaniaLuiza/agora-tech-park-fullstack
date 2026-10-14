@@ -38,6 +38,26 @@ const continuePendingImport = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Continuar importação' }));
 };
 
+it('apresenta os formatos de eventos em blocos verticais com títulos e campos completos', async () => {
+  render(<MemoryRouter><IndicatorImportPage type="EVENTS" /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByLabelText(/Selecionar arquivo/).disabled).toBe(false));
+  const guide = screen.getByRole('heading', { level: 3, name: 'Formatos aceitos' }).closest('section');
+  const meta = within(guide).getByText('Formato: XLSX · Limite: 200 MB · Cabeçalho: linha 1');
+  expect(meta.className).toBe('import-format-meta');
+  const blocks = guide.querySelectorAll('.import-format-block');
+  expect(blocks).toHaveLength(2);
+  expect(within(blocks[0]).getByRole('heading', { level: 4, name: '1. Planilha de Eventos · Aba: Eventos' })).toBeTruthy();
+  const fields = blocks[0].querySelectorAll('.import-format-field');
+  expect(fields).toHaveLength(2);
+  expect(within(fields[0]).getByText('Campos principais', { selector: 'strong' })).toBeTruthy();
+  expect(within(fields[0]).getByText('Lista · Data · Local', { selector: 'p' })).toBeTruthy();
+  expect(within(fields[1]).getByText('Campos complementares', { selector: 'strong' })).toBeTruthy();
+  expect(within(fields[1]).getByText('Temática · Modo · Tipo de Evento · Nº de Participantes · Nº de Empresas Participantes', { selector: 'p' })).toBeTruthy();
+  expect(within(blocks[0]).getByText('Mantenha as oito colunas de Eventos na ordem indicada. Os campos complementares podem ficar vazios.')).toBeTruthy();
+  expect(within(blocks[1]).getByRole('heading', { level: 4, name: '2. Exportação de Reservas · Aba: Exportação' })).toBeTruthy();
+  expect(within(blocks[1]).getByText('Use a exportação da operação, sem reorganizar colunas. Somente reservas confirmadas são elegíveis. Reservas do mesmo evento em várias salas são consolidadas quando os dados da atividade coincidem.')).toBeTruthy();
+});
+
 describe('gerenciamento explícito do lote ativo', () => {
   it.each(['EVENTS', 'RESIDENTS'])('lote de outro tipo não interfere na consulta de %s', async (type) => {
     api.getIndicatorImportDraft.mockResolvedValueOnce(type === 'EVENTS' ? residentBatch : eventBatch);

@@ -118,7 +118,7 @@ export async function verifyEmail(rawToken, ipAddress) {
     await notifications.createMany(adminIds, {
       title: 'Nova solicitação de acesso',
       message: `${result.user.name} confirmou o e-mail e aguarda análise.`,
-      link: '/admin/solicitacoes',
+      link: `/admin/solicitacoes?requestId=${encodeURIComponent(result.user.id)}`,
     });
   } catch (error) {
     // A confirmação não deve falhar caso o canal interno esteja temporariamente indisponível.

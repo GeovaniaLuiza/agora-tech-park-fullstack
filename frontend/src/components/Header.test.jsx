@@ -5,6 +5,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../contexts/AuthContext.jsx', () => ({
   useAuth: () => ({ user: { name: 'Admin Teste', role: 'ADMIN' } }),
 }));
+vi.mock('../services/api.js', () => ({
+  getNotifications: vi.fn().mockResolvedValue([]),
+  markNotificationRead: vi.fn(),
+}));
 
 import Header from './Header';
 

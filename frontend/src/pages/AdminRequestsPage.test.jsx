@@ -1,10 +1,12 @@
 import { StrictMode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
   approveAccessRequest: vi.fn(),
   getAccessRequests: vi.fn(),
+  getAccessRequest: vi.fn(),
   getOrganizations: vi.fn(),
   rejectAccessRequest: vi.fn(),
 }));
@@ -25,7 +27,7 @@ describe('painel de solicitações administrativas', () => {
   it('carrega em StrictMode sem retornar Promise como limpeza do efeito', async () => {
     api.getAccessRequests.mockResolvedValue([]);
 
-    render(<StrictMode><AdminRequestsPage /></StrictMode>);
+    render(<MemoryRouter><StrictMode><AdminRequestsPage /></StrictMode></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('Nenhuma solicitação pendente.')).toBeTruthy());
     expect(api.getAccessRequests).toHaveBeenCalled();
@@ -34,7 +36,7 @@ describe('painel de solicitações administrativas', () => {
   it('representa falha de carregamento sem remover a interface', async () => {
     api.getAccessRequests.mockRejectedValue(new Error('API indisponível'));
 
-    render(<AdminRequestsPage />);
+    render(<MemoryRouter><AdminRequestsPage /></MemoryRouter>);
 
     expect((await screen.findByRole('alert')).textContent).toContain('API indisponível');
   });
@@ -49,7 +51,7 @@ describe('painel de solicitações administrativas', () => {
     };
     api.getAccessRequests.mockResolvedValue([request]);
     api.approveAccessRequest.mockResolvedValue({});
-    render(<AdminRequestsPage />);
+    render(<MemoryRouter><AdminRequestsPage /></MemoryRouter>);
     await screen.findByText('Pessoa Teste');
 
     fireEvent.click(screen.getByRole('button', { name: /aprovar acesso/i }));

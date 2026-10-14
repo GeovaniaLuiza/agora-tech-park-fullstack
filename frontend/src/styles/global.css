@@ -1,5 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
 
+.notification-popover>button{cursor:pointer}
+.notification-popover>button:hover{background:#dce8ff}
+.notification-popover>button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.admin-row.selected-request{background:#edf4ff;box-shadow:inset 3px 0 var(--primary);outline:2px solid var(--primary);outline-offset:-2px}
+
 :root{font-family:Inter,Arial,sans-serif;color:#0d1930;background:#f6f9fc;font-synthesis:none;--navy:#071937;--blue:#173fa2;--primary:#234fbd;--line:#dfe6ee;--muted:#6f7a8e;--green:#19a86b}
 *{box-sizing:border-box}body{margin:0;font-size:14px}button,input,select{font:inherit}button{cursor:pointer}.app{min-height:100vh}.main{margin-left:214px;min-height:100vh}.content{padding:28px 28px 40px;max-width:1440px;margin:auto}
 .sidebar{position:fixed;inset:0 auto 0 0;width:214px;background:linear-gradient(180deg,#091c3f,#07162f);color:#aec0dc;padding:18px 12px;display:flex;flex-direction:column;z-index:10}.brand{height:48px;display:flex;align-items:center;gap:10px;color:#fff;font:700 14px Manrope}.brand small{display:block;font:400 10px Inter;color:#94a9cb;margin-top:2px}.brand-mark{width:34px;height:34px;border-radius:10px;background:#2455c3;display:grid;place-items:center;font-size:16px}.sidebar nav{display:grid;gap:4px;margin-top:25px}.sidebar button{border:0;background:transparent;color:inherit;display:flex;align-items:center;gap:12px;padding:12px;border-radius:9px;text-align:left;font-size:13px}.sidebar button svg{width:16px;height:16px}.sidebar nav button:hover,.sidebar nav button.active{background:#183b7d;color:#fff}.side-bottom{margin-top:auto;border-top:1px solid #1a2f51;padding-top:8px}.mobile-close{display:none!important;margin-left:auto;padding:4px!important}

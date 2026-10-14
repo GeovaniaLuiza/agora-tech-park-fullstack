@@ -25,7 +25,7 @@ const verificationRepo = vi.hoisted(() => ({
 }));
 const passwordResetRepo = vi.hoisted(() => ({ issue: vi.fn() }));
 const emailService = vi.hoisted(() => ({ sendVerification: vi.fn(), sendVerified: vi.fn(), sendApproved: vi.fn(), sendRejected: vi.fn(), sendInactive: vi.fn(), sendPasswordReset: vi.fn() }));
-const notificationRepo = vi.hoisted(() => ({ createMany: vi.fn() }));
+const notificationRepo = vi.hoisted(() => ({ createMany: vi.fn(), markRead: vi.fn(), findForUser: vi.fn() }));
 vi.mock('../src/repositories/userRepository.js', () => userRepo);
 vi.mock('../src/repositories/notificationRepository.js', () => notificationRepo);
 vi.mock('../src/repositories/auditRepository.js', () => auditRepo);
@@ -158,7 +158,7 @@ describe('autenticação e solicitação de acesso', () => {
     expect(valid.status).toBe(200);
     expect(notificationRepo.createMany).toHaveBeenCalledWith([activeUser.id], expect.objectContaining({
       title: 'Nova solicitação de acesso',
-      link: '/admin/solicitacoes',
+      link: `/admin/solicitacoes?requestId=${resident.id}`,
     }));
     expect(valid.body).not.toHaveProperty('token');
     expect(valid.body).not.toHaveProperty('user');
@@ -167,6 +167,7 @@ describe('autenticação e solicitação de acesso', () => {
       verificationRepo.verify.mockResolvedValueOnce({ state });
       expect((await request(app).post('/api/auth/verify-email').send({ token: rawToken })).status).toBe(status);
     }
+    expect(notificationRepo.createMany).toHaveBeenCalledTimes(1);
   });
   it('confirma o e-mail mesmo se a notificação posterior falhar e informa o resultado real', async () => {
     const rawToken = 'token-valid-with-at-least-thirty-two-characters';
@@ -577,6 +578,40 @@ describe('RBAC administrativo e isolamento do residente', () => {
     const response = await request(app).get('/api/admin/access-requests').set('Authorization', `Bearer ${tokenFor(resident)}`);
     expect(response.status).toBe(403);
     expect(accessRepo.listPending).not.toHaveBeenCalled();
+  });
+  it('consulta a solicitação pelo ID e trata solicitações removidas ou já analisadas', async () => {
+    const endpoint = `/api/admin/access-requests/${resident.id}`;
+    const get = () => request(app).get(endpoint).set('Authorization', `Bearer ${tokenFor(activeUser)}`);
+    accessRepo.findRequest.mockResolvedValue({ ...resident, status: 'PENDING' });
+    const response = await get();
+    expect(response.status).toBe(200);
+    expect(response.body.id).toBe(resident.id);
+    expect(accessRepo.findRequest).toHaveBeenCalledWith(resident.id);
+    for (const unavailable of [null, resident, { ...resident, status: 'PENDING', email_verified_at: null }]) {
+      accessRepo.findRequest.mockResolvedValue(unavailable);
+      expect((await get()).status).toBe(404);
+    }
+  });
+  it('bloqueia consulta individual sem sessão e para todos os perfis não ADMIN', async () => {
+    const endpoint = `/api/admin/access-requests/${resident.id}`;
+    expect((await request(app).get(endpoint)).status).toBe(401);
+    for (const role of ['GESTOR', 'PESQUISADOR', 'RESIDENTE']) {
+      userRepo.findPublicProfile.mockResolvedValue({ ...resident, role, organizations: [{ id: '55555555-5555-5555-5555-555555555555' }] });
+      expect((await request(app).get(endpoint).set('Authorization', `Bearer ${tokenFor(resident)}`)).status).toBe(403);
+    }
+    expect(accessRepo.findRequest).not.toHaveBeenCalled();
+  });
+  it('marca somente a notificação indicada pertencente ao usuário autenticado', async () => {
+    const id = '77777777-7777-7777-7777-777777777777';
+    const notification = { id, link: `/admin/solicitacoes?requestId=${resident.id}`, read_at: new Date().toISOString() };
+    notificationRepo.markRead.mockResolvedValueOnce(notification).mockResolvedValueOnce(undefined);
+    const endpoint = `/api/notifications/${id}/read`;
+    const response = await request(app).patch(endpoint).set('Authorization', `Bearer ${tokenFor(activeUser)}`);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(notification);
+    expect(notificationRepo.markRead).toHaveBeenCalledExactlyOnceWith(id, activeUser.id);
+    expect((await request(app).patch(endpoint).set('Authorization', `Bearer ${tokenFor(resident)}`)).status).toBe(404);
+    expect(notificationRepo.markRead).toHaveBeenLastCalledWith(id, resident.id);
   });
   it('impede residente de consultar ou responder por outra organização', async () => {
     userRepo.findPublicProfile.mockResolvedValue({ ...resident, organizations: [{ id: '55555555-5555-5555-5555-555555555555' }] });

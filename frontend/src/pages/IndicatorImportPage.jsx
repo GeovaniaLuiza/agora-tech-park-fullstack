@@ -34,7 +34,7 @@ function SummaryCards({ type, summary = {} }) {
 }
 const eventColumns = ['Lista', 'Data', 'Local', 'Temática', 'Modo', 'Tipo de Evento', 'Nº de Participantes', 'Nº de Empresas Participantes'];
 const validationOf = (item) => item.ignored || item.reviewStatus === 'EXCLUDED' ? 'IGNORED' : item.validationStatus || (item.reviewStatus === 'WITH_WARNINGS' ? 'WARNING' : item.reviewStatus === 'PENDING' ? 'REVIEW_REQUIRED' : 'VALID');
-const residentColumns = ['Legenda', 'Locador', 'Bloco', 'Bloco e Modúlo', 'Área', 'EMPRESA', 'CNPJ', 'Vigência', 'Fim', 'Atividades', 'Nacionalidade'];
+const residentColumns = ['Legenda', 'Locador', 'Bloco', 'Bloco e Módulo', 'Área', 'EMPRESA', 'CNPJ', 'Vigência', 'Fim', 'Atividades', 'Nacionalidade'];
 const areaLabel = (area) => area === null || area === undefined ? 'Não informado' : Number(area).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' m²';
 function readItems(batch, type) {
   if (batch?.importType !== type || !Array.isArray(batch?.draft?.items) || batch.draft.items.some((item) => !item || !Array.isArray(item.sourceRows)
@@ -47,7 +47,28 @@ function readItems(batch, type) {
   return batch.draft.items;
 }
 function FormatGuide({ type, maxBytes }) {
-  if (type === 'RESIDENTS') return <section className="panel import-format"><h3>Formato esperado</h3><p>Aba: Clientes · Cabeçalho: linha 2 · Formato: XLSX · Limite: {Math.round(maxBytes / 1024 / 1024)} MB</p><p>{residentColumns.join(' · ')}</p><p>Empresas com o mesmo CNPJ serão consolidadas. Múltiplas salas/módulos serão preservadas. Disponível e Áreas Comuns não geram residentes.</p></section>;
+  if (type === 'RESIDENTS') return <section className="panel import-format import-format-residents">
+    <header className="import-format-header">
+      <h3>Formato esperado</h3>
+    </header>
+    <div className="import-format-block">
+      <p>Arquivo: Clientes.xlsx</p>
+      <p>Aba: Clientes</p>
+      <p>Cabeçalho: linha 2</p>
+      <p>Formato: XLSX</p>
+      <p>Limite: {Math.round(maxBytes / 1024 / 1024)} MB</p>
+    </div>
+    <div className="import-format-block">
+      <h4>Colunas esperadas</h4>
+      <p>{residentColumns.join(' · ')}</p>
+    </div>
+    <div className="import-format-block">
+      <h4>Regras de consolidação</h4>
+      <p>Empresas com o mesmo CNPJ serão consolidadas.</p>
+      <p>Múltiplas salas/módulos serão preservadas.</p>
+      <p>Registros com "Disponível" e "Áreas Comuns" não geram residentes.</p>
+    </div>
+  </section>;
   return <section className="panel import-format import-format-events">
     <header className="import-format-header">
       <h3>Formatos aceitos</h3>

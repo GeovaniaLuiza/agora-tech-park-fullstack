@@ -94,6 +94,12 @@ describe('form saving and invitations through HTTP and PostgreSQL', () => {
   });
 
   it.each(['admin', 'researcher'])('allows %s to create, update and send an eligible resident invitation', async (role) => {
+    const eligible = await request(app).get('/api/forms/recipients/eligible')
+      .query({ organizationId: ids.org }).set('Authorization', token(ids[role])).expect(200);
+    expect(eligible.body.map(({ id }) => id).sort()).toEqual([ids.resident, ids.second].sort());
+    const otherOrganization = await request(app).get('/api/forms/recipients/eligible')
+      .query({ organizationId: ids.otherOrg }).set('Authorization', token(ids[role])).expect(200);
+    expect(otherOrganization.body).toEqual([]);
     const created = await create(ids[role]);
     expect(created.status).toBe(201);
     const id = created.body.id;
@@ -112,6 +118,7 @@ describe('form saving and invitations through HTTP and PostgreSQL', () => {
   it('keeps GESTOR and RESIDENTE unauthorized to create, edit or send', async () => {
     const id = await readyForm();
     for (const actor of [ids.manager, ids.resident]) {
+      await request(app).get('/api/forms/recipients/eligible').set('Authorization', token(actor)).expect(403);
       expect((await create(actor)).status).toBe(403);
       await request(app).put(`/api/forms/${id}`).set('Authorization', token(actor)).send({ title: 'Não autorizado' }).expect(403);
       await request(app).put(`/api/forms/${id}/audience`).set('Authorization', token(actor)).send(audience()).expect(403);
@@ -120,18 +127,34 @@ describe('form saving and invitations through HTTP and PostgreSQL', () => {
     expect(mail.sendFormInvitation).not.toHaveBeenCalled();
   });
 
-  it.each(['other organization', 'inactive membership', 'inactive organization', 'unverified email', 'inactive user', 'wrong role'])('blocks %s', async (reason) => {
+  it.each(['other organization', 'inactive membership', 'inactive organization', 'unverified email', 'inactive user', 'wrong role', 'missing user'])('blocks %s', async (reason) => {
     const id = await readyForm();
     const body = audience();
+    if (reason === 'missing user') body.recipientIds = [randomUUID()];
     if (reason === 'other organization') body.organizationIds = [ids.otherOrg];
     if (reason === 'inactive membership') await sql('UPDATE users_organizations SET active=FALSE WHERE user_id=$1', [ids.resident]);
     if (reason === 'inactive organization') await sql("UPDATE organizations SET status='INACTIVE' WHERE id=$1", [ids.org]);
     if (reason === 'unverified email') await sql('UPDATE users SET email_verified_at=NULL WHERE id=$1', [ids.resident]);
     if (reason === 'inactive user') await sql("UPDATE users SET status='INACTIVE' WHERE id=$1", [ids.resident]);
     if (reason === 'wrong role') await sql("UPDATE users SET role='GESTOR' WHERE id=$1", [ids.resident]);
+    const eligible = await request(app).get('/api/forms/recipients/eligible')
+      .query({ organizationId: body.organizationIds[0] }).set('Authorization', token(ids.admin)).expect(200);
+    expect(eligible.body.map(({ id: userId }) => userId)).not.toContain(body.recipientIds[0]);
+    await request(app).put(`/api/forms/${id}/audience`).set('Authorization', token(ids.admin)).send(body).expect(422);
     expect((await publish(id, body)).status).toBe(422);
     expect(mail.sendFormInvitation).not.toHaveBeenCalled();
     expect((await sql('SELECT status FROM forms WHERE id=$1', [id])).rows[0].status).toBe('DRAFT');
+  });
+
+  it.each(['organizationIds', 'recipientIds'])('rejects duplicate %s when saving or publishing an audience', async (field) => {
+    const id = await readyForm();
+    const body = audience();
+    body[field].push(body[field][0]);
+    await request(app).put(`/api/forms/${id}/audience`).set('Authorization', token(ids.admin)).send(body).expect(422);
+    expect((await publish(id, body)).status).toBe(422);
+    expect((await sql('SELECT * FROM form_respondents WHERE form_id=$1', [id])).rows).toHaveLength(0);
+    expect((await sql('SELECT status FROM forms WHERE id=$1', [id])).rows[0].status).toBe('DRAFT');
+    expect(mail.sendFormInvitation).not.toHaveBeenCalled();
   });
 
   it('requires recipients only for publication', async () => {

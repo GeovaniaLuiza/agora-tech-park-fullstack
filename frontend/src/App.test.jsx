@@ -118,7 +118,7 @@ describe('busca e seleção explícita de respondentes', () => {
     const scoped = targetIds.length ? eligible.filter((person) => person.organizations.some((organization) => targetIds.includes(organization.id))) : [];
     if (targetIds.length) await within(group).findByText(scoped.length
       ? `${scoped.length} respondente(s) disponível(is)`
-      : 'Nenhum respondente elegível para as organizações selecionadas.');
+      : 'Nenhum respondente com vínculo ativo e e-mail válido foi encontrado para as organizações selecionadas.');
     if (open && targetIds.length && scoped.length) {
       const trigger = within(group).getByRole('button', { name: 'Selecionar respondentes' });
       if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
@@ -133,6 +133,16 @@ describe('busca e seleção explícita de respondentes', () => {
   const query = (input, value) => fireEvent.change(input, { target: { value } });
   const emailOption = () => screen.getByRole('checkbox', { name: /Enviar formulário por e-mail/ });
 
+  it('explica como as organizações definem os residentes vinculados que podem receber o formulário', async () => {
+    await openPicker({ targets: [], open: false });
+    const organizationsGroup = screen.getByRole('group', { name: 'Organizações destinatárias' });
+    expect(within(organizationsGroup).getByText('Selecione uma ou mais organizações para definir quais residentes poderão receber o formulário.')).toBeTruthy();
+    const recipientsGroup = screen.getByRole('group', { name: 'RESPONDENTES' });
+    expect(within(recipientsGroup).getByText('Somente residentes ativos, com e-mail válido e vínculo ativo em uma das organizações destinatárias selecionadas podem receber o formulário.')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: /Enviar formulário por e-mail/ }).disabled).toBe(true);
+    expect(api.getEligibleFormRecipients).not.toHaveBeenCalled();
+    expect(api.publishForm).not.toHaveBeenCalled();
+  });
   it('opens the eligible options automatically after selecting an organization', async () => {
     await openPicker({ targets: [], open: false });
     fireEvent.click(await screen.findByRole('checkbox', { name: /^Empresa XPTO/ }));
@@ -200,13 +210,13 @@ describe('busca e seleção explícita de respondentes', () => {
 
   it('distingue ausência de organização da ausência de residentes elegíveis', async () => {
     await openPicker({ targets: [], open: false });
-    expect(screen.getByText('Selecione ao menos uma organização destinatária para visualizar os respondentes.')).toBeTruthy();
+    expect(screen.getByText('Selecione ao menos uma organização destinatária para visualizar os respondentes vinculados.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Selecionar respondentes' }).disabled).toBe(true);
     expect(api.getEligibleFormRecipients).not.toHaveBeenCalled();
 
     cleanup();
     await openPicker({ targets: ['org-a'], eligible: [], open: false });
-    await screen.findByText('Nenhum respondente elegível para as organizações selecionadas.');
+    await screen.findByText('Nenhum respondente com vínculo ativo e e-mail válido foi encontrado para as organizações selecionadas.');
     expect(screen.queryByRole('searchbox', { name: 'Buscar por nome ou e-mail' })).toBeNull();
   });
 
@@ -326,7 +336,7 @@ describe('busca e seleção explícita de respondentes', () => {
     expect(emailOption().checked).toBe(false);
     expect(emailOption().disabled).toBe(true);
     expect(screen.queryByRole('checkbox', { name: /João Souza/ })).toBeNull();
-    expect(screen.getByText('Selecione ao menos uma organização destinatária para visualizar os respondentes.')).toBeTruthy();
+    expect(screen.getByText('Selecione ao menos uma organização destinatária para visualizar os respondentes vinculados.')).toBeTruthy();
   });
 
   it('preserva quem continua vinculado a uma organização destinatária ao remover outra', async () => {
@@ -344,14 +354,14 @@ describe('busca e seleção explícita de respondentes', () => {
     expect(emailOption().checked).toBe(true);
     await screen.findByText('2 respondente(s) disponível(is)');
     fireEvent.click(screen.getByRole('checkbox', { name: /^Universidade ABC/ }));
-    await screen.findByText('Selecione ao menos uma organização destinatária para visualizar os respondentes.');
+    await screen.findByText('Selecione ao menos uma organização destinatária para visualizar os respondentes vinculados.');
     expect(emailOption().checked).toBe(false);
     expect(screen.getByText('0 respondente(s) selecionado(s)')).toBeTruthy();
   });
 
   it('permite remover uma atribuição antiga que não consta mais na lista de elegíveis', async () => {
     await openPicker({ editing: true, targets: ['org-a'], eligible: [], selected: [{ id: 'old-user', name: 'Pessoa desligada', email: 'antigo@example.com' }] });
-    expect(screen.getByText('Nenhum respondente elegível para as organizações selecionadas.')).toBeTruthy();
+    expect(screen.getByText('Nenhum respondente com vínculo ativo e e-mail válido foi encontrado para as organizações selecionadas.')).toBeTruthy();
     expect(screen.queryByRole('checkbox', { name: /Pessoa desligada/ })).toBeNull();
     expect(screen.getByText('0 respondente(s) selecionado(s)')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
@@ -480,7 +490,7 @@ describe('salvamento e envio de formulários', () => {
     await open(true);
     expect(screen.getByRole('checkbox', { name: /Empresa A/ }).checked).toBe(true);
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(await screen.findByText('Nenhum respondente elegível para as organizações selecionadas.')).toBeTruthy();
+    expect(await screen.findByText('Nenhum respondente com vínculo ativo e e-mail válido foi encontrado para as organizações selecionadas.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
     expect(await screen.findByText('Formulário salvo com sucesso.')).toBeTruthy();
     expect(api.updateForm).toHaveBeenCalledOnce();

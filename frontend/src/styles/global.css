@@ -164,6 +164,7 @@ html{background:var(--background)}body{min-width:320px;background:var(--backgrou
 .recipient-search-control{display:flex;align-items:center;gap:6px;min-width:0;margin:6px 0 10px}
 .recipient-search-control>svg{flex:none;color:var(--muted)}
 .recipient-search-control>input{min-width:0;flex:1}
+.recipient-fieldset>.recipient-organizations-help{margin:0 0 10px!important;font-size:10px!important;line-height:1.5;color:var(--muted)}
 .recipient-picker{min-width:0}
 .recipient-picker-trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:40px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#18253c;text-align:left;font:500 11px Manrope;cursor:pointer}
 .recipient-picker-trigger:hover:not(:disabled){border-color:#86a5e7;background:#f8faff}

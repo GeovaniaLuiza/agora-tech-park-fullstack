@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 import FormField from '../components/FormField';
 import { useAuth } from '../contexts/AuthContext';
-import { homeForRole } from '../config/access';
+import { loginDestination } from '../utils/loginDestination';
 import { validateLogin } from '../utils/authValidation';
 import { authRateLimit } from '../utils/authRateLimit';
 
 export default function LoginPage() {
   const { clearSessionError, login, sessionError, sessionRateLimit, sessionRecoveryRequired, restoreSession } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const emailRef = useRef(null);
   const [form, setForm] = useState({ email: '', password: '', remember: false });
   const [errors, setErrors] = useState({});
@@ -30,7 +31,7 @@ export default function LoginPage() {
     if (sessionRecoveryRequired || sessionRateLimit) {
       setAlert('');
       const user = await restoreSession();
-      if (user) navigate(homeForRole(user.role), { replace: true });
+      if (user) navigate(loginDestination(user, location.state?.from), { replace: true });
       return;
     }
     const nextErrors = validateLogin(form);
@@ -42,7 +43,7 @@ export default function LoginPage() {
     setLoading(true); setAlert(''); clearSessionError();
     try {
       const user = await login(form.email, form.password, form.remember);
-      navigate(homeForRole(user.role), { replace: true });
+      navigate(loginDestination(user, location.state?.from), { replace: true });
     } catch (error) {
       if (error.status === 429) {
         const limit = authRateLimit(error);

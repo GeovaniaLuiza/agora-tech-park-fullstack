@@ -7,6 +7,22 @@ import { sendFormInvitation } from './emailService.js';
 import { serviceError } from '../utils/validation.js';
 import { emailFailures, formsCreated, formsPublished } from '../observability/metrics.js';
 
+const isUuid = (value) => typeof value === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
+
+function validatedAudience(body = {}) {
+  const { organizationIds = [], recipientIds = [] } = body;
+  if (!Array.isArray(organizationIds) || organizationIds.some((id) => !isUuid(id))) {
+    throw serviceError(422, 'Lista de organizações destinatárias inválida', 'INVALID_ORGANIZATION');
+  }
+  if (!Array.isArray(recipientIds) || recipientIds.length > 100 || recipientIds.some((id) => !isUuid(id))) {
+    throw serviceError(422, 'Lista de residentes destinatários inválida', 'INVALID_RESIDENT_RECIPIENTS');
+  }
+  if (new Set(organizationIds).size !== organizationIds.length || new Set(recipientIds).size !== recipientIds.length) {
+    throw serviceError(422, 'Organizações e respondentes não podem ser duplicados', 'DUPLICATE_FORM_RECIPIENT');
+  }
+  return { organizationIds, recipientIds };
+}
+
 async function requireForm(id, user) {
   const form = await repository.findById(id, user);
   if (!form) throw serviceError(404, 'Formulário não encontrado', 'FORM_NOT_FOUND');
@@ -78,12 +94,9 @@ export async function updateForm(id, data, user) {
 }
 
 export async function saveAudience(id, body, user) {
+  if (!isUuid(id)) throw serviceError(422, 'Identificador de formulário inválido', 'INVALID_FORM_ID');
   await requireDraft(id);
-  const organizationIds = Array.isArray(body.organizationIds) ? body.organizationIds.filter(Boolean) : [];
-  const recipientIds = Array.isArray(body.recipientIds) ? body.recipientIds.filter(Boolean) : [];
-  if (new Set(organizationIds).size !== organizationIds.length || new Set(recipientIds).size !== recipientIds.length) {
-    throw serviceError(422, 'Organizações e respondentes não podem ser duplicados', 'DUPLICATE_FORM_RECIPIENT');
-  }
+  const { organizationIds, recipientIds } = validatedAudience(body);
   for (const organizationId of organizationIds) {
     if (!await organizations.existsActive(organizationId)) throw serviceError(422, 'Uma organização destinatária é inválida', 'INVALID_ORGANIZATION');
   }
@@ -100,6 +113,7 @@ export async function saveAudience(id, body, user) {
 }
 
 export async function publishForm(id, body, user) {
+  if (!isUuid(id)) throw serviceError(422, 'Identificador de formulário inválido', 'INVALID_FORM_ID');
   const form = await requireDraft(id);
   const questions = await repository.questions(id);
   if (!questions.length) throw serviceError(422, 'Inclua ao menos uma pergunta antes de publicar', 'FORM_WITHOUT_QUESTIONS');
@@ -108,15 +122,8 @@ export async function publishForm(id, body, user) {
       && (!form.innovation_center_id || !form.indicator_year || !form.indicator_month)) {
     throw serviceError(422, 'Para publicar indicadores, informe o Centro de Inovação, o ano e o mês de referência.', 'INDICATOR_PERIOD_REQUIRED');
   }
-  const organizationIds = Array.isArray(body.organizationIds) ? body.organizationIds.filter(Boolean) : [];
-  const recipientIds = Array.isArray(body.recipientIds) ? body.recipientIds.filter(Boolean) : [];
-  if (new Set(organizationIds).size !== organizationIds.length || new Set(recipientIds).size !== recipientIds.length) {
-    throw serviceError(422, 'Organizações e respondentes não podem ser duplicados', 'DUPLICATE_FORM_RECIPIENT');
-  }
-  if (!recipientIds.length) throw serviceError(422, 'Selecione ao menos um residente do Ágora Tech Park', 'RESIDENT_RECIPIENT_REQUIRED');
-  if (recipientIds.length > 100 || recipientIds.some((id) => !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id))) {
-    throw serviceError(422, 'Lista de residentes destinatários inválida', 'INVALID_RESIDENT_RECIPIENTS');
-  }
+  const { organizationIds, recipientIds } = validatedAudience(body);
+  if (!recipientIds.length) throw serviceError(422, 'Selecione ao menos um respondente para enviar o formulário.', 'RESIDENT_RECIPIENT_REQUIRED');
   for (const organizationId of organizationIds) {
     if (!await organizations.existsActive(organizationId)) {
       throw serviceError(422, 'Uma organização destinatária é inválida', 'INVALID_ORGANIZATION');
@@ -186,7 +193,9 @@ export async function resendInvitation(id, userId, user) {
   if (form.status !== 'ACTIVE') throw serviceError(409, 'O formulário ainda não foi publicado', 'FORM_NOT_ACTIVE');
   const respondent = await repository.respondent(id, userId);
   if (!respondent) throw serviceError(404, 'Respondente não encontrado', 'FORM_RESPONDENT_NOT_FOUND');
-  return { respondentId: userId, ...await deliverInvitations(form, [{ ...respondent, organizationName: respondent.organization_name }], user, 'FORM_EMAIL_RESENT') };
+  const eligible = await users.findEligibleFormRecipients({ organizationIds: [respondent.organization_id], userIds: [userId] });
+  if (!eligible.some((recipient) => recipient.id === userId)) throw serviceError(422, 'Um destinatário não é elegível', 'INELIGIBLE_RESIDENT_RECIPIENT');
+  return { respondentId: userId, ...await deliverInvitations(form, [{ ...eligible[0], id: userId, organizationName: respondent.organization_name }], user, 'FORM_EMAIL_RESENT') };
 }
 
 export async function closeForm(id, user) {

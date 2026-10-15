@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Building2, Check, CheckSquare, Edit3, Hash, List, Plus, Search, Trash2, Type, X,
@@ -12,7 +12,7 @@ import { useInnovationCenterSelection } from './hooks/useInnovationCenterSelecti
 import {
   addFormQuestion, addQuestionOption, archiveForm, clearAudit,
   createForm, duplicateForm, getAudit, getEligibleFormRecipients, getForm,
-  getFormQuestions, getFormResponse, getFormIndicatorDefinitions, getInnovationCenters, getOrganizations, getQuestionOptions,
+  getFormQuestions, getFormResponse, getFormIndicatorDefinitions, getFormOrganizations, getInnovationCenters, getOrganizations, getQuestionOptions,
   getResponseHistory, getFormRespondents, publishForm, saveFormAudience, saveResponseDraft, submitResponse,
   createOrganization, updateOrganization, inactivateOrganization, updateForm, updateFormQuestion,
 } from './services/api';
@@ -61,6 +61,7 @@ const ErrorMessage = ({ message }) => message ? <div className="error" role="ale
 function Forms({ resident = false }) {
   const { forms, loading, error, reload } = useForms();
   const navigate = useNavigate();
+  const location = useLocation();
   const [actionError, setActionError] = useState('');
   const [search, setSearch] = useState('');
   const visible = forms.filter((form) => form.title.toLowerCase().includes(search.toLowerCase()));
@@ -70,6 +71,7 @@ function Forms({ resident = false }) {
   };
   if (loading) return <div className="content">Carregando formulários...</div>;
   return <div className="content">
+    {location.state?.formMessage && <div className="success-message" role="status">{location.state.formMessage}</div>}
     <div className="toolbar"><label className="field-search"><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar formulário..." /></label>{!resident && <Button className="push" onClick={() => navigate('/forms/new')}><Plus />Criar novo formulário</Button>}</div>
     <ErrorMessage message={error || actionError} />
     <section className="forms-grid">{visible.map((form) => <FormCard
@@ -102,7 +104,10 @@ function Create() {
   const [residents, setResidents] = useState([]);
   const [recipientIds, setRecipientIds] = useState([]);
   const recipientSearch = '';
-  const [, setSuccess] = useState('');
+  const savedFormId = useRef(null);
+  const savingRef = useRef(false);
+  const [recipientError, setRecipientError] = useState('');
+  const [invalidFields, setInvalidFields] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -111,7 +116,7 @@ function Create() {
     getFormIndicatorDefinitions().then(setIndicatorDefinitions).catch((reason) => setError(reason.message));
     getEligibleFormRecipients().then(setResidents).catch((reason) => setError(reason.message));
     if (formId) {
-      Promise.all([getForm(formId), getFormQuestions(formId), getFormRespondents(formId)]).then(async ([loaded, loadedQuestions, savedRespondents]) => {
+      Promise.all([getForm(formId), getFormQuestions(formId), getFormRespondents(formId), getFormOrganizations(formId)]).then(async ([loaded, loadedQuestions, savedRespondents, savedOrganizations]) => {
         setForm({
           title: loaded.title,
           description: loaded.description || '',
@@ -127,7 +132,7 @@ function Create() {
         })));
         setQuestions(withOptions);
         setRecipientIds(savedRespondents.map((respondent) => respondent.user_id));
-        setTargets([...new Set(savedRespondents.map((respondent) => respondent.organization_id))]);
+        setTargets(savedOrganizations.map((organization) => organization.id));
       }).catch((reason) => setError(reason.message));
     }
   }, [formId]);
@@ -139,70 +144,94 @@ function Create() {
     setTargets(next);
     if (next.length) setRecipientIds((selected) => selected.filter((id) => residents.find((resident) => resident.id === id)?.organizations.some((organization) => next.includes(organization.id))));
   };
-  const toggleRecipient = (residentId) => setRecipientIds((selected) => selected.includes(residentId) ? selected.filter((id) => id !== residentId) : [...selected, residentId]);
+  const toggleRecipient = (residentId) => {
+    setRecipientError('');
+    setRecipientIds((selected) => selected.includes(residentId) ? selected.filter((id) => id !== residentId) : [...selected, residentId]);
+  };
   const updateQuestion = (index, patch) => setQuestions(questions.map((question, current) => current === index ? { ...question, ...patch } : question));
   const save = async (shouldPublish) => {
+    if (savingRef.current) return;
+    setError(''); setRecipientError(''); setInvalidFields([]);
+    const invalid = (message, fields) => { setError(message); setInvalidFields(fields); };
+    if (shouldPublish && !recipientIds.length) {
+      setRecipientError('Selecione ao menos um respondente para enviar o formulário.');
+      return;
+    }
     const title = form.title.trim();
     const filledQuestions = questions.filter((question) => question.label.trim());
     if (title.length < 3) {
-      setError('Informe um título com pelo menos 3 caracteres.');
+      invalid('Informe um título com pelo menos 3 caracteres.', ['title']);
       return;
     }
     if (questions.some((question) => question.label.trim() && question.label.trim().length < 3)) {
-      setError('Toda pergunta preenchida deve ter pelo menos 3 caracteres.');
+      invalid('Toda pergunta preenchida deve ter pelo menos 3 caracteres.', questions.flatMap((question, index) => question.label.trim() && question.label.trim().length < 3 ? [`question-${index}`] : []));
       return;
     }
     if (shouldPublish && !filledQuestions.length) {
-      setError('Inclua ao menos uma pergunta antes de publicar.');
+      invalid('Inclua ao menos uma pergunta antes de enviar.', questions.map((_, index) => `question-${index}`));
       return;
     }
     if (shouldPublish && (!form.startDate || !form.endDate)) {
-      setError('Defina as datas de início e fim antes de publicar.');
+      invalid('Defina as datas de início e fim antes de enviar.', [!form.startDate && 'startDate', !form.endDate && 'endDate'].filter(Boolean));
+      return;
+    }
+    if (form.startDate && form.endDate && form.startDate > form.endDate) {
+      invalid('A data final deve ser igual ou posterior à data inicial.', ['startDate', 'endDate']);
       return;
     }
     if (filledQuestions.some((question) => question.type === 'OPTION' && !question.options.split(',').some((value) => value.trim()))) {
-      setError('Informe ao menos uma opção para cada pergunta de escolha.');
+      invalid('Informe ao menos uma opção para cada pergunta de escolha.', questions.flatMap((question, index) => question.label.trim() && question.type === 'OPTION' && !question.options.split(',').some((value) => value.trim()) ? [`options-${index}`] : []));
       return;
     }
-    if (shouldPublish && !recipientIds.length) {
-      setError('Selecione ao menos um residente ativo para receber o formulário.');
-      return;
-    }
-    if (shouldPublish && filledQuestions.some((question) => question.indicatorId)
+    if ((form.indicatorMonth || (shouldPublish && filledQuestions.some((question) => question.indicatorId)))
         && (!centerId || !form.indicatorYear || !form.indicatorMonth)) {
-      setError('Para coletar indicadores, informe o Centro de Inovação, o ano e o mês de referência.');
+      invalid('Para coletar indicadores, informe o Centro de Inovação, o ano e o mês de referência.', [!centerId && 'center', !form.indicatorYear && 'year', !form.indicatorMonth && 'month'].filter(Boolean));
       return;
     }
-    setSaving(true); setError(''); setSuccess('');
+    savingRef.current = true;
+    setSaving(true);
     try {
       const hasIndicatorPeriod = Boolean(form.indicatorMonth);
       const payloadForm = { ...form, title,
         innovationCenterId: hasIndicatorPeriod ? centerId : null,
         indicatorYear: hasIndicatorPeriod ? Number(form.indicatorYear) : null,
         indicatorMonth: hasIndicatorPeriod ? Number(form.indicatorMonth) : null };
-      const saved = formId ? await updateForm(formId, payloadForm) : await createForm(payloadForm);
+      const existingId = formId || savedFormId.current;
+      const saved = existingId ? await updateForm(existingId, payloadForm) : await createForm(payloadForm);
+      savedFormId.current = saved.id;
       for (const [position, question] of filledQuestions.entries()) {
         const payload = { label: question.label, type: question.type, required: question.required, position, indicatorId: question.indicatorId || null };
         const savedQuestion = question.id
           ? await updateFormQuestion(saved.id, question.id, payload)
           : await addFormQuestion(saved.id, payload);
-        if (!question.id && question.type === 'OPTION') {
-          for (const option of question.options.split(',').map((value) => value.trim()).filter(Boolean)) {
-            await addQuestionOption(saved.id, savedQuestion.id, option);
+        const trackQuestion = (patch) => setQuestions((current) => current.map((item) => item === question || item.id === savedQuestion.id ? { ...item, id: savedQuestion.id, ...patch } : item));
+        if (!question.id) trackQuestion(question.type === 'OPTION' ? { savedOptionCount: 0 } : {});
+        if (question.type === 'OPTION' && (!question.id || question.savedOptionCount !== undefined)) {
+          const options = question.options.split(',').map((value) => value.trim()).filter(Boolean);
+          for (let index = question.savedOptionCount || 0; index < options.length; index += 1) {
+            await addQuestionOption(saved.id, savedQuestion.id, options[index]);
+            trackQuestion({ savedOptionCount: index + 1 });
           }
         }
       }
-      await saveFormAudience(saved.id, targets, recipientIds);
+      let formMessage = 'Formulário salvo com sucesso.';
       if (shouldPublish) {
         const published = await publishForm(saved.id, targets, recipientIds);
         const summary = published.notificationSummary;
-        setSuccess(`Formulário criado com sucesso e publicado. ${recipientIds.length} respondente(s) selecionado(s). ${summary.sent} e-mail(s) enviado(s)${summary.failed ? `; ${summary.failed} envio(s) falharam.` : '.'}`);
-        setTimeout(() => navigate('/forms'), 1400);
+        formMessage = summary.failed
+          ? `Formulário salvo. ${summary.sent} convites enviados e ${summary.failed} falharam.`
+          : `Formulário salvo e enviado para ${summary.sent} respondente(s).`;
       } else {
-        setSuccess('Rascunho salvo. Nenhum e-mail foi enviado.');
-        setTimeout(() => navigate('/forms'), 0);
+        await saveFormAudience(saved.id, targets, recipientIds);
       }
-    } catch (reason) { setError(reason.message === 'Erro interno do servidor' ? 'Não foi possível criar o formulário. Verifique o título, o período e os campos obrigatórios e tente novamente.' : reason.message); } finally { setSaving(false); }
+      navigate('/forms', { state: { formMessage } });
+    } catch (reason) {
+      if (['RESIDENT_RECIPIENT_REQUIRED', 'INELIGIBLE_RESIDENT_RECIPIENT', 'RESPONDENT_ORGANIZATION_REQUIRED'].includes(reason.code)) {
+        setRecipientError(reason.message);
+      } else {
+        setError(reason.message === 'Erro interno do servidor' ? 'Não foi possível concluir a operação. Verifique os dados e tente novamente.' : reason.message);
+      }
+    } finally { savingRef.current = false; setSaving(false); }
   };
   const categories = [...new Set(indicatorDefinitions.map((item) => item.category))];
   const availableIndicators = indicatorDefinitions.filter((item) => !indicatorCategory || item.category === indicatorCategory);
@@ -228,12 +257,12 @@ function Create() {
       <div className="indicator-selection-summary"><strong>{selectedIndicatorCount}</strong><span>indicador(es) selecionado(s)</span></div>
       <div className="indicator-catalog">{availableIndicators.map((definition) => { const selected = questions.some((question) => question.indicatorId === definition.id); return <label className={`indicator-option ${selected ? 'selected' : ''}`} key={definition.id}><input type="checkbox" checked={selected} onChange={() => toggleIndicator(definition)} /><span><strong>{definition.name}</strong><small>{definition.category} · {definition.unit} · {definition.aggregation_type}</small></span></label>; })}</div>
       <hr /><h4>PERÍODO DOS DADOS</h4>
-      <label>Centro<select value={centerId} onChange={(event) => { setCenterId(event.target.value); setForm({ ...form, innovationCenterId: event.target.value }); }}><option value="">Selecione</option>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label>
-      <div className="date-grid"><label>Ano<input type="number" min="2000" max="2200" step="1" value={form.indicatorYear} onChange={(event) => setForm({ ...form, indicatorYear: event.target.value })} /></label><label>Mês<select value={form.indicatorMonth} onChange={(event) => setForm({ ...form, indicatorMonth: event.target.value })}><option value="">Nenhum</option>{Array.from({ length: 12 }, (_, index) => <option value={index + 1} key={index + 1}>{index + 1}</option>)}</select></label></div>
+      <label>Centro<select value={centerId} aria-invalid={invalidFields.includes('center')} onChange={(event) => { setCenterId(event.target.value); setForm({ ...form, innovationCenterId: event.target.value }); }}><option value="">Selecione</option>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label>
+      <div className="date-grid"><label>Ano<input type="number" min="2000" max="2200" step="1" value={form.indicatorYear} aria-invalid={invalidFields.includes('year')} onChange={(event) => setForm({ ...form, indicatorYear: event.target.value })} /></label><label>Mês<select value={form.indicatorMonth} aria-invalid={invalidFields.includes('month')} onChange={(event) => setForm({ ...form, indicatorMonth: event.target.value })}><option value="">Nenhum</option>{Array.from({ length: 12 }, (_, index) => <option value={index + 1} key={index + 1}>{index + 1}</option>)}</select></label></div>
       <small>Este período representa os dados coletados e pode ser diferente do prazo de resposta.</small>
     </aside>
-    <aside className="panel toolbox form-settings"><h4>TIPOS DE PERGUNTA</h4>{questionTypes.map(([Icon, label, type]) => <button type="button" key={type} onClick={() => setQuestions([...questions, emptyQuestion(type)])}><span><Icon /></span>{label}</button>)}<hr /><h4>CONFIGURAÇÕES</h4><div className="date-grid"><label>Início<input type="date" value={form.startDate} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></label><label>Fim<input type="date" value={form.endDate} onChange={(event) => setForm({ ...form, endDate: event.target.value })} /></label></div><fieldset className="recipient-fieldset"><legend>Organizações destinatárias</legend>{organizations.filter((organization) => organization.status !== 'INACTIVE').map((organization) => <label className="recipient-option" key={organization.id}><input type="checkbox" checked={targets.includes(organization.id)} onChange={() => toggleTarget(organization.id)} /><span><strong>{organization.name}</strong><small>{organization.cnpj || 'Organização ativa'}</small></span></label>)}</fieldset><fieldset className="recipient-fieldset"><legend>Residentes respondentes</legend><p>Somente residentes ativos, com e-mail verificado e vínculo válido podem receber a coleta.</p><div className="recipient-list">{visibleResidents.map((resident) => <label className="recipient-option" key={resident.id}><input type="checkbox" checked={recipientIds.includes(resident.id)} onChange={() => toggleRecipient(resident.id)} /><span><strong>{resident.name}</strong><small>{resident.email}<br />{resident.organizations.map((organization) => organization.name).join(', ')}</small></span></label>)}{!visibleResidents.length && <small className="recipient-empty">Nenhum residente elegível para a organização selecionada.</small>}</div></fieldset><div className={`recipient-summary ${recipientIds.length ? 'ready' : ''}`}><strong>{recipientIds.length}</strong><span>residente(s) selecionado(s)</span></div></aside>
-    <main className="panel builder"><ErrorMessage message={error} /><div className="builder-heading"><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Título do formulário" /><textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Descrição" /></div>{questions.map((question, index) => <article className="question" key={question.id || index}><small>#{index + 1} <span>{question.type}</span></small><input value={question.label} onChange={(event) => updateQuestion(index, { label: event.target.value })} placeholder="Texto da pergunta" /><select value={question.type} onChange={(event) => updateQuestion(index, { type: event.target.value })}>{questionTypes.map(([, label, type]) => <option value={type} key={type}>{label}</option>)}</select>{question.type === 'OPTION' && <input value={question.options} onChange={(event) => updateQuestion(index, { options: event.target.value })} placeholder="Opções separadas por vírgula" />}</article>)}<Button type="button" variant="dashed" onClick={() => setQuestions([...questions, emptyQuestion()])}><Plus />Adicionar pergunta</Button><div className="toolbar"><Button type="button" disabled={saving} onClick={() => save(false)}>{saving ? 'Salvando...' : 'Salvar rascunho'}</Button><Button type="button" disabled={saving} onClick={() => save(true)}>Publicar</Button></div></main>
+    <aside className="panel toolbox form-settings"><h4>TIPOS DE PERGUNTA</h4>{questionTypes.map(([Icon, label, type]) => <button type="button" key={type} onClick={() => setQuestions([...questions, emptyQuestion(type)])}><span><Icon /></span>{label}</button>)}<hr /><h4>CONFIGURAÇÕES</h4><div className="date-grid"><label>Início<input type="date" value={form.startDate} aria-invalid={invalidFields.includes('startDate')} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></label><label>Fim<input type="date" value={form.endDate} aria-invalid={invalidFields.includes('endDate')} onChange={(event) => setForm({ ...form, endDate: event.target.value })} /></label></div><fieldset className="recipient-fieldset"><legend>Organizações destinatárias</legend>{organizations.filter((organization) => organization.status !== 'INACTIVE').map((organization) => <label className="recipient-option" key={organization.id}><input type="checkbox" checked={targets.includes(organization.id)} onChange={() => toggleTarget(organization.id)} /><span><strong>{organization.name}</strong><small>{organization.cnpj || 'Organização ativa'}</small></span></label>)}</fieldset><fieldset className="recipient-fieldset"><legend>Residentes respondentes</legend><p>Somente residentes ativos, com e-mail verificado e vínculo válido podem receber a coleta.</p><div className="recipient-list" aria-describedby={recipientError ? "recipient-error" : undefined}>{visibleResidents.map((resident) => <label className="recipient-option" key={resident.id}><input type="checkbox" checked={recipientIds.includes(resident.id)} onChange={() => toggleRecipient(resident.id)} /><span><strong>{resident.name}</strong><small>{resident.email}<br />{resident.organizations.map((organization) => organization.name).join(', ')}</small></span></label>)}{!visibleResidents.length && <small className="recipient-empty">Nenhum residente elegível para as organizações selecionadas.</small>}</div>{recipientError && <p id="recipient-error" className="error" role="alert">{recipientError}</p>}<small>O formulário pode ser salvo sem selecionar respondentes.</small></fieldset><div className={`recipient-summary ${recipientIds.length ? 'ready' : ''}`}><strong>{recipientIds.length}</strong><span>residente(s) selecionado(s)</span></div></aside>
+    <main className="panel builder"><ErrorMessage message={error} /><div className="builder-heading"><input value={form.title} aria-invalid={invalidFields.includes('title')} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Título do formulário" /><textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Descrição" /></div>{questions.map((question, index) => <article className="question" key={question.id || index}><small>#{index + 1} <span>{question.type}</span></small><input value={question.label} aria-invalid={invalidFields.includes(`question-${index}`)} onChange={(event) => updateQuestion(index, { label: event.target.value })} placeholder="Texto da pergunta" /><select value={question.type} onChange={(event) => updateQuestion(index, { type: event.target.value })}>{questionTypes.map(([, label, type]) => <option value={type} key={type}>{label}</option>)}</select>{question.type === 'OPTION' && <input value={question.options} aria-invalid={invalidFields.includes(`options-${index}`)} onChange={(event) => updateQuestion(index, { options: event.target.value })} placeholder="Opções separadas por vírgula" />}</article>)}<Button type="button" variant="dashed" onClick={() => setQuestions([...questions, emptyQuestion()])}><Plus />Adicionar pergunta</Button><div className="toolbar"><Button type="button" variant="secondary" disabled={saving} onClick={() => navigate('/forms')}>Cancelar</Button><Button type="button" variant="secondary" disabled={saving} onClick={() => save(false)}>{saving ? 'Salvando...' : formId ? 'Salvar alterações' : 'Salvar formulário'}</Button><Button type="button" disabled={saving} onClick={() => save(true)}>{formId ? 'Salvar e enviar' : 'Criar e enviar'}</Button></div></main>
     <aside className="panel preview"><h4>PRÉ-VISUALIZAÇÃO</h4><div><strong>{form.title || 'Novo formulário'}</strong><small>{questions.length} pergunta(s)</small>{questions.map((question, index) => <label key={question.id || index}>{question.label || 'Pergunta sem título'}<input disabled /></label>)}</div></aside>
   </div>;
 }

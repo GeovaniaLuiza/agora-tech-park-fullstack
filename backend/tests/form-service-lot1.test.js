@@ -33,11 +33,50 @@ beforeEach(() => {
 });
 
 describe('formService lote 1', () => {
+  it.each([saveAudience, publishForm])('rejeita formId inválido antes de consultar ou distribuir', async (operation) => {
+    await expect(operation('not-a-uuid', {}, manager)).rejects.toMatchObject({ status: 422, code: 'INVALID_FORM_ID' });
+    expect(mocks.forms.findState).not.toHaveBeenCalled();
+    expect(mocks.forms.publish).not.toHaveBeenCalled();
+    expect(mocks.forms.saveAudience).not.toHaveBeenCalled();
+    expect(mocks.sendFormInvitation).not.toHaveBeenCalled();
+  });
+
+  it('permite salvar audiência completamente vazia e exige respondente apenas ao publicar', async () => {
+    await expect(saveAudience(formId, {}, manager)).resolves.toEqual({ organizationIds: [], respondentIds: [] });
+    expect(mocks.forms.saveAudience).toHaveBeenCalledWith(formId, [], []);
+    await expect(publishForm(formId, {}, manager)).rejects.toMatchObject({ code: 'RESIDENT_RECIPIENT_REQUIRED', status: 422 });
+    expect(mocks.forms.publish).not.toHaveBeenCalled();
+    expect(mocks.sendFormInvitation).not.toHaveBeenCalled();
+  });
   it('cria formulario com periodo de indicadores normalizado e auditoria', async () => {
     const result = await createForm({ title: 'Coleta', innovationCenterId: 'center-1', indicatorYear: '2026', indicatorMonth: '4' }, manager);
     expect(mocks.forms.create).toHaveBeenCalledWith(expect.objectContaining({ createdBy: manager.sub, indicatorYear: 2026, indicatorMonth: 4 }));
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'FORM_CREATED', entityId: formId }));
     expect(result).toEqual({ id: formId, title: 'Coleta' });
+    expect(mocks.sendFormInvitation).not.toHaveBeenCalled();
+    expect(mocks.forms.publish).not.toHaveBeenCalled();
+  });
+
+  it('salva organizações sem respondentes e sem publicar ou enviar', async () => {
+    await expect(saveAudience(formId, { organizationIds: [organizationId], recipientIds: [] }, manager))
+      .resolves.toEqual({ organizationIds: [organizationId], respondentIds: [] });
+    expect(mocks.forms.saveAudience).toHaveBeenCalledWith(formId, [organizationId], []);
+    expect(mocks.users.findEligibleFormRecipients).not.toHaveBeenCalled();
+    expect(mocks.forms.publish).not.toHaveBeenCalled();
+    expect(mocks.sendFormInvitation).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ organizationIds: ['invalid'] }, 'INVALID_ORGANIZATION'],
+    [{ organizationIds: organizationId }, 'INVALID_ORGANIZATION'],
+    [{ recipientIds: ['invalid'] }, 'INVALID_RESIDENT_RECIPIENTS'],
+    [{ recipientIds: residentId }, 'INVALID_RESIDENT_RECIPIENTS'],
+  ])('valida audiência antes de consultar residentes: %j', async (body, code) => {
+    await expect(saveAudience(formId, body, manager)).rejects.toMatchObject({ status: 422, code });
+    await expect(publishForm(formId, body, manager)).rejects.toMatchObject({ status: 422, code });
+    expect(mocks.forms.saveAudience).not.toHaveBeenCalled();
+    expect(mocks.forms.publish).not.toHaveBeenCalled();
+    expect(mocks.sendFormInvitation).not.toHaveBeenCalled();
   });
 
   it('rejeita periodo de indicadores parcial ou fora da faixa', async () => {

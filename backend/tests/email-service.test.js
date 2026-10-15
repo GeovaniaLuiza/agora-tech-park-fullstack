@@ -35,8 +35,31 @@ describe('serviço de e-mail', () => {
 
     const message = provider.send.mock.calls[0][0];
     expect(message.to).toBe('residente@test.com');
-    expect(message.subject).toContain('Coleta anual');
+    expect(message.subject).toBe('Novo formulário disponível — Ágora Tech Park');
+    expect(message.text).toContain('Coleta anual');
     expect(message.text).toContain('https://indicadores.example/resident/forms/form-123/respond');
     expect(message.text).toContain('31/08/2026');
+    expect(message.text).toContain('Olá, Residente.');
+    expect(message.html).toContain('Olá, Residente.');
+    expect(message.html).toContain('Coleta anual');
+    expect(message.html).toContain('31/08/2026');
+    expect(message.html).toContain('https://indicadores.example/resident/forms/form-123/respond');
+  });
+
+  it('envia convite sem prazo e usa a identificação de respondente quando o nome não está disponível', async () => {
+    const provider = { send: vi.fn().mockResolvedValue({ accepted: ['residente@test.com'] }) };
+    setEmailProviderForTests(provider);
+    vi.stubEnv('FRONTEND_URL', '');
+    vi.stubEnv('CLIENT_URL', 'https://indicadores.example');
+    await sendFormInvitation({ email: 'residente@test.com', formId: 'form-123', formTitle: 'Coleta sem prazo' });
+    expect(provider.send).toHaveBeenCalledOnce();
+    const message = provider.send.mock.calls[0][0];
+    expect(message.subject).toBe('Novo formulário disponível — Ágora Tech Park');
+    for (const body of [message.text, message.html]) {
+      expect(body).toContain('Olá, respondente.');
+      expect(body).toContain('Coleta sem prazo');
+      expect(body).toContain('https://indicadores.example/resident/forms/form-123/respond');
+      expect(body).not.toMatch(/undefined|null|até /);
+    }
   });
 });

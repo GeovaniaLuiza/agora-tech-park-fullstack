@@ -42,6 +42,7 @@ export async function login({ email, password }, ipAddress) {
     throw serviceError(403, 'Esta conta não está disponível no momento. Verifique se seu acesso está ativo e se sua organização está vinculada. Se precisar, contate o administrador do Ágora Tech Park.', 'ACCOUNT_UNAVAILABLE');
   }
   const profile = await users.findPublicProfile(user.id);
+  if (!profile) throw genericLoginError();
   if (user.role === ROLES.RESIDENT && !profile.organizations.length) {
     throw serviceError(403, 'Esta conta não está disponível no momento. Verifique se seu acesso está ativo e se sua organização está vinculada. Se precisar, contate o administrador do Ágora Tech Park.', 'ACCOUNT_UNAVAILABLE');
   }

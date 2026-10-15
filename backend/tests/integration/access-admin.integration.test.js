@@ -24,6 +24,9 @@ beforeAll(async () => {
   await setup.query(`SET search_path TO ${schema}, public`);
   await setup.query(`CREATE TABLE users (LIKE public.users INCLUDING ALL)`);
   await setup.query(`CREATE TABLE audit_logs (LIKE public.audit_logs INCLUDING ALL)`);
+  for (const table of ['users_organizations', 'email_verification_tokens', 'password_reset_tokens']) {
+    await setup.query(`CREATE TABLE ${table} (LIKE public.${table} INCLUDING ALL)`);
+  }
 });
 
 beforeEach(async () => {
@@ -37,7 +40,7 @@ beforeEach(async () => {
     await client.query("SET statement_timeout = '5s'");
     return client;
   });
-  await setup.query('TRUNCATE audit_logs, users');
+  await setup.query('TRUNCATE audit_logs, users, users_organizations, email_verification_tokens, password_reset_tokens');
   await setup.query(`INSERT INTO users(id,name,email,password_hash,role,status)
     VALUES($1,'Admin A','a@test.invalid','test','ADMIN','ACTIVE'),
           ($2,'Admin B','b@test.invalid','test','ADMIN','ACTIVE')`, [firstId, secondId]);

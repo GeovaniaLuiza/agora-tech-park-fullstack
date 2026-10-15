@@ -28,7 +28,7 @@ export async function consume(rawToken, passwordHash, audit) {
     await client.query('BEGIN');
     const { rows } = await client.query(`SELECT t.id,t.user_id,t.expires_at,t.used_at,u.email_verified_at,u.status
       FROM password_reset_tokens t JOIN users u ON u.id=t.user_id
-      WHERE t.token_hash=$1 FOR UPDATE`, [hash(rawToken)]);
+      WHERE u.deleted_at IS NULL AND t.token_hash=$1 FOR UPDATE`, [hash(rawToken)]);
     const token = rows[0];
     if (!token) { await client.query('ROLLBACK'); return { state: 'INVALID' }; }
     if (token.used_at) { await client.query('ROLLBACK'); return { state: 'USED' }; }

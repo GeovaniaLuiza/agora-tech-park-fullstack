@@ -331,21 +331,22 @@ function Create() {
         <h4>TIPOS DE PERGUNTA</h4>{questionTypes.map(([Icon, label, type]) => <button type="button" key={type} disabled={saving || !canEdit} onClick={() => setQuestions([...questions, emptyQuestion(type)])}><span><Icon /></span>{label}</button>)}
         <hr /><h4>CONFIGURAÇÕES</h4>
         <div className="date-grid"><label>Início<input type="date" disabled={saving || !canEdit} value={form.startDate} aria-invalid={invalidFields.includes('startDate')} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></label><label>Fim<input type="date" disabled={saving || !canEdit} value={form.endDate} aria-invalid={invalidFields.includes('endDate')} onChange={(event) => setForm({ ...form, endDate: event.target.value })} /></label></div>
-        <fieldset className="recipient-fieldset"><legend>Organizações destinatárias</legend>
+        <fieldset className="recipient-fieldset" aria-describedby="recipient-organizations-help"><legend>Organizações destinatárias</legend>
+          <p id="recipient-organizations-help" className="recipient-organizations-help">Selecione uma ou mais organizações para definir quais residentes poderão receber o formulário.</p>
           {organizations.filter((organization) => organization.status !== 'INACTIVE').map((organization) => <label className="recipient-option" key={organization.id}><input type="checkbox" disabled={saving || !canEdit} checked={targets.includes(organization.id)} onChange={() => toggleTarget(organization.id)} /><span><strong>{organization.name}</strong><small>{organization.cnpj || 'Organização ativa'}</small></span></label>)}
         </fieldset>
         <fieldset className="recipient-fieldset"><legend>RESPONDENTES</legend>
-          <p id="recipient-search-help">Somente residentes ativos, com e-mail verificado e vínculo válido podem receber a coleta.</p>
+          <p id="recipient-search-help">Somente residentes ativos, com e-mail válido e vínculo ativo em uma das organizações destinatárias selecionadas podem receber o formulário.</p>
           <label id="recipient-picker-label" htmlFor="recipient-picker-trigger">Selecionar respondentes</label>
           <div className="recipient-picker" ref={recipientPickerRef} onKeyDown={(event) => { if (event.key === 'Escape' && recipientPickerOpen) { setRecipientPickerOpen(false); document.getElementById('recipient-picker-trigger')?.focus(); } }}>
             <button id="recipient-picker-trigger" className="recipient-picker-trigger" type="button" disabled={saving || !canEdit || !targets.length || recipientLoading} aria-haspopup="true" aria-expanded={recipientPickerOpen} aria-controls="recipient-picker-options" aria-labelledby="recipient-picker-label" aria-describedby="recipient-search-help recipient-availability" onClick={() => setRecipientPickerOpen((open) => !open)}>
               <span>{recipientLoading ? 'Carregando respondentes...' : 'Selecione um ou mais respondentes'}</span><span className="recipient-picker-chevron" aria-hidden="true">{recipientPickerOpen ? '▴' : '▾'}</span>
             </button>
             <p id="recipient-availability" className="recipient-availability" role="status">{!targets.length
-              ? 'Selecione ao menos uma organização destinatária para visualizar os respondentes.'
+              ? 'Selecione ao menos uma organização destinatária para visualizar os respondentes vinculados.'
               : recipientLoading ? 'Carregando respondentes elegíveis...'
                 : eligibleResidents.length ? `${eligibleResidents.length} respondente(s) disponível(is)`
-                  : 'Nenhum respondente elegível para as organizações selecionadas.'}</p>
+                  : 'Nenhum respondente com vínculo ativo e e-mail válido foi encontrado para as organizações selecionadas.'}</p>
             {recipientPickerOpen && <div className="recipient-picker-popover">
               <label className="recipient-picker-search-label" htmlFor="recipient-search">Buscar por nome ou e-mail</label>
               <div className="recipient-search-control">

@@ -211,12 +211,14 @@ function validateRecord(payload, type) {
 }
 
 export async function listRecords(filters) {
+  if (!RECORD_TYPE_VALUES.includes(filters.type)) throw serviceError(422, 'Tipo de cadastro inválido.', 'INVALID_RECORD_TYPE');
   await ensureCenter(filters.centerId);
   return repository.listRecords({ centerId: filters.centerId, type: filters.type, year: filters.year ? yearValue(filters.year) : null, month: filters.month ? monthValue(filters.month) : null, search: filters.search || null, includeInactive: filters.includeInactive === 'true' });
 }
 
 export async function saveRecord(id, type, payload, user) {
   ensureEditor(user);
+  if (!RECORD_TYPE_VALUES.includes(type)) throw serviceError(422, 'Tipo de cadastro inválido.', 'INVALID_RECORD_TYPE');
   const current = id ? await repository.findRecord(id) : null;
   if (id && (!current || current.record_type !== type)) throw serviceError(404, 'Cadastro não encontrado.', 'RECORD_NOT_FOUND');
   const merged = current ? { ...current, ...normalizeRecord(payload) } : normalizeRecord(payload);
@@ -231,6 +233,7 @@ export async function saveRecord(id, type, payload, user) {
 
 export async function removeRecord(id, type, user) {
   ensureEditor(user);
+  if (!RECORD_TYPE_VALUES.includes(type)) throw serviceError(422, 'Tipo de cadastro inválido.', 'INVALID_RECORD_TYPE');
   const current = await repository.findRecord(id);
   if (!current || current.record_type !== type) throw serviceError(404, 'Cadastro não encontrado.', 'RECORD_NOT_FOUND');
   await repository.deleteRecord(id, user.sub);

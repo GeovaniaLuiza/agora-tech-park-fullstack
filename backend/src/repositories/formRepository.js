@@ -294,6 +294,9 @@ export async function indicatorDefinitions(category = null) {
   const { rows } = await query(
     `SELECT id,code,name,description,category,unit,value_type,periodicity,aggregation_type
      FROM indicator_definitions WHERE active AND calculation_type='MANUAL'
+       AND value_type NOT IN ('TEXT','BOOLEAN','JSON')
+       AND aggregation_type IN ('SUM','COUNT','AVERAGE','LAST_VALUE')
+       AND annual_aggregation IN ('SUM','COUNT','AVERAGE','LAST_VALUE')
        AND ($1::text IS NULL OR category=$1) ORDER BY category,sort_order,name`,
     [category],
   );
@@ -302,7 +305,7 @@ export async function indicatorDefinitions(category = null) {
 
 export async function findDefinitionById(id) {
   const { rows } = await query(
-    `SELECT id,code,name,category,unit,value_type,periodicity,aggregation_type,calculation_type,active
+    `SELECT id,code,name,category,unit,value_type,periodicity,aggregation_type,annual_aggregation,calculation_type,active
      FROM indicator_definitions WHERE id=$1`, [id],
   );
   return rows[0];

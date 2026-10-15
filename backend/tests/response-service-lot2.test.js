@@ -15,7 +15,7 @@ const formId = 'form-1';
 const organizationId = 'organization-1';
 const resident = { sub: 'resident-1', role: 'RESIDENTE' };
 const manager = { sub: 'manager-1', role: 'PESQUISADOR' };
-const activeForm = { id: formId, status: 'ACTIVE', start_date: '2020-01-01', end_date: '2099-12-31', targeted: true, innovation_center_id: 'center-1', indicator_year: 2026, indicator_month: 2 };
+const activeForm = { id: formId, organization_id: organizationId, status: 'ACTIVE', start_date: '2020-01-01', end_date: '2099-12-31', targeted: true, innovation_center_id: 'center-1', indicator_year: 2026, indicator_month: 2 };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -33,6 +33,25 @@ beforeEach(() => {
 });
 
 describe('responseService lote 2', () => {
+  it('rejects reopening by a resident before accessing the repository', async () => {
+    await expect(reopen('response-1', resident)).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    expect(mocks.responses.reopen).not.toHaveBeenCalled();
+  });
+
+  it('reopens a form without indicator competence and still audits inside the transaction', async () => {
+    await reopen('response-1', manager);
+    await mocks.responses.reopen.mock.calls[0][2]({ organization_id: organizationId, indicator_year: null }, 'transaction-client');
+    expect(mocks.processLinkedAnswers).not.toHaveBeenCalled();
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'RESPONSE_REOPENED' }), 'transaction-client');
+  });
+
+  it('submits a form without indicator competence without publishing indicators', async () => {
+    mocks.responses.submissionContext.mockResolvedValueOnce({ ...activeForm, indicator_year: null });
+    await submit(formId, { organizationId, answers: [{ questionId: 'text', value: 'Ana' }] }, resident);
+    await expect(mocks.responses.submit.mock.calls[0][0].processSubmission('response-1', 'transaction-client')).resolves.toBe(0);
+    expect(mocks.processLinkedAnswers).not.toHaveBeenCalled();
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ details: expect.objectContaining({ indicatorsUpdated: 0 }) }), 'transaction-client');
+  });
   it('restringe preenchimento a residentes', async () => {
     await expect(saveDraft(formId, { organizationId, answers: [] }, manager)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mocks.responses.submissionContext).not.toHaveBeenCalled();
@@ -75,7 +94,7 @@ describe('responseService lote 2', () => {
   it('salva rascunho normalizado e registra auditoria', async () => {
     const result = await saveDraft(formId, { organizationId, answers: [{ questionId: 'text', value: ' Ana ' }, { questionId: 'number', value: '' }] }, resident);
     expect(result.status).toBe('DRAFT');
-    expect(mocks.responses.saveDraft).toHaveBeenCalledWith(expect.objectContaining({ answers: [{ questionId: 'text', value: 'Ana', indicator_id: null }] }));
+    expect(mocks.responses.saveDraft).toHaveBeenCalledWith(expect.objectContaining({ answers: [{ questionId: 'text', value: 'Ana', indicator_id: null, questionType: 'TEXT' }] }));
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'RESPONSE_DRAFT_SAVED' }));
   });
 
@@ -103,7 +122,8 @@ describe('responseService lote 2', () => {
 
   it('reabre apenas resposta enviada e registra auditoria', async () => {
     await expect(reopen('response-1', manager)).resolves.toMatchObject({ status: 'REOPENED' });
-    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'RESPONSE_REOPENED' }));
+    await mocks.responses.reopen.mock.calls[0][2]({ organization_id: organizationId, innovation_center_id: 'center-1', indicator_year: 2026, indicator_month: 2 }, 'transaction-client');
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'RESPONSE_REOPENED' }), 'transaction-client');
     mocks.responses.reopen.mockResolvedValueOnce(null);
     await expect(reopen('response-1', manager)).rejects.toMatchObject({ code: 'RESPONSE_NOT_SUBMITTED' });
   });

@@ -223,7 +223,7 @@ function Create() {
   return <div className="content builder-layout">
     <aside className="panel toolbox form-settings indicator-catalog-panel">
       <h4>INDICADORES DA PLANILHA 2026</h4>
-      <p className="indicator-catalog-help">Selecione os indicadores que serão coletados neste formulário. Os valores mensais alimentam os indicadores e o Dashboard.</p>
+      <p className="indicator-catalog-help">Selecione os indicadores numéricos que serão coletados neste formulário. Somente perguntas vinculadas alimentam os indicadores e o Dashboard, conforme a agregação do catálogo.</p>
       <label>Categoria<select value={indicatorCategory} onChange={(event) => setIndicatorCategory(event.target.value)}><option value="">Todas</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
       <div className="indicator-selection-summary"><strong>{selectedIndicatorCount}</strong><span>indicador(es) selecionado(s)</span></div>
       <div className="indicator-catalog">{availableIndicators.map((definition) => { const selected = questions.some((question) => question.indicatorId === definition.id); return <label className={`indicator-option ${selected ? 'selected' : ''}`} key={definition.id}><input type="checkbox" checked={selected} onChange={() => toggleIndicator(definition)} /><span><strong>{definition.name}</strong><small>{definition.category} · {definition.unit} · {definition.aggregation_type}</small></span></label>; })}</div>

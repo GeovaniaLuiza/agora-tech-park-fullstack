@@ -270,11 +270,12 @@ export async function recordsForCalculation(centerId, year, client = pool) {
 
 export async function manualValuesForCalculation(centerId, year, client = pool) {
   const { rows } = await client.query(
-    `SELECT v.*,d.code,d.value_type,d.annual_aggregation FROM indicator_values v
+    `SELECT DISTINCT ON (v.indicator_id,v.month) v.*,d.code,d.value_type,d.annual_aggregation FROM indicator_values v
      JOIN indicator_definitions d ON d.id=v.indicator_id
      WHERE v.innovation_center_id=$1 AND v.year=$2
-       AND v.source_type='MANUAL_ENTRY'
-       AND v.deleted_at IS NULL AND v.month IS NOT NULL`,
+       AND v.source_type IN ('MANUAL_ENTRY','FORM_RESPONSE')
+       AND v.deleted_at IS NULL AND v.month IS NOT NULL
+     ORDER BY v.indicator_id,v.month,CASE v.source_type WHEN 'FORM_RESPONSE' THEN 0 ELSE 1 END,v.updated_at DESC`,
     [centerId, year],
   );
   return rows;

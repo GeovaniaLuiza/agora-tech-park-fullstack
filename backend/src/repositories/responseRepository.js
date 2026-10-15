@@ -1,12 +1,16 @@
 import { pool, query } from '../db/pool.js';
 
-export async function submissionContext(formId, organizationId) {
+export async function submissionContext(formId, organizationId, userId) {
   const { rows } = await query(
-    `SELECT f.id,f.status,f.start_date,f.end_date,f.innovation_center_id,f.indicator_year,f.indicator_month,
+    `SELECT f.id,f.status,f.start_date,f.end_date,f.innovation_center_id,f.indicator_year,f.indicator_month,o.id AS organization_id,
       (NOT EXISTS (SELECT 1 FROM form_organizations fo WHERE fo.form_id=f.id)
-       OR EXISTS (SELECT 1 FROM form_organizations fo WHERE fo.form_id=f.id AND fo.organization_id=$2)) AS targeted
-     FROM forms f WHERE f.id=$1`,
-    [formId, organizationId],
+       OR EXISTS (SELECT 1 FROM form_organizations fo WHERE fo.form_id=f.id AND fo.organization_id=o.id))
+      AND (NOT EXISTS (SELECT 1 FROM form_respondents fr WHERE fr.form_id=f.id)
+        OR EXISTS (SELECT 1 FROM form_respondents fr WHERE fr.form_id=f.id AND fr.user_id=$3 AND fr.organization_id=o.id)) AS targeted
+     FROM forms f JOIN users_organizations uo ON uo.user_id=$3 AND uo.active
+     JOIN organizations o ON o.id=uo.organization_id AND o.status='ACTIVE' AND o.id=$2
+     WHERE f.id=$1`,
+    [formId, organizationId, userId],
   );
   return rows[0];
 }
@@ -27,6 +31,7 @@ async function persist({ formId, organizationId, userId, answers, submit, proces
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`response:${formId}:${organizationId}`]);
     const current = await client.query(
       `SELECT id,status FROM responses WHERE form_id=$1 AND organization_id=$2 FOR UPDATE`,
       [formId, organizationId],
@@ -73,13 +78,25 @@ async function persist({ formId, organizationId, userId, answers, submit, proces
 export const saveDraft = (data) => persist({ ...data, submit: false });
 export const submit = (data) => persist({ ...data, submit: true });
 
-export async function reopen(responseId, userId) {
-  const { rows } = await query(
-    `UPDATE responses SET status='REOPENED',reopened_at=NOW(),reopened_by=$2
-     WHERE id=$1 AND status='SUBMITTED' RETURNING id,form_id,organization_id,status,reopened_at`,
-    [responseId, userId],
-  );
-  return rows[0];
+export async function reopen(responseId, userId, processReopen) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `UPDATE responses SET status='REOPENED',reopened_at=NOW(),reopened_by=$2
+       WHERE id=$1 AND status='SUBMITTED' RETURNING id,form_id,organization_id,status,reopened_at`,
+      [responseId, userId],
+    );
+    if (rows[0] && processReopen) {
+      const context = await client.query(
+        `SELECT r.organization_id,f.innovation_center_id,f.indicator_year,f.indicator_month
+         FROM responses r JOIN forms f ON f.id=r.form_id WHERE r.id=$1`, [responseId]);
+      await processReopen(context.rows[0], client);
+    }
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
 export async function history(organizationId) {

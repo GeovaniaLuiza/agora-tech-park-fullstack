@@ -418,7 +418,7 @@ describe('salvamento e envio de formulários', () => {
     await open(true);
     expect(screen.getByRole('checkbox', { name: /Empresa A/ }).checked).toBe(true);
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByText('Nenhum respondente elegível para as organizações selecionadas.')).toBeTruthy();
+    expect(await screen.findByText('Nenhum respondente elegível para as organizações selecionadas.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
     expect(await screen.findByText('Formulário salvo com sucesso.')).toBeTruthy();
     expect(api.updateForm).toHaveBeenCalledOnce();

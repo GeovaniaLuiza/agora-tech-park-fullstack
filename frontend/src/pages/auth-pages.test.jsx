@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-const auth = vi.hoisted(() => ({ clearSessionError: vi.fn(), login: vi.fn(), sessionError: '' }));
+const auth = vi.hoisted(() => ({ clearSessionError: vi.fn(), login: vi.fn(), restoreSession: vi.fn(), sessionRecoveryRequired: false, sessionError: '' }));
 const api = vi.hoisted(() => ({ registerRequest: vi.fn() }));
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('../contexts/AuthContext.jsx', () => ({ useAuth: () => auth }));
@@ -11,7 +11,7 @@ vi.mock('../services/api', async (original) => ({ ...(await original()), registe
 import LoginPage from './LoginPage';
 import RegisterRequestPage from './RegisterRequestPage';
 
-beforeEach(() => { cleanup(); vi.clearAllMocks(); });
+beforeEach(() => { cleanup(); vi.clearAllMocks(); auth.sessionRecoveryRequired = false; });
 
 const fillRegistration = () => {
   fireEvent.change(screen.getByLabelText(/nome completo/i), { target: { value: 'Pessoa Teste' } });
@@ -24,6 +24,20 @@ const fillRegistration = () => {
 };
 
 describe('páginas públicas de autenticação', () => {
+  it.each([true, false])('preserva o convite ao retomar a sessão e permanece no login se a restauração falhar: %s', async (restored) => {
+    const path = '/resident/forms/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/respond';
+    auth.sessionRecoveryRequired = true;
+    auth.restoreSession.mockResolvedValueOnce(restored ? { role: 'RESIDENTE' } : null);
+    render(<MemoryRouter initialEntries={[{ pathname: '/login', state: { from: path } }]}><Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path={path} element={<p>Responder coleta convidada</p>} />
+    </Routes></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Retomar sessão' }));
+    if (restored) expect(await screen.findByText('Responder coleta convidada')).toBeTruthy();
+    else expect(await screen.findByRole('button', { name: 'Retomar sessão' })).toBeTruthy();
+    expect(auth.restoreSession).toHaveBeenCalledOnce();
+    expect(auth.login).not.toHaveBeenCalled();
+  });
   it('retorna ao formulário do convite após autenticar o residente', async () => {
     const path = '/resident/forms/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/respond';
     auth.login.mockResolvedValue({ role: 'RESIDENTE' });

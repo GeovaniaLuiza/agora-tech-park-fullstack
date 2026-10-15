@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const auth = vi.hoisted(() => ({
@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   getEligibleFormRecipients: vi.fn(),
   createForm: vi.fn(),
   addFormQuestion: vi.fn(),
+  addQuestionOption: vi.fn(),
   getForms: vi.fn(),
   getForm: vi.fn(),
   getFormQuestions: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock('./services/api', async (original) => ({
   getEligibleFormRecipients: api.getEligibleFormRecipients,
   createForm: api.createForm,
   addFormQuestion: api.addFormQuestion,
+  addQuestionOption: api.addQuestionOption,
   getForms: api.getForms,
   getForm: api.getForm,
   getFormQuestions: api.getFormQuestions,
@@ -78,6 +80,8 @@ beforeEach(() => {
   api.getEligibleFormRecipients.mockResolvedValue([]);
   api.createForm.mockResolvedValue({ id: 'form-1' });
   api.addFormQuestion.mockResolvedValue({ id: 'question-1' });
+  api.updateFormQuestion.mockImplementation(async (_formId, id) => ({ id }));
+  api.addQuestionOption.mockReset().mockResolvedValue({ id: 'option-1' });
   api.saveFormAudience.mockResolvedValue({});
   auth.value = {
     user: { id: '1', name: 'Admin Teste', role: 'ADMIN', organizations: [] },
@@ -277,5 +281,152 @@ describe('salvamento e envio de formulários', () => {
     expect(api.updateForm).toHaveBeenCalledOnce();
     expect(api.addFormQuestion).toHaveBeenCalledOnce();
     expect(api.updateFormQuestion).toHaveBeenCalledOnce();
+  });
+
+  it('permite desmarcar o respondente e salvar sem enviar', async () => {
+    await prepareSend();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Ana/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    expect(screen.getByRole('alert').textContent).toContain('Selecione ao menos um respondente');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    await screen.findByText('Formulário salvo com sucesso.');
+    expect(api.saveFormAudience).toHaveBeenCalledWith('form-1', [], []);
+    expect(api.publishForm).not.toHaveBeenCalled();
+  });
+
+  it('destaca a pergunta curta sem marcar as demais perguntas', async () => {
+    await open();
+    fireEvent.change(screen.getByPlaceholderText('Texto da pergunta'), { target: { value: 'AB' } });
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar pergunta/ }));
+    const fields = screen.getAllByPlaceholderText('Texto da pergunta');
+    fireEvent.change(fields[1], { target: { value: 'Pergunta válida' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    expect(screen.getByRole('alert').textContent).toContain('Toda pergunta preenchida');
+    expect(fields.map((field) => field.getAttribute('aria-invalid'))).toEqual(['true', 'false']);
+    expect(api.createForm).not.toHaveBeenCalled();
+  });
+
+  it('exige uma pergunta para enviar, mas permite salvar somente o título', async () => {
+    await prepareSend();
+    fireEvent.change(screen.getByPlaceholderText('Texto da pergunta'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    expect(screen.getByRole('alert').textContent).toBe('Inclua ao menos uma pergunta antes de enviar.');
+    expect(api.createForm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    await screen.findByText('Formulário salvo com sucesso.');
+    expect(api.addFormQuestion).not.toHaveBeenCalled();
+    expect(api.publishForm).not.toHaveBeenCalled();
+  });
+
+  it.each(['Início', 'Fim', 'ambas'])('exige somente as datas ausentes para enviar: %s', async (missing) => {
+    await prepareSend();
+    for (const label of missing === 'ambas' ? ['Início', 'Fim'] : [missing]) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value: '' } });
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    expect(screen.getByRole('alert').textContent).toBe('Defina as datas de início e fim antes de enviar.');
+    for (const label of ['Início', 'Fim']) {
+      expect(screen.getByLabelText(label).getAttribute('aria-invalid')).toBe(String(missing === label || missing === 'ambas'));
+    }
+    expect(api.createForm).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia salvar datas invertidas antes de chamar a API', async () => {
+    await open();
+    fireEvent.change(screen.getByLabelText('Início'), { target: { value: '2026-12-31' } });
+    fireEvent.change(screen.getByLabelText('Fim'), { target: { value: '2026-01-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    expect(screen.getByRole('alert').textContent).toBe('A data final deve ser igual ou posterior à data inicial.');
+    expect(screen.getByLabelText('Fim').getAttribute('aria-invalid')).toBe('true');
+    expect(api.createForm).not.toHaveBeenCalled();
+  });
+
+  const chooseOptions = () => {
+    const question = screen.getByPlaceholderText('Texto da pergunta').closest('article');
+    fireEvent.change(within(question).getByRole('combobox'), { target: { value: 'OPTION' } });
+    return screen.getByPlaceholderText('Opções separadas por vírgula');
+  };
+
+  it('destaca opções vazias sem invalidar uma pergunta livre', async () => {
+    await prepareSend();
+    const options = chooseOptions();
+    fireEvent.change(options, { target: { value: ', , ' } });
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar pergunta/ }));
+    fireEvent.change(screen.getAllByPlaceholderText('Texto da pergunta')[1], { target: { value: 'Pergunta livre' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    expect(screen.getByRole('alert').textContent).toContain('Informe ao menos uma opção');
+    expect(options.getAttribute('aria-invalid')).toBe('true');
+    expect(api.createForm).not.toHaveBeenCalled();
+  });
+
+  it('retoma apenas as opções pendentes após falha, sem duplicar formulário, pergunta ou primeira opção', async () => {
+    api.addQuestionOption.mockResolvedValueOnce({ id: 'option-1' }).mockRejectedValueOnce(new Error('Falha nas opções'));
+    await prepareSend();
+    fireEvent.change(chooseOptions(), { target: { value: ' Sim, Não, ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    await screen.findByText('Falha nas opções');
+    expect(api.publishForm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    await screen.findByText('Formulário salvo e enviado para 1 respondente(s).');
+    expect(api.createForm).toHaveBeenCalledOnce();
+    expect(api.addFormQuestion).toHaveBeenCalledOnce();
+    expect(api.addQuestionOption.mock.calls.map((call) => call[2])).toEqual(['Sim', 'Não', 'Não']);
+    expect(api.updateFormQuestion).toHaveBeenCalledOnce();
+    expect(api.publishForm).toHaveBeenCalledOnce();
+  });
+
+  it.each(['Centro', 'Ano', 'Mês'])('destaca a referência ausente de um indicador antes de enviar: %s', async (missing) => {
+    api.getInnovationCenters.mockResolvedValue(missing === 'Centro' ? [] : [{ id: 'center-1', code: 'CI_JOINVILLE', name: 'Joinville' }]);
+    api.getFormIndicatorDefinitions.mockResolvedValue([{ id: 'indicator-1', name: 'Empregos', value_type: 'INTEGER', category: 'Pessoas', unit: 'UNIDADE', aggregation_type: 'SUM' }]);
+    await prepareSend();
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Empregos/ }));
+    fireEvent.change(screen.getByLabelText('Mês'), { target: { value: missing === 'Mês' ? '' : '10' } });
+    if (missing === 'Centro') fireEvent.change(screen.getByLabelText('Centro'), { target: { value: '' } });
+    if (missing === 'Ano') fireEvent.change(screen.getByLabelText('Ano'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    expect(screen.getByRole('alert').textContent).toContain('Para coletar indicadores');
+    expect(screen.getByLabelText(missing).getAttribute('aria-invalid')).toBe('true');
+    expect(api.createForm).not.toHaveBeenCalled();
+  });
+
+  it.each(['INELIGIBLE_RESIDENT_RECIPIENT', 'RESPONDENT_ORGANIZATION_REQUIRED', 'RESIDENT_RECIPIENT_REQUIRED'])('mostra erro de elegibilidade no seletor de respondentes: %s', async (code) => {
+    api.publishForm.mockRejectedValueOnce({ code, message: 'Respondente indisponível. Atualize a seleção.' });
+    await prepareSend();
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.closest('fieldset').querySelector('legend').textContent).toBe('Residentes respondentes');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Ana/ }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('orienta o usuário após erro interno e permite tentar novamente sem recriar o formulário', async () => {
+    api.saveFormAudience.mockRejectedValueOnce(new Error('Erro interno do servidor'));
+    await open();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    await screen.findByText('Não foi possível concluir a operação. Verifique os dados e tente novamente.');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    await screen.findByText('Formulário salvo com sucesso.');
+    expect(api.createForm).toHaveBeenCalledOnce();
+    expect(api.updateForm).toHaveBeenCalledOnce();
+  });
+
+  it('bloqueia cliques consecutivos antes da atualização visual do botão', async () => {
+    let complete;
+    api.createForm.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    await prepareSend();
+    const button = screen.getByRole('button', { name: 'Criar e enviar' });
+    act(() => { fireEvent.click(button); fireEvent.click(button); });
+    expect(api.createForm).toHaveBeenCalledOnce();
+    complete({ id: 'form-1' });
+    await screen.findByText('Formulário salvo e enviado para 1 respondente(s).');
+    expect(api.publishForm).toHaveBeenCalledOnce();
+  });
+
+  it('cancela a edição sem salvar ou enviar', async () => {
+    await open();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/forms'));
+    expect(api.createForm).not.toHaveBeenCalled();
+    expect(api.publishForm).not.toHaveBeenCalled();
   });
 });

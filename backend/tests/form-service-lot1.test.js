@@ -33,6 +33,21 @@ beforeEach(() => {
 });
 
 describe('formService lote 1', () => {
+  it.each([saveAudience, publishForm])('rejeita formId inválido antes de consultar ou distribuir', async (operation) => {
+    await expect(operation('not-a-uuid', {}, manager)).rejects.toMatchObject({ status: 422, code: 'INVALID_FORM_ID' });
+    expect(mocks.forms.findState).not.toHaveBeenCalled();
+    expect(mocks.forms.publish).not.toHaveBeenCalled();
+    expect(mocks.forms.saveAudience).not.toHaveBeenCalled();
+    expect(mocks.sendFormInvitation).not.toHaveBeenCalled();
+  });
+
+  it('permite salvar audiência completamente vazia e exige respondente apenas ao publicar', async () => {
+    await expect(saveAudience(formId, {}, manager)).resolves.toEqual({ organizationIds: [], respondentIds: [] });
+    expect(mocks.forms.saveAudience).toHaveBeenCalledWith(formId, [], []);
+    await expect(publishForm(formId, {}, manager)).rejects.toMatchObject({ code: 'RESIDENT_RECIPIENT_REQUIRED', status: 422 });
+    expect(mocks.forms.publish).not.toHaveBeenCalled();
+    expect(mocks.sendFormInvitation).not.toHaveBeenCalled();
+  });
   it('cria formulario com periodo de indicadores normalizado e auditoria', async () => {
     const result = await createForm({ title: 'Coleta', innovationCenterId: 'center-1', indicatorYear: '2026', indicatorMonth: '4' }, manager);
     expect(mocks.forms.create).toHaveBeenCalledWith(expect.objectContaining({ createdBy: manager.sub, indicatorYear: 2026, indicatorMonth: 4 }));

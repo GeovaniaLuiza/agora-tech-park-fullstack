@@ -209,6 +209,17 @@ describe('repositories de indicadores com PostgreSQL real', () => {
 });
 
 describe('repository de formularios com PostgreSQL real', () => {
+  it('preserva datas omitidas e permite apagá-las com string vazia sem publicar', async () => {
+    const form = await forms.create({ title: 'Rascunho com datas', startDate: '2026-01-01', endDate: '2026-12-31', createdBy: adminId });
+    const updated = await forms.update(form.id, { description: 'Descrição atualizada' });
+    expect(updated.status).toBe('DRAFT');
+    expect(updated.start_date).toEqual(form.start_date);
+    expect(updated.end_date).toEqual(form.end_date);
+    const cleared = await forms.update(form.id, { startDate: '', endDate: '' });
+    expect(cleared).toMatchObject({ status: 'DRAFT', start_date: null, end_date: null, published_at: null });
+    expect(await forms.respondents(form.id)).toEqual([]);
+  });
+
   it('publica audiencia, aplica escopo do residente e registra entrega e resposta', async () => {
     const form = await forms.create({
       title: 'Pesquisa Lot 6', description: 'Inicial', startDate: '2026-01-01', endDate: '2026-12-31', createdBy: adminId,

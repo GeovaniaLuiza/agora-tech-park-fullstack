@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 
 const auth = vi.hoisted(() => ({
   value: {
@@ -184,7 +185,7 @@ describe('salvamento e envio de formulários', () => {
     if (existing) await screen.findByDisplayValue('Coleta existente');
     else fireEvent.change(screen.getByPlaceholderText('Título do formulário'), { target: { value: 'Nova coleta' } });
   };
-  const prepareSend = async (existing = false) => {
+  const prepareSend = async (existing = false, sendEmail = true) => {
     api.getOrganizations.mockResolvedValue([{ id: 'org-1', name: 'Empresa A', status: 'ACTIVE' }]);
     api.getEligibleFormRecipients.mockResolvedValue([{ id: 'resident-1', name: 'Ana', email: 'ana@example.com', organizations: [{ id: 'org-1', name: 'Empresa A' }] }]);
     if (existing) api.getFormQuestions.mockResolvedValue([{ id: 'question-1', label: 'Sua resposta', type: 'TEXT', required: true }]);
@@ -193,6 +194,7 @@ describe('salvamento e envio de formulários', () => {
     fireEvent.change(screen.getByLabelText('Início'), { target: { value: '2026-10-01' } });
     fireEvent.change(screen.getByLabelText('Fim'), { target: { value: '2026-12-31' } });
     fireEvent.click(await screen.findByRole('checkbox', { name: /Ana/ }));
+    if (sendEmail) fireEvent.click(screen.getByRole('checkbox', { name: /Enviar convite por e-mail/ }));
   };
 
   it('edita sem respondente e restaura organizações sem residentes', async () => {
@@ -209,11 +211,13 @@ describe('salvamento e envio de formulários', () => {
     expect(api.publishForm).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])('só exige respondente ao tentar enviar; existente=%s', async (existing) => {
+  it.each([false, true])('desabilita envio sem respondentes e permite salvar; existente=%s', async (existing) => {
     await open(existing);
     expect(screen.queryByText('Selecione ao menos um respondente para enviar o formulário.')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: existing ? 'Salvar e enviar' : 'Criar e enviar' }));
-    expect(screen.getByRole('alert').textContent).toBe('Selecione ao menos um respondente para enviar o formulário.');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(true);
+    expect(screen.getByRole('checkbox', { name: /Enviar convite por e-mail/ }).disabled).toBe(true);
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(api.publishForm).not.toHaveBeenCalled();
     expect(api.createForm).not.toHaveBeenCalled();
     expect(api.updateForm).not.toHaveBeenCalled();
@@ -251,7 +255,7 @@ describe('salvamento e envio de formulários', () => {
   it.each([false, true])('seleciona respondente e mostra feedback de envio; parcial=%s', async (partial) => {
     api.publishForm.mockResolvedValue({ notificationSummary: { sent: 1, failed: partial ? 1 : 0 } });
     await prepareSend();
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     expect(await screen.findByText(partial ? 'Formulário salvo. 1 convites enviados e 1 falharam.' : 'Formulário salvo e enviado para 1 respondente(s).')).toBeTruthy();
     expect(api.publishForm).toHaveBeenCalledWith('form-1', [], ['resident-1']);
     expect(api.publishForm).toHaveBeenCalledOnce();
@@ -262,7 +266,7 @@ describe('salvamento e envio de formulários', () => {
     let complete;
     api.createForm.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
     await prepareSend();
-    const button = screen.getByRole('button', { name: 'Criar e enviar' });
+    const button = screen.getByRole('button', { name: 'Salvar e enviar' });
     fireEvent.click(button); fireEvent.click(button);
     expect(api.createForm).toHaveBeenCalledOnce();
     complete({ id: 'form-1' });
@@ -273,9 +277,9 @@ describe('salvamento e envio de formulários', () => {
   it('preserva o formulário criado ao repetir após uma falha de publicação', async () => {
     api.publishForm.mockRejectedValueOnce(new Error('Falha temporária'));
     await prepareSend();
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     await screen.findByText('Falha temporária');
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     await screen.findByText('Formulário salvo e enviado para 1 respondente(s).');
     expect(api.createForm).toHaveBeenCalledOnce();
     expect(api.updateForm).toHaveBeenCalledOnce();
@@ -286,8 +290,10 @@ describe('salvamento e envio de formulários', () => {
   it('permite desmarcar o respondente e salvar sem enviar', async () => {
     await prepareSend();
     fireEvent.click(screen.getByRole('checkbox', { name: /Ana/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
-    expect(screen.getByRole('alert').textContent).toContain('Selecione ao menos um respondente');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(true);
+    expect(screen.getByRole('checkbox', { name: /Enviar convite por e-mail/ }).checked).toBe(false);
+    expect(screen.queryByRole('alert')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
     await screen.findByText('Formulário salvo com sucesso.');
     expect(api.saveFormAudience).toHaveBeenCalledWith('form-1', [], []);
@@ -309,7 +315,7 @@ describe('salvamento e envio de formulários', () => {
   it('exige uma pergunta para enviar, mas permite salvar somente o título', async () => {
     await prepareSend();
     fireEvent.change(screen.getByPlaceholderText('Texto da pergunta'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     expect(screen.getByRole('alert').textContent).toBe('Inclua ao menos uma pergunta antes de enviar.');
     expect(api.createForm).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
@@ -323,7 +329,7 @@ describe('salvamento e envio de formulários', () => {
     for (const label of missing === 'ambas' ? ['Início', 'Fim'] : [missing]) {
       fireEvent.change(screen.getByLabelText(label), { target: { value: '' } });
     }
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     expect(screen.getByRole('alert').textContent).toBe('Defina as datas de início e fim antes de enviar.');
     for (const label of ['Início', 'Fim']) {
       expect(screen.getByLabelText(label).getAttribute('aria-invalid')).toBe(String(missing === label || missing === 'ambas'));
@@ -353,7 +359,7 @@ describe('salvamento e envio de formulários', () => {
     fireEvent.change(options, { target: { value: ', , ' } });
     fireEvent.click(screen.getByRole('button', { name: /Adicionar pergunta/ }));
     fireEvent.change(screen.getAllByPlaceholderText('Texto da pergunta')[1], { target: { value: 'Pergunta livre' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     expect(screen.getByRole('alert').textContent).toContain('Informe ao menos uma opção');
     expect(options.getAttribute('aria-invalid')).toBe('true');
     expect(api.createForm).not.toHaveBeenCalled();
@@ -363,10 +369,10 @@ describe('salvamento e envio de formulários', () => {
     api.addQuestionOption.mockResolvedValueOnce({ id: 'option-1' }).mockRejectedValueOnce(new Error('Falha nas opções'));
     await prepareSend();
     fireEvent.change(chooseOptions(), { target: { value: ' Sim, Não, ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     await screen.findByText('Falha nas opções');
     expect(api.publishForm).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     await screen.findByText('Formulário salvo e enviado para 1 respondente(s).');
     expect(api.createForm).toHaveBeenCalledOnce();
     expect(api.addFormQuestion).toHaveBeenCalledOnce();
@@ -383,7 +389,7 @@ describe('salvamento e envio de formulários', () => {
     fireEvent.change(screen.getByLabelText('Mês'), { target: { value: missing === 'Mês' ? '' : '10' } });
     if (missing === 'Centro') fireEvent.change(screen.getByLabelText('Centro'), { target: { value: '' } });
     if (missing === 'Ano') fireEvent.change(screen.getByLabelText('Ano'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     expect(screen.getByRole('alert').textContent).toContain('Para coletar indicadores');
     expect(screen.getByLabelText(missing).getAttribute('aria-invalid')).toBe('true');
     expect(api.createForm).not.toHaveBeenCalled();
@@ -392,7 +398,7 @@ describe('salvamento e envio de formulários', () => {
   it.each(['INELIGIBLE_RESIDENT_RECIPIENT', 'RESPONDENT_ORGANIZATION_REQUIRED', 'RESIDENT_RECIPIENT_REQUIRED'])('mostra erro de elegibilidade no seletor de respondentes: %s', async (code) => {
     api.publishForm.mockRejectedValueOnce({ code, message: 'Respondente indisponível. Atualize a seleção.' });
     await prepareSend();
-    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
     const alert = await screen.findByRole('alert');
     expect(alert.closest('fieldset').querySelector('legend').textContent).toBe('Residentes respondentes');
     fireEvent.click(screen.getByRole('checkbox', { name: /Ana/ }));
@@ -414,7 +420,7 @@ describe('salvamento e envio de formulários', () => {
     let complete;
     api.createForm.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
     await prepareSend();
-    const button = screen.getByRole('button', { name: 'Criar e enviar' });
+    const button = screen.getByRole('button', { name: 'Salvar e enviar' });
     act(() => { fireEvent.click(button); fireEvent.click(button); });
     expect(api.createForm).toHaveBeenCalledOnce();
     complete({ id: 'form-1' });
@@ -428,5 +434,117 @@ describe('salvamento e envio de formulários', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/forms'));
     expect(api.createForm).not.toHaveBeenCalled();
     expect(api.publishForm).not.toHaveBeenCalled();
+  });
+
+  it('começa com envio desmarcado e desabilitado, com explicação acessível e sem alerta global', async () => {
+    await open();
+    const checkbox = screen.getByRole('checkbox', { name: 'Enviar convite por e-mail aos respondentes selecionados' });
+    expect(checkbox.checked).toBe(false);
+    expect(checkbox.disabled).toBe(true);
+    expect(checkbox.type).toBe('checkbox');
+    const descriptions = checkbox.getAttribute('aria-describedby').split(' ').map((id) => document.getElementById(id).textContent).join(' ');
+    expect(descriptions).toContain('0 respondente(s) selecionado(s)');
+    expect(descriptions).toContain('Os respondentes receberão um e-mail com link direto para acessar e responder o formulário.');
+    expect(descriptions).toContain('Selecione ao menos um respondente para habilitar o envio por e-mail.');
+    expect(screen.getByRole('button', { name: 'Salvar formulário' }).classList.contains('primary')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(true);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('habilita a opção com respondente sem assumir intenção de enviar e salva apenas o rascunho', async () => {
+    await prepareSend(false, false);
+    const checkbox = screen.getByRole('checkbox', { name: /Enviar convite por e-mail/ });
+    expect(checkbox.disabled).toBe(false);
+    expect(checkbox.checked).toBe(false);
+    expect(screen.getByText('1 respondente(s) selecionado(s)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    await screen.findByText('Formulário salvo com sucesso.');
+    expect(api.saveFormAudience).toHaveBeenCalledWith('form-1', [], ['resident-1']);
+    expect(api.publishForm).not.toHaveBeenCalled();
+  });
+
+  it('permite marcar pelo teclado, preserva a intenção ao editar e desmarcar cancela o envio', async () => {
+    const user = userEvent.setup();
+    await prepareSend(false, false);
+    const checkbox = screen.getByRole('checkbox', { name: /Enviar convite por e-mail/ });
+    checkbox.focus();
+    await user.keyboard(' ');
+    expect(document.activeElement).toBe(checkbox);
+    expect(checkbox.checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(false);
+    expect(screen.getByRole('button', { name: 'Salvar formulário' }).classList.contains('secondary')).toBe(true);
+    fireEvent.change(screen.getByPlaceholderText('Descrição'), { target: { value: 'Descrição atualizada' } });
+    fireEvent.change(screen.getByPlaceholderText('Texto da pergunta'), { target: { value: 'Pergunta atualizada' } });
+    expect(checkbox.checked).toBe(true);
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(false);
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Salvar formulário' }).classList.contains('primary')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    await screen.findByText('Formulário salvo com sucesso.');
+    expect(api.publishForm).not.toHaveBeenCalled();
+  });
+
+  it('atualiza o contador e só cancela a intenção de envio quando remove o último respondente', async () => {
+    api.getEligibleFormRecipients.mockResolvedValue([
+      { id: 'resident-1', name: 'Ana', email: 'ana@example.com', organizations: [{ id: 'org-1', name: 'Empresa A' }] },
+      { id: 'resident-2', name: 'Bia', email: 'bia@example.com', organizations: [{ id: 'org-1', name: 'Empresa A' }] },
+    ]);
+    await open();
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Bia/ }));
+    const email = screen.getByRole('checkbox', { name: /Enviar convite por e-mail/ });
+    fireEvent.click(email);
+    expect(screen.getByText('2 respondente(s) selecionado(s)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Ana/ }));
+    expect(email.checked).toBe(true);
+    expect(screen.getByText('1 respondente(s) selecionado(s)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Bia/ }));
+    expect(email.checked).toBe(false);
+    expect(email.disabled).toBe(true);
+    expect(screen.getByText('0 respondente(s) selecionado(s)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Ana/ }));
+    expect(email.disabled).toBe(false);
+    expect(email.checked).toBe(false);
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(true);
+  });
+
+  it('limpa a intenção de envio se a mudança de organização remover os respondentes', async () => {
+    api.getOrganizations.mockResolvedValue([{ id: 'org-1', name: 'Empresa A', status: 'ACTIVE' }, { id: 'org-2', name: 'Empresa B', status: 'ACTIVE' }]);
+    api.getEligibleFormRecipients.mockResolvedValue([{ id: 'resident-1', name: 'Ana', email: 'ana@example.com', organizations: [{ id: 'org-1', name: 'Empresa A' }] }]);
+    await open();
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana/ }));
+    const email = screen.getByRole('checkbox', { name: /Enviar convite por e-mail/ });
+    fireEvent.click(email);
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Empresa B/ }));
+    expect(email.checked).toBe(false);
+    expect(email.disabled).toBe(true);
+    expect(screen.getByText('0 respondente(s) selecionado(s)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(true);
+  });
+
+  it('restaura os respondentes de um rascunho sem marcar automaticamente o envio', async () => {
+    api.getFormRespondents.mockResolvedValue([{ user_id: 'resident-1', organization_id: 'org-1', status: 'PENDING' }]);
+    api.getEligibleFormRecipients.mockResolvedValue([{ id: 'resident-1', name: 'Ana', email: 'ana@example.com', organizations: [{ id: 'org-1', name: 'Empresa A' }] }]);
+    await open(true);
+    expect(screen.getByRole('checkbox', { name: /Ana/ }).checked).toBe(true);
+    expect(screen.getByRole('checkbox', { name: /Enviar convite por e-mail/ }).checked).toBe(false);
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Salvar alterações' }).disabled).toBe(false);
+  });
+
+  it('bloqueia alteração e envio de formulário já publicado e mantém reenvio como ação separada', async () => {
+    api.getForm.mockResolvedValue({ id: 'form-1', title: 'Coleta existente', status: 'ACTIVE' });
+    api.getFormRespondents.mockResolvedValue([{ user_id: 'resident-1', organization_id: 'org-1', status: 'SENT' }]);
+    await open(true);
+    expect(screen.getByRole('checkbox', { name: /Enviar convite por e-mail/ }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Salvar e enviar' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Salvar alterações' }).disabled).toBe(true);
+    expect(screen.getByPlaceholderText('Título do formulário').disabled).toBe(true);
+    expect(screen.getByText(/Convites já enviados não serão reenviados/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
+    expect(api.publishForm).not.toHaveBeenCalled();
+    expect(api.updateForm).not.toHaveBeenCalled();
   });
 });

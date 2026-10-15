@@ -33,6 +33,25 @@ beforeEach(() => {
 });
 
 describe('responseService lote 2', () => {
+  it('rejects reopening by a resident before accessing the repository', async () => {
+    await expect(reopen('response-1', resident)).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    expect(mocks.responses.reopen).not.toHaveBeenCalled();
+  });
+
+  it('reopens a form without indicator competence and still audits inside the transaction', async () => {
+    await reopen('response-1', manager);
+    await mocks.responses.reopen.mock.calls[0][2]({ organization_id: organizationId, indicator_year: null }, 'transaction-client');
+    expect(mocks.processLinkedAnswers).not.toHaveBeenCalled();
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'RESPONSE_REOPENED' }), 'transaction-client');
+  });
+
+  it('submits a form without indicator competence without publishing indicators', async () => {
+    mocks.responses.submissionContext.mockResolvedValueOnce({ ...activeForm, indicator_year: null });
+    await submit(formId, { organizationId, answers: [{ questionId: 'text', value: 'Ana' }] }, resident);
+    await expect(mocks.responses.submit.mock.calls[0][0].processSubmission('response-1', 'transaction-client')).resolves.toBe(0);
+    expect(mocks.processLinkedAnswers).not.toHaveBeenCalled();
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ details: expect.objectContaining({ indicatorsUpdated: 0 }) }), 'transaction-client');
+  });
   it('restringe preenchimento a residentes', async () => {
     await expect(saveDraft(formId, { organizationId, answers: [] }, manager)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mocks.responses.submissionContext).not.toHaveBeenCalled();

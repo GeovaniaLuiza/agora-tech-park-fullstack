@@ -25,6 +25,15 @@ beforeEach(() => {
 });
 
 describe('indicatorManagementService lote 5', () => {
+  it.each(['FORM_RESPONSE', 'INVALID_TYPE'])('rejects generic record operations for %s before repository access', async (type) => {
+    await expect(service.listRecords({ type, centerId: center.id })).rejects.toMatchObject({ status: 422, code: 'INVALID_RECORD_TYPE' });
+    await expect(service.saveRecord(null, type, { centerId: center.id }, admin)).rejects.toMatchObject({ status: 422, code: 'INVALID_RECORD_TYPE' });
+    await expect(service.removeRecord('record-1', type, admin)).rejects.toMatchObject({ status: 422, code: 'INVALID_RECORD_TYPE' });
+    expect(mocks.repo.findCenter).not.toHaveBeenCalled();
+    expect(mocks.repo.findRecord).not.toHaveBeenCalled();
+    expect(mocks.repo.createRecord).not.toHaveBeenCalled();
+    expect(mocks.repo.deleteRecord).not.toHaveBeenCalled();
+  });
   it('lista centros e catalogo respeitando flags', async () => {
     mocks.repo.listCenters.mockResolvedValue([center]);
     mocks.repo.listCatalogDefinitions.mockResolvedValue([{ id: 'def-1' }]);

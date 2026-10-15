@@ -34,6 +34,15 @@ beforeEach(() => {
 });
 
 describe('formService lote 2', () => {
+  it.each([
+    { value_type: 'TEXT' }, { value_type: 'BOOLEAN' }, { value_type: 'JSON' },
+    { aggregation_type: 'MANUAL' }, { annual_aggregation: 'DERIVED' },
+  ])('rejects a form mapping with unsupported collection rules: %j', async (override) => {
+    mocks.forms.findDefinitionById.mockResolvedValueOnce({ active: true, calculation_type: 'MANUAL', value_type: 'INTEGER', aggregation_type: 'SUM', annual_aggregation: 'SUM', ...override });
+    await expect(createQuestion(formId, { indicatorId: 'indicator-1' }, manager)).rejects.toMatchObject({ status: 422, code: 'UNSUPPORTED_FORM_AGGREGATION' });
+    expect(mocks.forms.addQuestion).not.toHaveBeenCalled();
+    expect(mocks.forms.indicatorAlreadyLinked).not.toHaveBeenCalled();
+  });
   it('atualiza apenas rascunho, normaliza período e audita', async () => {
     const result = await updateForm(formId, { title: 'Atualizada', innovationCenterId: 'center-1', indicatorYear: '2026', indicatorMonth: '2' }, manager);
     expect(result.title).toBe('Atualizada');

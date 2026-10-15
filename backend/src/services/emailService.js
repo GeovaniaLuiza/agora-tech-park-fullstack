@@ -31,7 +31,7 @@ export const sendRejected = ({ email, name }) => send(email, 'Atualização da s
 export const sendInactive = ({ email, name }) => send(email, 'Acesso inativado — Ágora Tech Park', inactiveTemplate({ name }));
 export const sendFormInvitation = ({ email, name, formId, formTitle, deadline, organizationName }) => {
   const url = new URL(`/resident/forms/${formId}/respond`, process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5174');
-  return send(email, `Formulário disponível: ${formTitle}`, formInvitationTemplate({
+  return send(email, 'Novo formulário disponível — Ágora Tech Park', formInvitationTemplate({
     name: name || 'respondente', formTitle, deadline, organizationName, formUrl: url.toString(),
   }));
 };

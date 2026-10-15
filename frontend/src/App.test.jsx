@@ -20,6 +20,14 @@ const api = vi.hoisted(() => ({
   getEligibleFormRecipients: vi.fn(),
   createForm: vi.fn(),
   addFormQuestion: vi.fn(),
+  getForms: vi.fn(),
+  getForm: vi.fn(),
+  getFormQuestions: vi.fn(),
+  getFormOrganizations: vi.fn(),
+  getFormRespondents: vi.fn(),
+  updateForm: vi.fn(),
+  updateFormQuestion: vi.fn(),
+  publishForm: vi.fn(),
   saveFormAudience: vi.fn(),
 }));
 
@@ -38,12 +46,28 @@ vi.mock('./services/api', async (original) => ({
   getEligibleFormRecipients: api.getEligibleFormRecipients,
   createForm: api.createForm,
   addFormQuestion: api.addFormQuestion,
+  getForms: api.getForms,
+  getForm: api.getForm,
+  getFormQuestions: api.getFormQuestions,
+  getFormOrganizations: api.getFormOrganizations,
+  getFormRespondents: api.getFormRespondents,
+  updateForm: api.updateForm,
+  updateFormQuestion: api.updateFormQuestion,
+  publishForm: api.publishForm,
   saveFormAudience: api.saveFormAudience,
 }));
 
 import App from './App';
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  api.getForms.mockResolvedValue([]);
+  api.getForm.mockResolvedValue({ id: 'form-1', title: 'Coleta existente', status: 'DRAFT' });
+  api.getFormQuestions.mockResolvedValue([]);
+  api.getFormOrganizations.mockResolvedValue([]);
+  api.getFormRespondents.mockResolvedValue([]);
+  api.updateForm.mockResolvedValue({ id: 'form-1' });
+  api.publishForm.mockResolvedValue({ notificationSummary: { sent: 1, failed: 0 } });
   api.getAccessRequests.mockResolvedValue([]);
   api.getIndicators.mockResolvedValue([]);
   api.getIndicatorHistory.mockResolvedValue([]);
@@ -139,10 +163,119 @@ describe('roteamento principal', () => {
     window.history.replaceState({}, '', '/forms/new');
     render(<App />);
     fireEvent.change(screen.getByPlaceholderText('Título do formulário'), { target: { value: 'Novo formulário' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar rascunho' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
     await waitFor(() => expect(api.createForm).toHaveBeenCalledOnce());
     expect(api.addFormQuestion).not.toHaveBeenCalled();
-    await waitFor(() => expect(window.location.pathname).toBe('/forms'));
+    expect(await screen.findByText('Formulário salvo com sucesso.')).toBeTruthy();
+    expect(api.publishForm).not.toHaveBeenCalled();
   });
 
+});
+
+
+describe('salvamento e envio de formulários', () => {
+  const open = async (existing = false) => {
+    window.history.replaceState({}, '', existing ? '/forms/form-1/edit' : '/forms/new');
+    render(<App />);
+    if (existing) await screen.findByDisplayValue('Coleta existente');
+    else fireEvent.change(screen.getByPlaceholderText('Título do formulário'), { target: { value: 'Nova coleta' } });
+  };
+  const prepareSend = async (existing = false) => {
+    api.getOrganizations.mockResolvedValue([{ id: 'org-1', name: 'Empresa A', status: 'ACTIVE' }]);
+    api.getEligibleFormRecipients.mockResolvedValue([{ id: 'resident-1', name: 'Ana', email: 'ana@example.com', organizations: [{ id: 'org-1', name: 'Empresa A' }] }]);
+    if (existing) api.getFormQuestions.mockResolvedValue([{ id: 'question-1', label: 'Sua resposta', type: 'TEXT', required: true }]);
+    await open(existing);
+    fireEvent.change(screen.getByPlaceholderText('Texto da pergunta'), { target: { value: 'Sua resposta' } });
+    fireEvent.change(screen.getByLabelText('Início'), { target: { value: '2026-10-01' } });
+    fireEvent.change(screen.getByLabelText('Fim'), { target: { value: '2026-12-31' } });
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana/ }));
+  };
+
+  it('edita sem respondente e restaura organizações sem residentes', async () => {
+    api.getOrganizations.mockResolvedValue([{ id: 'org-1', name: 'Empresa A', status: 'ACTIVE' }]);
+    api.getFormOrganizations.mockResolvedValue([{ id: 'org-1' }]);
+    await open(true);
+    expect(screen.getByRole('checkbox', { name: /Empresa A/ }).checked).toBe(true);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('Nenhum residente elegível para as organizações selecionadas.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+    expect(await screen.findByText('Formulário salvo com sucesso.')).toBeTruthy();
+    expect(api.updateForm).toHaveBeenCalledOnce();
+    expect(api.saveFormAudience).toHaveBeenCalledWith('form-1', ['org-1'], []);
+    expect(api.publishForm).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('só exige respondente ao tentar enviar; existente=%s', async (existing) => {
+    await open(existing);
+    expect(screen.queryByText('Selecione ao menos um respondente para enviar o formulário.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: existing ? 'Salvar e enviar' : 'Criar e enviar' }));
+    expect(screen.getByRole('alert').textContent).toBe('Selecione ao menos um respondente para enviar o formulário.');
+    expect(api.publishForm).not.toHaveBeenCalled();
+    expect(api.createForm).not.toHaveBeenCalled();
+    expect(api.updateForm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: existing ? 'Salvar alterações' : 'Salvar formulário' }));
+    expect(await screen.findByText('Formulário salvo com sucesso.')).toBeTruthy();
+  });
+
+  it('salvar com residentes selecionados não envia convites', async () => {
+    await prepareSend();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    expect(await screen.findByText('Formulário salvo com sucesso.')).toBeTruthy();
+    expect(api.saveFormAudience).toHaveBeenCalledWith('form-1', [], ['resident-1']);
+    expect(api.publishForm).not.toHaveBeenCalled();
+  });
+
+  it('salva e envia um formulário existente', async () => {
+    await prepareSend(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e enviar' }));
+    await screen.findByText('Formulário salvo e enviado para 1 respondente(s).');
+    expect(api.createForm).not.toHaveBeenCalled();
+    expect(api.updateForm).toHaveBeenCalledOnce();
+    expect(api.publishForm).toHaveBeenCalledWith('form-1', [], ['resident-1']);
+  });
+
+  it('destaca somente o campo de título inválido ao salvar', async () => {
+    await open();
+    fireEvent.change(screen.getByPlaceholderText('Título do formulário'), { target: { value: 'AB' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar formulário' }));
+    expect(screen.getByPlaceholderText('Título do formulário').getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByLabelText('Início').getAttribute('aria-invalid')).toBe('false');
+    expect(screen.queryByText('Selecione ao menos um respondente para enviar o formulário.')).toBeNull();
+    expect(api.createForm).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('seleciona respondente e mostra feedback de envio; parcial=%s', async (partial) => {
+    api.publishForm.mockResolvedValue({ notificationSummary: { sent: 1, failed: partial ? 1 : 0 } });
+    await prepareSend();
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    expect(await screen.findByText(partial ? 'Formulário salvo. 1 convites enviados e 1 falharam.' : 'Formulário salvo e enviado para 1 respondente(s).')).toBeTruthy();
+    expect(api.publishForm).toHaveBeenCalledWith('form-1', [], ['resident-1']);
+    expect(api.publishForm).toHaveBeenCalledOnce();
+    expect(api.saveFormAudience).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia duplo clique enquanto persiste', async () => {
+    let complete;
+    api.createForm.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    await prepareSend();
+    const button = screen.getByRole('button', { name: 'Criar e enviar' });
+    fireEvent.click(button); fireEvent.click(button);
+    expect(api.createForm).toHaveBeenCalledOnce();
+    complete({ id: 'form-1' });
+    await screen.findByText('Formulário salvo e enviado para 1 respondente(s).');
+    expect(api.publishForm).toHaveBeenCalledOnce();
+  });
+
+  it('preserva o formulário criado ao repetir após uma falha de publicação', async () => {
+    api.publishForm.mockRejectedValueOnce(new Error('Falha temporária'));
+    await prepareSend();
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    await screen.findByText('Falha temporária');
+    fireEvent.click(screen.getByRole('button', { name: 'Criar e enviar' }));
+    await screen.findByText('Formulário salvo e enviado para 1 respondente(s).');
+    expect(api.createForm).toHaveBeenCalledOnce();
+    expect(api.updateForm).toHaveBeenCalledOnce();
+    expect(api.addFormQuestion).toHaveBeenCalledOnce();
+    expect(api.updateFormQuestion).toHaveBeenCalledOnce();
+  });
 });

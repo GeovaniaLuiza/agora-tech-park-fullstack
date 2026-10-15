@@ -35,7 +35,8 @@ describe('serviço de e-mail', () => {
 
     const message = provider.send.mock.calls[0][0];
     expect(message.to).toBe('residente@test.com');
-    expect(message.subject).toContain('Coleta anual');
+    expect(message.subject).toBe('Novo formulário disponível — Ágora Tech Park');
+    expect(message.text).toContain('Coleta anual');
     expect(message.text).toContain('https://indicadores.example/resident/forms/form-123/respond');
     expect(message.text).toContain('31/08/2026');
   });

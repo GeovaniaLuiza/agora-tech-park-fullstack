@@ -69,11 +69,13 @@ export async function create({ title, description = '', startDate, endDate, inno
 export async function update(id, { title, description, startDate, endDate, innovationCenterId, indicatorYear, indicatorMonth }) {
   const { rows } = await query(
     `UPDATE forms SET title=COALESCE($2,title),description=COALESCE($3,description),
-      start_date=COALESCE($4,start_date),end_date=COALESCE($5,end_date),
+      start_date=CASE WHEN $9 THEN $4::timestamptz ELSE start_date END,
+      end_date=CASE WHEN $10 THEN $5::timestamptz ELSE end_date END,
       innovation_center_id=COALESCE($6,innovation_center_id),indicator_year=COALESCE($7,indicator_year),
       indicator_month=COALESCE($8,indicator_month)
      WHERE id=$1 AND status='DRAFT' RETURNING id`,
-    [id, title, description, startDate, endDate, innovationCenterId, indicatorYear, indicatorMonth],
+    [id, title, description, startDate || null, endDate || null, innovationCenterId, indicatorYear, indicatorMonth,
+      startDate !== undefined, endDate !== undefined],
   );
   return rows[0] ? findById(id) : null;
 }

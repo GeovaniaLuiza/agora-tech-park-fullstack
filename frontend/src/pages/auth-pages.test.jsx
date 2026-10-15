@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const auth = vi.hoisted(() => ({ clearSessionError: vi.fn(), login: vi.fn(), sessionError: '' }));
 const api = vi.hoisted(() => ({ registerRequest: vi.fn() }));
@@ -24,6 +24,18 @@ const fillRegistration = () => {
 };
 
 describe('páginas públicas de autenticação', () => {
+  it('retorna ao formulário do convite após autenticar o residente', async () => {
+    const path = '/resident/forms/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/respond';
+    auth.login.mockResolvedValue({ role: 'RESIDENTE' });
+    render(<MemoryRouter initialEntries={[{ pathname: '/login', state: { from: path } }]}><Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path={path} element={<p>Responder coleta convidada</p>} />
+    </Routes></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText(/^e-mail/i), { target: { value: 'pessoa@test.com' } });
+    fireEvent.change(screen.getByLabelText(/^senha/i), { target: { value: 'Senha123' } });
+    fireEvent.click(screen.getByRole('button', { name: /entrar/i }));
+    expect(await screen.findByText('Responder coleta convidada')).toBeTruthy();
+  });
   it('valida login antes de chamar a API', () => {
     render(<MemoryRouter><LoginPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: /entrar/i }));

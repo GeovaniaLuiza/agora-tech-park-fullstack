@@ -137,3 +137,4 @@ html{background:var(--background)}body{min-width:320px;background:var(--backgrou
 .import-format-guide .import-format-field strong { font-size: 11px; }
 .import-occupation{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:10px 0;border-bottom:1px solid var(--line)}.import-occupation p{grid-column:1/-1}.import-occupation label{display:grid;gap:4px;font-size:9px;color:var(--muted)}@media(max-width:700px){.import-occupation{grid-template-columns:1fr}}
 .import-pending-details{display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:24px;row-gap:12px;align-items:baseline;min-width:0}.import-pending-details>dt,.import-pending-details>dd{margin:0;min-width:0}.import-pending-details>dd{overflow-wrap:anywhere}@media(max-width:700px){.import-pending-details{grid-template-columns:minmax(0,1fr)}}
+.builder-layout input[aria-invalid=true],.builder-layout select[aria-invalid=true]{outline:2px solid #b42318;outline-offset:2px}

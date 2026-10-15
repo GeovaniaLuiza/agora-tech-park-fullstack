@@ -89,6 +89,7 @@ function Forms({ resident = false }) {
 
 const questionTypes = [[Type, 'Texto', 'TEXT'], [Hash, 'Número', 'NUMBER'], [List, 'Escolha', 'OPTION'], [CheckSquare, 'Decimal', 'DECIMAL']];
 const emptyQuestion = (type = 'TEXT') => ({ label: '', type, required: true, options: '', indicatorId: '' });
+const normalizeRecipientSearch = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
 
 function Create() {
   const { formId } = useParams();
@@ -102,10 +103,11 @@ function Create() {
   const [organizations, setOrganizations] = useState([]);
   const [targets, setTargets] = useState([]);
   const [residents, setResidents] = useState([]);
+  const [savedRecipients, setSavedRecipients] = useState([]);
   const [recipientIds, setRecipientIds] = useState([]);
   const [emailInvitations, setEmailInvitations] = useState(false);
   const [formStatus, setFormStatus] = useState(formId ? null : 'DRAFT');
-  const recipientSearch = '';
+  const [recipientSearch, setRecipientSearch] = useState('');
   const savedFormId = useRef(null);
   const savingRef = useRef(false);
   const [recipientError, setRecipientError] = useState('');
@@ -133,19 +135,24 @@ function Create() {
           options: question.type === 'OPTION' ? (await getQuestionOptions(formId, question.id)).map((option) => option.value).join(', ') : '',
         })));
         setQuestions(withOptions);
+        setSavedRecipients(savedRespondents.map((respondent) => ({ id: respondent.user_id, name: respondent.name || 'Respondente indisponível', email: respondent.email || '' })));
         setRecipientIds(savedRespondents.map((respondent) => respondent.user_id));
         setTargets(savedOrganizations.map((organization) => organization.id));
         setFormStatus(loaded.status);
       }).catch((reason) => setError(reason.message));
     }
   }, [formId]);
-  const visibleResidents = (targets.length
+  const scopedResidents = targets.length
     ? residents.filter((resident) => resident.organizations.some((organization) => targets.includes(organization.id)))
-    : residents).filter((resident) => `${resident.name} ${resident.email}`.toLowerCase().includes(recipientSearch.toLowerCase()));
+    : residents;
+  const search = normalizeRecipientSearch(recipientSearch.trim());
+  const visibleResidents = scopedResidents.filter((resident) => normalizeRecipientSearch(`${resident.name} ${resident.email}`).includes(search));
+  const selectedResidents = recipientIds.map((id) => residents.find((resident) => resident.id === id)
+    || savedRecipients.find((recipient) => recipient.id === id) || { id, name: 'Respondente indisponível', email: '' });
   const toggleTarget = (organizationId) => {
     const next = targets.includes(organizationId) ? targets.filter((id) => id !== organizationId) : [...targets, organizationId];
     setTargets(next);
-    if (next.length) selectRecipients(recipientIds.filter((id) => residents.find((resident) => resident.id === id)?.organizations.some((organization) => next.includes(organization.id))));
+    selectRecipients(next.length ? recipientIds.filter((id) => residents.find((resident) => resident.id === id)?.organizations.some((organization) => next.includes(organization.id))) : []);
   };
   const canEdit = formStatus === 'DRAFT';
   const canSendEmail = canEdit && recipientIds.length > 0;
@@ -285,12 +292,21 @@ function Create() {
         <fieldset className="recipient-fieldset"><legend>Organizações destinatárias</legend>
           {organizations.filter((organization) => organization.status !== 'INACTIVE').map((organization) => <label className="recipient-option" key={organization.id}><input type="checkbox" disabled={saving || !canEdit} checked={targets.includes(organization.id)} onChange={() => toggleTarget(organization.id)} /><span><strong>{organization.name}</strong><small>{organization.cnpj || 'Organização ativa'}</small></span></label>)}
         </fieldset>
-        <fieldset className="recipient-fieldset"><legend>Residentes respondentes</legend>
-          <p>Somente residentes ativos, com e-mail verificado e vínculo válido podem receber a coleta.</p>
-          <div className="recipient-list" aria-describedby={recipientError ? 'recipient-error' : undefined}>
-            {visibleResidents.map((resident) => <label className="recipient-option" key={resident.id}><input type="checkbox" disabled={saving || !canEdit} checked={recipientIds.includes(resident.id)} onChange={() => toggleRecipient(resident.id)} /><span><strong>{resident.name}</strong><small>{resident.email}<br />{resident.organizations.map((organization) => organization.name).join(', ')}</small></span></label>)}
-            {!visibleResidents.length && <small className="recipient-empty">Nenhum residente elegível para as organizações selecionadas.</small>}
+        <fieldset className="recipient-fieldset"><legend>RESPONDENTES</legend>
+          <p id="recipient-search-help">Somente residentes ativos, com e-mail verificado e vínculo válido podem receber a coleta.</p>
+          <label htmlFor="recipient-search">Buscar respondente por nome ou e-mail</label>
+          <div className="recipient-search-control">
+            <Search aria-hidden="true" />
+            <input id="recipient-search" type="search" placeholder="Buscar respondente por nome ou e-mail..." value={recipientSearch} disabled={saving || !canEdit} onChange={(event) => setRecipientSearch(event.target.value)} aria-controls="recipient-search-results" aria-describedby="recipient-search-help recipient-search-summary" />
+            {recipientSearch && <button type="button" disabled={saving || !canEdit} onClick={() => setRecipientSearch('')} aria-label="Limpar busca de respondentes"><X aria-hidden="true" /></button>}
           </div>
+          <p id="recipient-search-summary" className="recipient-search-summary" role="status">{visibleResidents.length} respondente(s) encontrado(s)</p>
+          <div id="recipient-search-results" className="recipient-list" aria-describedby={recipientError ? 'recipient-error' : undefined}>
+            {visibleResidents.map((resident) => <label className="recipient-option" key={resident.id}><input type="checkbox" disabled={saving || !canEdit} checked={recipientIds.includes(resident.id)} onChange={() => toggleRecipient(resident.id)} /><span><strong>{resident.name}</strong><small>{resident.email}<br />{resident.organizations.filter((organization) => !targets.length || targets.includes(organization.id)).map((organization) => organization.name).join(', ')}</small></span></label>)}
+            {!visibleResidents.length && <small className="recipient-empty">{scopedResidents.length && search ? 'Nenhum respondente encontrado para a busca informada.' : 'Nenhum residente elegível para as organizações selecionadas.'}</small>}
+          </div>
+          <p id="form-email-count" className="recipient-selection-count" aria-live="polite">{recipientIds.length} respondente(s) selecionado(s)</p>
+          {selectedResidents.length > 0 && <ul className="selected-recipients" aria-label="Respondentes selecionados">{selectedResidents.map((resident) => <li key={resident.id}><span><strong>{resident.name}</strong><small>{resident.email}</small></span><button type="button" disabled={saving || !canEdit} onClick={() => toggleRecipient(resident.id)} aria-label={`Remover respondente ${resident.name}${resident.email ? ` (${resident.email})` : ''}`}><X aria-hidden="true" /></button></li>)}</ul>}
           {recipientError && <p id="recipient-error" className="error" role="alert">{recipientError}</p>}
           <small>O formulário pode ser salvo sem selecionar respondentes.</small>
         </fieldset>
@@ -298,9 +314,8 @@ function Create() {
           <legend>ENVIO DO FORMULÁRIO</legend>
           <label className="form-delivery-option" htmlFor="send-form-email">
             <input id="send-form-email" type="checkbox" checked={emailInvitations && canSendEmail} disabled={saving || !canSendEmail} onChange={(event) => setEmailInvitations(event.target.checked)} aria-describedby="form-email-help form-email-count form-email-availability" />
-            <span>Enviar convite por e-mail aos respondentes selecionados</span>
+            <span>Enviar formulário por e-mail aos respondentes selecionados</span>
           </label>
-          <p id="form-email-count" className="form-delivery-count" aria-live="polite">{recipientIds.length} respondente(s) selecionado(s)</p>
           <p id="form-email-help">Os respondentes receberão um e-mail com link direto para acessar e responder o formulário.</p>
           <p id="form-email-availability">{!canEdit && formStatus
             ? 'Este formulário não está em rascunho. Convites já enviados não serão reenviados por esta configuração; o reenvio é uma ação separada.'

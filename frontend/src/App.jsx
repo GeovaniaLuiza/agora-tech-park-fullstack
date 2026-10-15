@@ -103,11 +103,15 @@ function Create() {
   const [organizations, setOrganizations] = useState([]);
   const [targets, setTargets] = useState([]);
   const [residents, setResidents] = useState([]);
+  const [loadedRecipientOrganizations, setLoadedRecipientOrganizations] = useState([]);
   const [savedRecipients, setSavedRecipients] = useState([]);
   const [recipientIds, setRecipientIds] = useState([]);
   const [emailInvitations, setEmailInvitations] = useState(false);
   const [formStatus, setFormStatus] = useState(formId ? null : 'DRAFT');
   const [recipientSearch, setRecipientSearch] = useState('');
+  const [recipientPickerOpen, setRecipientPickerOpen] = useState(false);
+  const recipientPickerRef = useRef(null);
+  const recipientSearchRef = useRef(null);
   const savedFormId = useRef(null);
   const savingRef = useRef(false);
   const [recipientError, setRecipientError] = useState('');
@@ -118,7 +122,6 @@ function Create() {
     getOrganizations().then(setOrganizations).catch((reason) => setError(reason.message));
     getInnovationCenters().then(setCenters).catch((reason) => setError(reason.message));
     getFormIndicatorDefinitions().then(setIndicatorDefinitions).catch((reason) => setError(reason.message));
-    getEligibleFormRecipients().then(setResidents).catch((reason) => setError(reason.message));
     if (formId) {
       Promise.all([getForm(formId), getFormQuestions(formId), getFormRespondents(formId), getFormOrganizations(formId)]).then(async ([loaded, loadedQuestions, savedRespondents, savedOrganizations]) => {
         setForm({
@@ -142,16 +145,54 @@ function Create() {
       }).catch((reason) => setError(reason.message));
     }
   }, [formId]);
-  const scopedResidents = targets.length
-    ? residents.filter((resident) => resident.organizations.some((organization) => targets.includes(organization.id)))
-    : residents;
+  useEffect(() => {
+    let active = true;
+    if (!targets.length) {
+      return () => { active = false; };
+    }
+    getEligibleFormRecipients(targets)
+      .then((eligible) => {
+        if (!active) return;
+        setResidents(eligible);
+        setLoadedRecipientOrganizations(targets);
+        setRecipientIds((current) => {
+          const next = current.filter((id) => eligible.some((resident) => resident.id === id));
+          if (!next.length && current.length) setEmailInvitations(false);
+          return next;
+        });
+      })
+      .catch((reason) => {
+        if (!active) return;
+        setResidents([]);
+        setLoadedRecipientOrganizations(targets);
+        setError(reason.message);
+      });
+    return () => { active = false; };
+  }, [targets]);
+  useEffect(() => {
+    if (!recipientPickerOpen) return undefined;
+    const closeOutside = (event) => {
+      if (!recipientPickerRef.current?.contains(event.target)) setRecipientPickerOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [recipientPickerOpen]);
+  useEffect(() => {
+    if (recipientPickerOpen) recipientSearchRef.current?.focus();
+  }, [recipientPickerOpen]);
+  const recipientLoading = targets.length > 0
+    && (targets.length !== loadedRecipientOrganizations.length || targets.some((id, index) => loadedRecipientOrganizations[index] !== id));
+  const eligibleResidents = targets.length ? residents : [];
   const search = normalizeRecipientSearch(recipientSearch.trim());
-  const visibleResidents = scopedResidents.filter((resident) => normalizeRecipientSearch(`${resident.name} ${resident.email}`).includes(search));
+  const visibleResidents = eligibleResidents.filter((resident) => normalizeRecipientSearch(`${resident.name} ${resident.email}`).includes(search));
   const selectedResidents = recipientIds.map((id) => residents.find((resident) => resident.id === id)
     || savedRecipients.find((recipient) => recipient.id === id) || { id, name: 'Respondente indisponível', email: '' });
   const toggleTarget = (organizationId) => {
     const next = targets.includes(organizationId) ? targets.filter((id) => id !== organizationId) : [...targets, organizationId];
+    setLoadedRecipientOrganizations([]);
     setTargets(next);
+    setRecipientSearch('');
+    setRecipientPickerOpen(false);
     selectRecipients(next.length ? recipientIds.filter((id) => residents.find((resident) => resident.id === id)?.organizations.some((organization) => next.includes(organization.id))) : []);
   };
   const canEdit = formStatus === 'DRAFT';
@@ -294,19 +335,36 @@ function Create() {
         </fieldset>
         <fieldset className="recipient-fieldset"><legend>RESPONDENTES</legend>
           <p id="recipient-search-help">Somente residentes ativos, com e-mail verificado e vínculo válido podem receber a coleta.</p>
-          <label htmlFor="recipient-search">Buscar respondente por nome ou e-mail</label>
-          <div className="recipient-search-control">
-            <Search aria-hidden="true" />
-            <input id="recipient-search" type="search" placeholder="Buscar respondente por nome ou e-mail..." value={recipientSearch} disabled={saving || !canEdit} onChange={(event) => setRecipientSearch(event.target.value)} aria-controls="recipient-search-results" aria-describedby="recipient-search-help recipient-search-summary" />
-            {recipientSearch && <button type="button" disabled={saving || !canEdit} onClick={() => setRecipientSearch('')} aria-label="Limpar busca de respondentes"><X aria-hidden="true" /></button>}
+          <label id="recipient-picker-label" htmlFor="recipient-picker-trigger">Selecionar respondentes</label>
+          <div className="recipient-picker" ref={recipientPickerRef} onKeyDown={(event) => { if (event.key === 'Escape' && recipientPickerOpen) { setRecipientPickerOpen(false); document.getElementById('recipient-picker-trigger')?.focus(); } }}>
+            <button id="recipient-picker-trigger" className="recipient-picker-trigger" type="button" disabled={saving || !canEdit || !targets.length || recipientLoading} aria-haspopup="true" aria-expanded={recipientPickerOpen} aria-controls="recipient-picker-options" aria-labelledby="recipient-picker-label" aria-describedby="recipient-search-help recipient-availability" onClick={() => setRecipientPickerOpen((open) => !open)}>
+              <span>{recipientLoading ? 'Carregando respondentes...' : 'Selecione um ou mais respondentes'}</span><span className="recipient-picker-chevron" aria-hidden="true">{recipientPickerOpen ? '▴' : '▾'}</span>
+            </button>
+            <p id="recipient-availability" className="recipient-availability" role="status">{!targets.length
+              ? 'Selecione ao menos uma organização destinatária para visualizar os respondentes.'
+              : recipientLoading ? 'Carregando respondentes elegíveis...'
+                : eligibleResidents.length ? `${eligibleResidents.length} respondente(s) disponível(is)`
+                  : 'Nenhum respondente elegível para as organizações selecionadas.'}</p>
+            {recipientPickerOpen && <div className="recipient-picker-popover">
+              <label className="recipient-picker-search-label" htmlFor="recipient-search">Buscar por nome ou e-mail</label>
+              <div className="recipient-search-control">
+                <Search aria-hidden="true" />
+                <input ref={recipientSearchRef} id="recipient-search" type="search" placeholder="Buscar por nome ou e-mail..." value={recipientSearch} disabled={saving || !canEdit} onChange={(event) => setRecipientSearch(event.target.value)} aria-controls="recipient-picker-options" aria-describedby="recipient-search-help recipient-availability" />
+                {recipientSearch && <button type="button" disabled={saving || !canEdit} onClick={() => setRecipientSearch('')} aria-label="Limpar busca de respondentes"><X aria-hidden="true" /></button>}
+              </div>
+              <div id="recipient-picker-options" className="recipient-list" role="group" aria-labelledby="recipient-picker-label" aria-describedby={recipientError ? 'recipient-error' : undefined}>
+                {!targets.length
+                  ? <small className="recipient-empty">Selecione ao menos uma organização destinatária para visualizar os respondentes.</small>
+                  : recipientLoading ? <small className="recipient-empty">Carregando respondentes elegíveis...</small>
+                    : !eligibleResidents.length ? <small className="recipient-empty">Nenhum respondente elegível para as organizações selecionadas.</small>
+                      : !visibleResidents.length ? <small className="recipient-empty">Nenhum respondente encontrado para esta busca.</small>
+                        : visibleResidents.map((resident) => <label className="recipient-option" key={resident.id}><input type="checkbox" disabled={saving || !canEdit} checked={recipientIds.includes(resident.id)} onChange={() => toggleRecipient(resident.id)} /><span><strong>{resident.name}</strong><small>{resident.email}<br />{resident.organizations.filter((organization) => targets.includes(organization.id)).map((organization) => organization.name).join(', ')}</small></span></label>)}
+              </div>
+              {targets.length > 0 && !recipientLoading && eligibleResidents.length > 0 && <p id="recipient-search-summary" className="recipient-search-summary" role="status">{visibleResidents.length} respondente(s) encontrado(s)</p>}
+            </div>}
+            <p id="form-email-count" className="recipient-selection-count" aria-live="polite">{recipientIds.length} respondente(s) selecionado(s)</p>
+            {selectedResidents.length > 0 && <ul className="selected-recipients" aria-label="Respondentes selecionados">{selectedResidents.map((resident) => <li key={resident.id}><span><strong>{resident.name}</strong><small>{resident.email}</small></span><button type="button" disabled={saving || !canEdit} onClick={() => toggleRecipient(resident.id)} aria-label={`Remover respondente ${resident.name}${resident.email ? ` (${resident.email})` : ''}`}><X aria-hidden="true" /></button></li>)}</ul>}
           </div>
-          <p id="recipient-search-summary" className="recipient-search-summary" role="status">{visibleResidents.length} respondente(s) encontrado(s)</p>
-          <div id="recipient-search-results" className="recipient-list" aria-describedby={recipientError ? 'recipient-error' : undefined}>
-            {visibleResidents.map((resident) => <label className="recipient-option" key={resident.id}><input type="checkbox" disabled={saving || !canEdit} checked={recipientIds.includes(resident.id)} onChange={() => toggleRecipient(resident.id)} /><span><strong>{resident.name}</strong><small>{resident.email}<br />{resident.organizations.filter((organization) => !targets.length || targets.includes(organization.id)).map((organization) => organization.name).join(', ')}</small></span></label>)}
-            {!visibleResidents.length && <small className="recipient-empty">{scopedResidents.length && search ? 'Nenhum respondente encontrado para a busca informada.' : 'Nenhum residente elegível para as organizações selecionadas.'}</small>}
-          </div>
-          <p id="form-email-count" className="recipient-selection-count" aria-live="polite">{recipientIds.length} respondente(s) selecionado(s)</p>
-          {selectedResidents.length > 0 && <ul className="selected-recipients" aria-label="Respondentes selecionados">{selectedResidents.map((resident) => <li key={resident.id}><span><strong>{resident.name}</strong><small>{resident.email}</small></span><button type="button" disabled={saving || !canEdit} onClick={() => toggleRecipient(resident.id)} aria-label={`Remover respondente ${resident.name}${resident.email ? ` (${resident.email})` : ''}`}><X aria-hidden="true" /></button></li>)}</ul>}
           {recipientError && <p id="recipient-error" className="error" role="alert">{recipientError}</p>}
           <small>O formulário pode ser salvo sem selecionar respondentes.</small>
         </fieldset>

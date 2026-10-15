@@ -120,13 +120,69 @@ describe('busca e seleção explícita de respondentes', () => {
       ? `${scoped.length} respondente(s) disponível(is)`
       : 'Nenhum respondente elegível para as organizações selecionadas.');
     if (open && targetIds.length && scoped.length) {
-      fireEvent.click(within(group).getByRole('button', { name: 'Selecionar respondentes' }));
+      const trigger = within(group).getByRole('button', { name: 'Selecionar respondentes' });
+      if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
       await within(group).findByRole('searchbox', { name: 'Buscar por nome ou e-mail' });
+    }
+    if (!open) {
+      const trigger = within(group).getByRole('button', { name: 'Selecionar respondentes' });
+      if (trigger.getAttribute('aria-expanded') === 'true') fireEvent.click(trigger);
     }
     return within(group).queryByRole('searchbox', { name: 'Buscar por nome ou e-mail' });
   };
   const query = (input, value) => fireEvent.change(input, { target: { value } });
   const emailOption = () => screen.getByRole('checkbox', { name: /Enviar formulário por e-mail/ });
+
+  it('opens the eligible options automatically after selecting an organization', async () => {
+    await openPicker({ targets: [], open: false });
+    fireEvent.click(await screen.findByRole('checkbox', { name: /^Empresa XPTO/ }));
+    const maria = await screen.findByRole('checkbox', { name: /Maria Silva/ });
+    expect(screen.getByRole('button', { name: 'Selecionar respondentes' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('searchbox').value).toBe('');
+    expect(maria.closest('label').textContent).toContain(residents[0].name);
+    expect(maria.closest('label').textContent).toContain(residents[0].email);
+    expect(maria.closest('label').textContent).toContain(organizations[0].name);
+    expect(maria.closest('label').textContent).not.toContain('org-a');
+    expect(screen.queryByRole('checkbox', { name: /Jo.o Souza/ })).toBeNull();
+    expect(api.getEligibleFormRecipients).toHaveBeenCalledWith(['org-a']);
+  });
+
+  it('uses only the latest backend eligibility response after organization changes', async () => {
+    await openPicker({ targets: [], open: false });
+    let resolveFirst;
+    let resolveLatest;
+    api.getEligibleFormRecipients.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveLatest = resolve; }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /^Empresa XPTO/ }));
+    await waitFor(() => expect(resolveFirst).toBeTypeOf('function'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Universidade ABC/ }));
+    await waitFor(() => expect(resolveLatest).toBeTypeOf('function'));
+    await act(async () => resolveLatest([residents[1]]));
+    expect(screen.getByRole('checkbox', { name: /Jo.o Souza/ })).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: /Lucas Lima/ })).toBeNull();
+    await act(async () => resolveFirst([residents[0]]));
+    expect(screen.queryByRole('checkbox', { name: /Maria Silva/ })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: /Jo.o Souza/ })).toBeTruthy();
+  });
+
+  it('clears the list and email intent even if an obsolete request finishes later', async () => {
+    await openPicker({ targets: ['org-a'] });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Maria Silva/ }));
+    fireEvent.click(emailOption());
+    let resolvePending;
+    api.getEligibleFormRecipients.mockImplementationOnce(() => new Promise((resolve) => { resolvePending = resolve; }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Universidade ABC/ }));
+    await waitFor(() => expect(resolvePending).toBeTypeOf('function'));
+    expect(screen.queryByRole('checkbox', { name: /Maria Silva/ })).toBeNull();
+    fireEvent.click(await screen.findByRole('checkbox', { name: /^Empresa XPTO/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Universidade ABC/ }));
+    await act(async () => resolvePending(residents));
+    expect(screen.queryByRole('checkbox', { name: /Maria Silva/ })).toBeNull();
+    expect(screen.queryByRole('list')).toBeNull();
+    expect(emailOption().checked).toBe(false);
+    expect(emailOption().disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Selecionar respondentes' }).disabled).toBe(true);
+  });
 
   it('mostra a lista completa ao abrir, sem exigir busca, e exibe disponibilidade antes de filtrar', async () => {
     const input = await openPicker();
@@ -258,7 +314,9 @@ describe('busca e seleção explícita de respondentes', () => {
     expect(screen.getByText('1 respondente(s) selecionado(s)')).toBeTruthy();
     expect(emailOption().checked).toBe(true);
     await screen.findByText('2 respondente(s) disponível(is)');
-    fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    if (screen.getByRole('button', { name: 'Selecionar respondentes' }).getAttribute('aria-expanded') !== 'true') {
+      fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    }
     const filteredInput = await screen.findByRole('searchbox', { name: 'Buscar por nome ou e-mail' });
     query(filteredInput, 'universidade.example');
     expect(screen.getByRole('checkbox', { name: /João Souza/ })).toBeTruthy();
@@ -276,7 +334,9 @@ describe('busca e seleção explícita de respondentes', () => {
     fireEvent.click(emailOption());
     fireEvent.click(screen.getByRole('checkbox', { name: /^Empresa XPTO/ }));
     await screen.findByText('2 respondente(s) disponível(is)');
-    fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    if (screen.getByRole('button', { name: 'Selecionar respondentes' }).getAttribute('aria-expanded') !== 'true') {
+      fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    }
     const lucas = screen.getByRole('checkbox', { name: /Lucas Lima/ });
     expect(lucas.checked).toBe(true);
     expect(lucas.closest('label').textContent).toContain('Universidade ABC');
@@ -407,7 +467,9 @@ describe('salvamento e envio de formulários', () => {
     fireEvent.change(screen.getByPlaceholderText('Texto da pergunta'), { target: { value: 'Sua resposta' } });
     fireEvent.change(screen.getByLabelText('Início'), { target: { value: '2026-10-01' } });
     fireEvent.change(screen.getByLabelText('Fim'), { target: { value: '2026-12-31' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    if (screen.getByRole('button', { name: 'Selecionar respondentes' }).getAttribute('aria-expanded') !== 'true') {
+      fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    }
     fireEvent.click(await screen.findByRole('checkbox', { name: /Ana/ }));
     if (sendEmail) fireEvent.click(screen.getByRole('checkbox', { name: /Enviar formulário por e-mail/ }));
   };
@@ -710,7 +772,9 @@ describe('salvamento e envio de formulários', () => {
     await open();
     fireEvent.click(await screen.findByRole('checkbox', { name: /Empresa A/ }));
     await screen.findByText('2 respondente(s) disponível(is)');
-    fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    if (screen.getByRole('button', { name: 'Selecionar respondentes' }).getAttribute('aria-expanded') !== 'true') {
+      fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    }
     fireEvent.click(await screen.findByRole('checkbox', { name: /Ana/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Bia/ }));
     const email = screen.getByRole('checkbox', { name: /Enviar formulário por e-mail/ });
@@ -736,7 +800,9 @@ describe('salvamento e envio de formulários', () => {
     await open();
     fireEvent.click(await screen.findByRole('checkbox', { name: /Empresa A/ }));
     await screen.findByText('1 respondente(s) disponível(is)');
-    fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    if (screen.getByRole('button', { name: 'Selecionar respondentes' }).getAttribute('aria-expanded') !== 'true') {
+      fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    }
     fireEvent.click(await screen.findByRole('checkbox', { name: /Ana/ }));
     const email = screen.getByRole('checkbox', { name: /Enviar formulário por e-mail/ });
     fireEvent.click(email);
@@ -755,7 +821,9 @@ describe('salvamento e envio de formulários', () => {
     api.getEligibleFormRecipients.mockResolvedValue([{ id: 'resident-1', name: 'Ana', email: 'ana@example.com', organizations: [{ id: 'org-1', name: 'Empresa A' }] }]);
     await open(true);
     await screen.findByText('1 respondente(s) disponível(is)');
-    fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    if (screen.getByRole('button', { name: 'Selecionar respondentes' }).getAttribute('aria-expanded') !== 'true') {
+      fireEvent.click(screen.getByRole('button', { name: 'Selecionar respondentes' }));
+    }
     await screen.findByRole('checkbox', { name: /Ana/ });
     expect(screen.getByRole('checkbox', { name: /Ana/ }).checked).toBe(true);
     expect(screen.getByRole('checkbox', { name: /Enviar formulário por e-mail/ }).checked).toBe(false);

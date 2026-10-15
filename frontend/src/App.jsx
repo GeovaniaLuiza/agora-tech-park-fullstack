@@ -182,7 +182,7 @@ function Create() {
   }, [recipientPickerOpen]);
   const recipientLoading = targets.length > 0
     && (targets.length !== loadedRecipientOrganizations.length || targets.some((id, index) => loadedRecipientOrganizations[index] !== id));
-  const eligibleResidents = targets.length ? residents : [];
+  const eligibleResidents = targets.length && !recipientLoading ? residents : [];
   const search = normalizeRecipientSearch(recipientSearch.trim());
   const visibleResidents = eligibleResidents.filter((resident) => normalizeRecipientSearch(`${resident.name} ${resident.email}`).includes(search));
   const selectedResidents = recipientIds.map((id) => residents.find((resident) => resident.id === id)
@@ -192,7 +192,8 @@ function Create() {
     setLoadedRecipientOrganizations([]);
     setTargets(next);
     setRecipientSearch('');
-    setRecipientPickerOpen(false);
+    setRecipientPickerOpen(next.length > 0);
+    if (!next.length) setResidents([]);
     selectRecipients(next.length ? recipientIds.filter((id) => residents.find((resident) => resident.id === id)?.organizations.some((organization) => next.includes(organization.id))) : []);
   };
   const canEdit = formStatus === 'DRAFT';
@@ -353,11 +354,7 @@ function Create() {
                 {recipientSearch && <button type="button" disabled={saving || !canEdit} onClick={() => setRecipientSearch('')} aria-label="Limpar busca de respondentes"><X aria-hidden="true" /></button>}
               </div>
               <div id="recipient-picker-options" className="recipient-list" role="group" aria-labelledby="recipient-picker-label" aria-describedby={recipientError ? 'recipient-error' : undefined}>
-                {!targets.length
-                  ? <small className="recipient-empty">Selecione ao menos uma organização destinatária para visualizar os respondentes.</small>
-                  : recipientLoading ? <small className="recipient-empty">Carregando respondentes elegíveis...</small>
-                    : !eligibleResidents.length ? <small className="recipient-empty">Nenhum respondente elegível para as organizações selecionadas.</small>
-                      : !visibleResidents.length ? <small className="recipient-empty">Nenhum respondente encontrado para esta busca.</small>
+                {eligibleResidents.length > 0 && !visibleResidents.length ? <small className="recipient-empty">Nenhum respondente encontrado para esta busca.</small>
                         : visibleResidents.map((resident) => <label className="recipient-option" key={resident.id}><input type="checkbox" disabled={saving || !canEdit} checked={recipientIds.includes(resident.id)} onChange={() => toggleRecipient(resident.id)} /><span><strong>{resident.name}</strong><small>{resident.email}<br />{resident.organizations.filter((organization) => targets.includes(organization.id)).map((organization) => organization.name).join(', ')}</small></span></label>)}
               </div>
               {targets.length > 0 && !recipientLoading && eligibleResidents.length > 0 && <p id="recipient-search-summary" className="recipient-search-summary" role="status">{visibleResidents.length} respondente(s) encontrado(s)</p>}

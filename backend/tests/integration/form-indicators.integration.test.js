@@ -15,7 +15,7 @@ describe('formulário alimenta indicadores', () => {
       const user = (await client.query("INSERT INTO users(name,email,password_hash,role,status) VALUES('Test','form-indicator@integration.invalid','unused','RESIDENTE','ACTIVE') RETURNING id")).rows[0];
       const form = (await client.query("INSERT INTO forms(title,created_by) VALUES('Test',$1) RETURNING id", [user.id])).rows[0];
       const question = (await client.query("INSERT INTO questions(form_id,label,type) VALUES($1,'Test','NUMBER') RETURNING id", [form.id])).rows[0];
-      const responseId = (await client.query("INSERT INTO responses(form_id,organization_id,answered_by,status) VALUES($1,$2,$3,'SUBMITTED') RETURNING id", [form.id, organization.id, user.id])).rows[0].id;
+      const responseId = (await client.query("INSERT INTO responses(form_id,organization_id,respondent_user_id,answered_by,status) VALUES($1,$2,$3,$3,'SUBMITTED') RETURNING id", [form.id, organization.id, user.id])).rows[0].id;
       const base = { responseId, organizationId: organization.id, centerId: center.id,
         year: 2199, month: 5, userId: null };
 

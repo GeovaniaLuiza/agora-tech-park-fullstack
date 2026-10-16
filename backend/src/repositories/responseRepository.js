@@ -31,10 +31,19 @@ async function persist({ formId, organizationId, userId, answers, submit, proces
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`response:${formId}:${organizationId}`]);
-    const current = await client.query(
-      `SELECT id,status FROM responses WHERE form_id=$1 AND organization_id=$2 FOR UPDATE`,
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`response:${formId}:${organizationId}:${userId}`]);
+    // Unassigned history must be reconciled explicitly before another contribution.
+    const legacy = await client.query(
+      'SELECT id FROM responses WHERE form_id=$1 AND organization_id=$2 AND respondent_user_id IS NULL FOR UPDATE',
       [formId, organizationId],
+    );
+    if (legacy.rows.length) {
+      await client.query('ROLLBACK');
+      return { legacyConflict: true };
+    }
+    const current = await client.query(
+      `SELECT id,status FROM responses WHERE form_id=$1 AND organization_id=$2 AND respondent_user_id=$3 FOR UPDATE`,
+      [formId, organizationId, userId],
     );
     if (current.rows[0]?.status === 'SUBMITTED') {
       await client.query('ROLLBACK');
@@ -43,8 +52,8 @@ async function persist({ formId, organizationId, userId, answers, submit, proces
     let responseId = current.rows[0]?.id;
     if (!responseId) {
       const created = await client.query(
-        `INSERT INTO responses(form_id,organization_id,answered_by,status,submitted_at)
-         VALUES($1,$2,$3,$4::varchar,CASE WHEN $4::varchar='SUBMITTED' THEN NOW() END) RETURNING id`,
+        `INSERT INTO responses(form_id,organization_id,respondent_user_id,answered_by,status,submitted_at)
+         VALUES($1,$2,$3,$3,$4::varchar,CASE WHEN $4::varchar='SUBMITTED' THEN NOW() END) RETURNING id`,
         [formId, organizationId, userId, submit ? 'SUBMITTED' : 'DRAFT'],
       );
       responseId = created.rows[0].id;
@@ -84,7 +93,8 @@ export async function reopen(responseId, userId, processReopen) {
     await client.query('BEGIN');
     const { rows } = await client.query(
       `UPDATE responses SET status='REOPENED',reopened_at=NOW(),reopened_by=$2
-       WHERE id=$1 AND status='SUBMITTED' RETURNING id,form_id,organization_id,status,reopened_at`,
+       WHERE id=$1 AND status='SUBMITTED' AND respondent_user_id IS NOT NULL
+       RETURNING id,form_id,organization_id,respondent_user_id,status,reopened_at`,
       [responseId, userId],
     );
     if (rows[0] && processReopen) {
@@ -99,24 +109,27 @@ export async function reopen(responseId, userId, processReopen) {
   finally { client.release(); }
 }
 
-export async function history(organizationId) {
+export async function history(organizationId, userId = null) {
   const { rows } = await query(
-    `SELECT r.id,r.form_id,f.title,r.status,r.submitted_at AS sent_at,r.updated_at
+    `SELECT r.id,r.form_id,r.respondent_user_id,f.title,r.status,r.submitted_at AS sent_at,r.updated_at
      FROM responses r JOIN forms f ON f.id=r.form_id
-     WHERE r.organization_id=$1 ORDER BY r.updated_at DESC`,
-    [organizationId],
+     WHERE r.organization_id=$1 AND ($2::uuid IS NULL OR r.respondent_user_id=$2) ORDER BY r.updated_at DESC`,
+    [organizationId, userId],
   );
   return rows;
 }
 
-export async function findByFormAndOrganization(formId, organizationId) {
+export async function findByFormAndOrganization(formId, organizationId, userId = null, responseId = null) {
   const { rows } = await query(
-    `SELECT r.id,r.form_id,r.organization_id,r.status,r.created_at,r.updated_at,
+    `SELECT r.id,r.form_id,r.organization_id,r.respondent_user_id,r.answered_by,r.status,r.created_at,r.updated_at,
       r.submitted_at,r.reopened_at
-     FROM responses r WHERE r.form_id=$1 AND r.organization_id=$2`,
-    [formId, organizationId],
+     FROM responses r WHERE r.form_id=$1 AND r.organization_id=$2
+       AND ($3::uuid IS NULL OR r.respondent_user_id=$3)
+       AND ($4::uuid IS NULL OR r.id=$4)`,
+    [formId, organizationId, userId, responseId],
   );
-  return rows[0];
+  // Staff may inspect all respondents, but must select explicitly when ambiguous.
+  return rows.length > 1 ? { ambiguous: true } : rows[0];
 }
 
 export async function getAnswers(responseId) {

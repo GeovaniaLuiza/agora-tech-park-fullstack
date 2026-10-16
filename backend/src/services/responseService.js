@@ -69,6 +69,7 @@ async function write(formId, body, user, submit) {
       return indicatorsUpdated;
     } : null,
   });
+  if (result.legacyConflict) throw serviceError(409, 'Esta organização possui uma resposta histórica sem proprietário confirmado. Solicite revisão administrativa.', 'LEGACY_RESPONSE_REVIEW_REQUIRED');
   if (result.conflict) throw serviceError(409, 'A resposta já foi enviada e precisa ser reaberta antes de ser alterada', 'RESPONSE_ALREADY_SUBMITTED');
   if (submit) responsesSubmitted.inc();
   if (!submit) await record({ userId: user.sub, action: 'RESPONSE_DRAFT_SAVED', entity: 'response',
@@ -81,12 +82,13 @@ export const submit = (formId, body, user) => write(formId, body, user, true);
 
 export async function history(organizationId, user) {
   await assertOrganizationAccess(user, organizationId);
-  return responses.history(organizationId);
+  return responses.history(organizationId, user.role === 'RESIDENTE' ? user.sub : null);
 }
 
-export async function get(formId, organizationId, user) {
+export async function get(formId, organizationId, user, responseId = null) {
   await assertOrganizationAccess(user, organizationId);
-  const response = await responses.findByFormAndOrganization(formId, organizationId);
+  const response = await responses.findByFormAndOrganization(formId, organizationId, user.role === 'RESIDENTE' ? user.sub : null, responseId);
+  if (response?.ambiguous) throw serviceError(409, 'Selecione uma resposta pelo identificador para consultar este formulário.', 'RESPONSE_SELECTION_REQUIRED');
   if (!response) throw serviceError(404, 'Resposta não encontrada', 'RESPONSE_NOT_FOUND');
   return { ...response, answers: await responses.getAnswers(response.id) };
 }

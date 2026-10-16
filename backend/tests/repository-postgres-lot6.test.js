@@ -259,7 +259,7 @@ describe('repository de formularios com PostgreSQL real', () => {
     await forms.markResponded(form.id, residentId);
     expect((await forms.respondent(form.id, residentId)).status).toBe('RESPONDED');
 
-    await setup.query("INSERT INTO responses(form_id,organization_id,answered_by,status) VALUES($1,$2,$3,'SUBMITTED')", [form.id, organizationId, residentId]);
+    await setup.query("INSERT INTO responses(form_id,organization_id,respondent_user_id,answered_by,status) VALUES($1,$2,$3,$3,'SUBMITTED')", [form.id, organizationId, residentId]);
     expect(await forms.progress(form.id)).toMatchObject({ recipients: 1, submitted: 1 });
     expect((await forms.questions(form.id)).map((item) => item.label)).toEqual(['Quantidade?', 'Escolha']);
   });

@@ -111,6 +111,23 @@ describe('responseService lote 2', () => {
     await expect(submit(formId, { organizationId, answers: [{ questionId: 'text', value: 'Ana' }] }, resident)).rejects.toMatchObject({ code: 'RESPONSE_ALREADY_SUBMITTED' });
   });
 
+  it('scopes resident reads and history to the authenticated identity and keeps staff access explicit', async () => {
+    await get(formId, organizationId, resident, 'response-1');
+    expect(mocks.responses.findByFormAndOrganization).toHaveBeenCalledWith(formId, organizationId, resident.sub, 'response-1');
+    await history(organizationId, resident);
+    expect(mocks.responses.history).toHaveBeenCalledWith(organizationId, resident.sub);
+    await history(organizationId, manager);
+    expect(mocks.responses.history).toHaveBeenCalledWith(organizationId, null);
+    mocks.responses.findByFormAndOrganization.mockResolvedValueOnce({ ambiguous: true });
+    await expect(get(formId, organizationId, manager)).rejects.toMatchObject({ status: 409, code: 'RESPONSE_SELECTION_REQUIRED' });
+  });
+
+  it('does not claim unresolved history when saving or submitting', async () => {
+    mocks.responses.submit.mockResolvedValueOnce({ legacyConflict: true });
+    await expect(submit(formId, { organizationId, answers: [{ questionId: 'text', value: 'Ana' }] }, resident))
+      .rejects.toMatchObject({ status: 409, code: 'LEGACY_RESPONSE_REVIEW_REQUIRED' });
+  });
+
   it('protege histórico e consulta, incluindo resposta inexistente', async () => {
     mocks.users.hasOrganization.mockResolvedValueOnce(false);
     await expect(history(organizationId, resident)).rejects.toMatchObject({ code: 'FORBIDDEN' });

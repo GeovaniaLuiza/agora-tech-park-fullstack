@@ -91,6 +91,40 @@ const questionTypes = [[Type, 'Texto', 'TEXT'], [Hash, 'Número', 'NUMBER'], [Li
 const emptyQuestion = (type = 'TEXT') => ({ label: '', type, required: true, options: '', indicatorId: '' });
 const normalizeRecipientSearch = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
 
+function formValidation(form, questions, centerId, shouldPublish) {
+  const invalid = (message, fields) => ({ message, fields });
+  const title = form.title.trim();
+  const filledQuestions = questions.filter((question) => question.label.trim());
+  if (title.length < 3) {
+    return invalid('Informe um título com pelo menos 3 caracteres.', ['title']);
+  }
+  if (questions.some((question) => question.label.trim() && question.label.trim().length < 3)) {
+    return invalid('Toda pergunta preenchida deve ter pelo menos 3 caracteres.', questions.flatMap((question, index) => question.label.trim() && question.label.trim().length < 3 ? [`question-${index}`] : []));
+  }
+  if (shouldPublish && !filledQuestions.length) {
+    return invalid('Inclua ao menos uma pergunta antes de enviar.', questions.map((_, index) => `question-${index}`));
+  }
+  if (shouldPublish && (!form.startDate || !form.endDate)) {
+    return invalid('Defina as datas de início e fim antes de enviar.', [!form.startDate && 'startDate', !form.endDate && 'endDate'].filter(Boolean));
+  }
+  if (form.startDate && form.endDate && form.startDate > form.endDate) {
+    return invalid('A data final deve ser igual ou posterior à data inicial.', ['startDate', 'endDate']);
+  }
+  if (filledQuestions.some((question) => question.type === 'OPTION' && !question.options.split(',').some((value) => value.trim()))) {
+    return invalid('Informe ao menos uma opção para cada pergunta de escolha.', questions.flatMap((question, index) => question.label.trim() && question.type === 'OPTION' && !question.options.split(',').some((value) => value.trim()) ? [`options-${index}`] : []));
+  }
+  if ((form.indicatorMonth || (shouldPublish && filledQuestions.some((question) => question.indicatorId)))
+      && (!centerId || !form.indicatorYear || !form.indicatorMonth)) {
+    return invalid('Para coletar indicadores, informe o Centro de Inovação, o ano e o mês de referência.', [!centerId && 'center', !form.indicatorYear && 'year', !form.indicatorMonth && 'month'].filter(Boolean));
+  }
+  return null;
+}
+
+function FormEditorRoute() {
+  const { formId } = useParams();
+  return <Create key={formId || 'new'} />;
+}
+
 function Create() {
   const { formId } = useParams();
   const navigate = useNavigate();
@@ -197,7 +231,10 @@ function Create() {
     selectRecipients(next.length ? recipientIds.filter((id) => residents.find((resident) => resident.id === id)?.organizations.some((organization) => next.includes(organization.id))) : []);
   };
   const canEdit = formStatus === 'DRAFT';
-  const canSendEmail = canEdit && recipientIds.length > 0;
+  const canSendEmail = canEdit && !recipientLoading && targets.length > 0
+    && targets.every((id) => organizations.some((organization) => organization.id === id && organization.status !== 'INACTIVE'))
+    && recipientIds.length > 0 && recipientIds.every((id) => eligibleResidents.some((resident) => resident.id === id));
+  const canSaveAndSend = canSendEmail && emailInvitations && !formValidation(form, questions, centerId, true);
   const selectRecipients = (selected) => {
     setRecipientIds(selected);
     setRecipientError('');
@@ -210,7 +247,6 @@ function Create() {
   const save = async (shouldPublish) => {
     if (savingRef.current || !canEdit) return;
     setError(''); setRecipientError(''); setInvalidFields([]);
-    const invalid = (message, fields) => { setError(message); setInvalidFields(fields); };
     if (shouldPublish && !recipientIds.length) {
       setRecipientError('Selecione ao menos um respondente para enviar o formulário.');
       return;
@@ -219,37 +255,14 @@ function Create() {
       setRecipientError('Marque o envio de convite por e-mail antes de enviar o formulário.');
       return;
     }
+    const validation = formValidation(form, questions, centerId, shouldPublish);
+    if (validation) {
+      setError(validation.message);
+      setInvalidFields(validation.fields);
+      return;
+    }
     const title = form.title.trim();
     const filledQuestions = questions.filter((question) => question.label.trim());
-    if (title.length < 3) {
-      invalid('Informe um título com pelo menos 3 caracteres.', ['title']);
-      return;
-    }
-    if (questions.some((question) => question.label.trim() && question.label.trim().length < 3)) {
-      invalid('Toda pergunta preenchida deve ter pelo menos 3 caracteres.', questions.flatMap((question, index) => question.label.trim() && question.label.trim().length < 3 ? [`question-${index}`] : []));
-      return;
-    }
-    if (shouldPublish && !filledQuestions.length) {
-      invalid('Inclua ao menos uma pergunta antes de enviar.', questions.map((_, index) => `question-${index}`));
-      return;
-    }
-    if (shouldPublish && (!form.startDate || !form.endDate)) {
-      invalid('Defina as datas de início e fim antes de enviar.', [!form.startDate && 'startDate', !form.endDate && 'endDate'].filter(Boolean));
-      return;
-    }
-    if (form.startDate && form.endDate && form.startDate > form.endDate) {
-      invalid('A data final deve ser igual ou posterior à data inicial.', ['startDate', 'endDate']);
-      return;
-    }
-    if (filledQuestions.some((question) => question.type === 'OPTION' && !question.options.split(',').some((value) => value.trim()))) {
-      invalid('Informe ao menos uma opção para cada pergunta de escolha.', questions.flatMap((question, index) => question.label.trim() && question.type === 'OPTION' && !question.options.split(',').some((value) => value.trim()) ? [`options-${index}`] : []));
-      return;
-    }
-    if ((form.indicatorMonth || (shouldPublish && filledQuestions.some((question) => question.indicatorId)))
-        && (!centerId || !form.indicatorYear || !form.indicatorMonth)) {
-      invalid('Para coletar indicadores, informe o Centro de Inovação, o ano e o mês de referência.', [!centerId && 'center', !form.indicatorYear && 'year', !form.indicatorMonth && 'month'].filter(Boolean));
-      return;
-    }
     savingRef.current = true;
     setSaving(true);
     try {
@@ -276,6 +289,7 @@ function Create() {
           }
         }
       }
+      await saveFormAudience(saved.id, targets, recipientIds);
       let formMessage = 'Formulário salvo com sucesso.';
       if (shouldPublish) {
         const published = await publishForm(saved.id, targets, recipientIds);
@@ -283,8 +297,6 @@ function Create() {
         formMessage = summary.failed
           ? `Formulário salvo. ${summary.sent} convites enviados e ${summary.failed} falharam.`
           : `Formulário salvo e enviado para ${summary.sent} respondente(s).`;
-      } else {
-        await saveFormAudience(saved.id, targets, recipientIds);
       }
       navigate('/forms', { state: { formMessage } });
     } catch (reason) {
@@ -369,7 +381,7 @@ function Create() {
         <fieldset className={`form-delivery ${emailInvitations && canSendEmail ? 'enabled' : ''}`}>
           <legend>ENVIO DO FORMULÁRIO</legend>
           <label className="form-delivery-option" htmlFor="send-form-email">
-            <input id="send-form-email" type="checkbox" checked={emailInvitations && canSendEmail} disabled={saving || !canSendEmail} onChange={(event) => setEmailInvitations(event.target.checked)} aria-describedby="form-email-help form-email-count form-email-availability" />
+            <input id="send-form-email" type="checkbox" checked={emailInvitations} disabled={saving || !canSendEmail} onChange={(event) => setEmailInvitations(event.target.checked)} aria-describedby="form-email-help form-email-count form-email-availability" />
             <span>Enviar formulário por e-mail aos respondentes selecionados</span>
           </label>
           <p id="form-email-help">Os respondentes receberão um e-mail com link direto para acessar e responder o formulário.</p>
@@ -395,7 +407,7 @@ function Create() {
       <footer className="toolbar builder-actions" aria-label="Ações do formulário">
         <Button type="button" variant="secondary" disabled={saving} onClick={() => navigate('/forms')}>Cancelar</Button>
         <Button type="button" variant={emailInvitations && canSendEmail ? 'secondary' : 'primary'} disabled={saving || !canEdit} onClick={() => save(false)}>{saving ? 'Salvando...' : formId ? 'Salvar alterações' : 'Salvar formulário'}</Button>
-        <Button type="button" variant={emailInvitations && canSendEmail ? 'primary' : 'secondary'} disabled={saving || !canSendEmail || !emailInvitations} onClick={() => save(true)}>Salvar e enviar</Button>
+        <Button type="button" variant={emailInvitations && canSendEmail ? 'primary' : 'secondary'} disabled={saving || !canSaveAndSend} onClick={() => save(true)}>Salvar e enviar</Button>
       </footer>
     </main>
     <aside className="panel preview"><h4>PRÉ-VISUALIZAÇÃO</h4><div className="preview-scroll"><strong>{form.title || 'Novo formulário'}</strong><small>{questions.length} pergunta(s)</small>{questions.map((question, index) => <label key={question.id || index}>{question.label || 'Pergunta sem título'}<input disabled aria-label={`Pré-visualização da pergunta ${index + 1}`} /></label>)}</div></aside>
@@ -530,7 +542,7 @@ export default function App() {
     <Route element={<ProtectedRoute />}><Route path="/unauthorized" element={<Unauthorized />} /><Route path="/unknown-profile" element={<UnknownProfile />} /><Route path="/" element={<HomeRedirect />} />
       <Route element={<AppShell />}>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/dashboard" element={<DashboardPage />} /></Route>
-        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/pesquisa" element={<Navigate to="/forms" replace />} /><Route path="/forms" element={<Forms />} /><Route path="/forms/new" element={<Create />} /><Route path="/forms/:formId/edit" element={<Create />} /></Route>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/pesquisa" element={<Navigate to="/forms" replace />} /><Route path="/forms" element={<Forms />} /><Route path="/forms/new" element={<FormEditorRoute />} /><Route path="/forms/:formId/edit" element={<FormEditorRoute />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/indicators" element={<IndicatorsPage />} /><Route path="/indicadores" element={<IndicatorsRedirect />} /></Route><Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR']} />}><Route path="/organizations" element={<Residents />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicators/catalog" element={<IndicatorCatalogPage />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicadores/importar-eventos" element={<IndicatorImportPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/importar-residentes" element={<IndicatorImportPage key="RESIDENTS" type="RESIDENTS" />} /><Route path="/indicadores/eventos" element={<ImportedIndicatorsPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/residentes" element={<ImportedIndicatorsPage key="RESIDENTS" type="RESIDENTS" />} /></Route>

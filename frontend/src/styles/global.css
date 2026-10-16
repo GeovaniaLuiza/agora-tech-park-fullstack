@@ -31,7 +31,19 @@
 @media(max-width:1100px){.institutional-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-filters{grid-template-columns:repeat(3,1fr)}.dashboard-filters>span{grid-column:1/-1}.dashboard-skeleton{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:800px){.dashboard-page-head,.dashboard-head-actions{align-items:flex-start;flex-direction:column}.dashboard-chart-grid{grid-template-columns:1fr}.dashboard-filters{grid-template-columns:repeat(2,1fr)}.dashboard-head-actions{gap:8px}}
 @media(max-width:520px){.institutional-grid,.dashboard-filters,.dashboard-skeleton{grid-template-columns:1fr}.dashboard-page-head h2{font-size:21px}.dashboard-head-actions,.dashboard-head-actions .button{width:100%}.dashboard-chart-card>header{display:block}.chart-legend{justify-content:flex-start;margin-top:10px}.dashboard-filters>span{grid-column:auto}}
-.capacitation-chart{min-width:0}.capacitation-chart>label{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin-bottom:7px;color:#5c697d;font-size:10px}.capacitation-chart select{border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px;color:#243149}
+.executive-dashboard{grid-template-columns:minmax(0,1fr)}
+.dashboard-chart-grid{align-items:stretch}
+.dashboard-chart-card{display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0;height:100%}
+.dashboard-chart-card>header{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;min-width:0}
+.chart-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;min-width:0}
+.chart-header-row>h3{flex:1;min-width:0;overflow-wrap:anywhere}
+.chart-header-row>.chart-legend{max-width:55%;margin-top:0}
+.dashboard-chart-card header p{margin-top:0}
+.dashboard-chart-card>.dashboard-chart{min-width:0;align-self:stretch}
+.dashboard-chart-card>.chart-accessible-summary{align-self:start}
+.capacitation-metric{display:flex;align-items:center;flex:0 1 65%;gap:7px;min-width:0;margin:0;color:#5c697d;font-size:10px}
+.capacitation-metric select{flex:1;min-width:0;max-width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px;color:#243149}
+@media(max-width:520px){.chart-header-row{flex-wrap:wrap}.capacitation-metric{flex-basis:100%}.chart-header-row>.chart-legend{max-width:100%}}
 .indicator-details{display:grid;gap:7px;margin:12px 0}.indicator-details>div{display:flex;justify-content:space-between;gap:12px;padding-top:7px;border-top:1px solid var(--line);font-size:10px}.indicator-details span{color:var(--muted);text-align:right}
 
 /* Identidade visual consolidada a partir das referências img-1 a img-7. */

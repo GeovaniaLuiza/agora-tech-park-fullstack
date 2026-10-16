@@ -68,6 +68,58 @@ afterEach(async () => {
 afterAll(shutdown);
 
 describe('form indicator contributions with real PostgreSQL in CI coverage', () => {
+  it.each([false, true])('reads the authenticated resident response with explicit responseId=%s', async (explicitId) => {
+    const draft = await service.saveDraft(ids.form, body('17'), resident);
+    const token = `Bearer ${jwt.sign({ sub: ids.resident }, process.env.JWT_SECRET)}`;
+    const endpoint = `/api/forms/${ids.form}/organizations/${ids.orgA}/responses`;
+    const result = await request(app).get(explicitId ? `${endpoint}?responseId=${draft.id}` : endpoint)
+      .set('Authorization', token).expect(200);
+    expect(result.body).toMatchObject({ id: draft.id, form_id: ids.form, organization_id: ids.orgA,
+      respondent_user_id: ids.resident, answered_by: ids.resident, status: 'DRAFT' });
+    expect(result.body.answers).toEqual([expect.objectContaining({ question_id: ids.question, value: '17' })]);
+  });
+
+  it('requires staff to select one of two responses belonging to the same organization', async () => {
+    await sql('INSERT INTO users_organizations(user_id,organization_id) VALUES($1,$2)', [ids.residentB, ids.orgA]);
+    await sql('UPDATE form_respondents SET organization_id=$3 WHERE form_id=$1 AND user_id=$2', [ids.form, ids.residentB, ids.orgA]);
+    const first = await service.saveDraft(ids.form, body('10'), resident);
+    const second = await service.saveDraft(ids.form, body('20'), { sub: ids.residentB, role: 'RESIDENTE' });
+    expect(first.id).not.toBe(second.id);
+    const token = `Bearer ${jwt.sign({ sub: ids.admin }, process.env.JWT_SECRET)}`;
+    const endpoint = `/api/forms/${ids.form}/organizations/${ids.orgA}/responses`;
+    const ambiguous = await request(app).get(endpoint).set('Authorization', token).expect(409);
+    expect(ambiguous.body.code).toBe('RESPONSE_SELECTION_REQUIRED');
+    for (const [response, owner, value] of [[first, ids.resident, '10'], [second, ids.residentB, '20']]) {
+      const selected = await request(app).get(`${endpoint}?responseId=${response.id}`).set('Authorization', token).expect(200);
+      expect(selected.body).toMatchObject({ id: response.id, organization_id: ids.orgA, respondent_user_id: owner });
+      expect(selected.body.answers).toEqual([expect.objectContaining({ question_id: ids.question, value })]);
+    }
+  });
+
+  it('rejects draft and submission without changing unresolved history, answers or contributions', async () => {
+    const historical = await publish('19');
+    // Model a preserved post-migration historical row with unresolved ownership.
+    await sql('UPDATE responses SET respondent_user_id=NULL WHERE id=$1', [historical.id]);
+    const snapshot = async () => ({
+      responses: (await sql('SELECT * FROM responses WHERE form_id=$1 ORDER BY id', [ids.form])).rows,
+      answers: await responses.getAnswers(historical.id),
+      contributions: await records(),
+      values: await values(),
+    });
+    const before = await snapshot();
+    expect(before.responses).toEqual([expect.objectContaining({ id: historical.id, respondent_user_id: null })]);
+    expect(before.answers).toEqual([expect.objectContaining({ question_id: ids.question, value: '19' })]);
+    expect(before.contributions).toEqual([expect.objectContaining({ response_id: historical.id, active: true })]);
+    expect(before.values).toHaveLength(2);
+    const token = `Bearer ${jwt.sign({ sub: ids.resident }, process.env.JWT_SECRET)}`;
+    for (const method of ['put', 'post']) {
+      const endpoint = `/api/forms/${ids.form}/responses${method === 'put' ? '/draft' : ''}`;
+      const rejected = await request(app)[method](endpoint).set('Authorization', token).send(body('99')).expect(409);
+      expect(rejected.body.code).toBe('LEGACY_RESPONSE_REVIEW_REQUIRED');
+      expect(await snapshot()).toEqual(before);
+    }
+  });
+
   it.each([
     ['SUM', 10, 30, 45, 20], ['COUNT', 1, 2, 2, 1],
     ['AVERAGE', 10, 15, 22.5, 20], ['LAST_VALUE', 10, 20, 25, 20],

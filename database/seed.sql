@@ -4,7 +4,7 @@ INSERT INTO users (id, name, email, password_hash, role, status, email_verified_
 ('22222222-2222-2222-2222-222222222222', 'Geovania Francisco', 'geovania.francisco@agoratechpark.com.br', '$2a$10$X4hOPFquUUx7mrsNHSLlOOTtAdWfvsergWSjX/Nh.g.dCI0vfwptq', 'ADMIN', 'ACTIVE', NOW()),
 ('33333333-3333-3333-3333-333333333333', 'João Silva', 'joao@agoratechpark.com.br', '$2a$10$X4hOPFquUUx7mrsNHSLlOOTtAdWfvsergWSjX/Nh.g.dCI0vfwptq', 'GESTOR', 'ACTIVE', NOW()),
 ('44444444-4444-4444-4444-444444444444', 'Ana Costa', 'ana@agoratechpark.com.br', '$2a$10$X4hOPFquUUx7mrsNHSLlOOTtAdWfvsergWSjX/Nh.g.dCI0vfwptq', 'RESIDENTE', 'ACTIVE', NOW())
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Insert organizations
 INSERT INTO organizations (id, name, cnpj) VALUES 

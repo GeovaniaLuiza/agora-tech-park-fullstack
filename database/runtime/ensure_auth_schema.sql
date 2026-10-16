@@ -62,7 +62,16 @@ ALTER TABLE email_verification_tokens
   ADD CONSTRAINT email_verification_tokens_delivery_status_check
   CHECK (delivery_status IN ('PENDING', 'DELIVERED', 'FAILED'));
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower_unique ON users ((LOWER(email)));
+-- Keep compatibility with both pre-020 and migrated databases. Never recreate
+-- absolute uniqueness after soft deletion has enabled email reuse.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema=current_schema() AND table_name='users' AND column_name='deleted_at') THEN
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_live_email_lower_unique ON users (LOWER(email)) WHERE deleted_at IS NULL;
+  ELSE
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower_unique ON users (LOWER(email));
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_users_requested_cnpj ON users(requested_company_cnpj);
 CREATE INDEX IF NOT EXISTS idx_users_pending_review

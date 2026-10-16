@@ -9,6 +9,9 @@ const indicators = await import('../src/repositories/indicatorManagementReposito
 const forms = await import('../src/repositories/formRepository.js');
 const access = await import('../src/repositories/accessRepository.js');
 const organizations = await import('../src/repositories/organizationRepository.js');
+const users = await import('../src/repositories/userRepository.js');
+const passwordResets = await import('../src/repositories/passwordResetRepository.js');
+const emailVerification = await import('../src/repositories/emailVerificationRepository.js');
 
 const schema = `lot6_${randomUUID().replaceAll('-', '')}`;
 const adminId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -20,7 +23,7 @@ const tableNames = [
   'users', 'organizations', 'users_organizations', 'innovation_centers', 'indicator_definitions',
   'indicator_applicability', 'indicator_values', 'indicator_records', 'forms', 'form_organizations',
   'form_respondents', 'questions', 'question_options', 'question_indicator_links', 'responses', 'answers',
-  'audit_logs',
+  'audit_logs', 'password_reset_tokens', 'email_verification_tokens',
 ];
 
 let setup;
@@ -389,4 +392,53 @@ describe('repositories de acesso e organizacoes com PostgreSQL real', () => {
     expect(await access.setRole(randomUUID(), 'ADMIN', async () => {})).toBeNull();
     expect(await access.setStatus(randomUUID(), 'ACTIVE', adminId, async () => {})).toBeNull();
   });
+  it('deletes an identity transactionally, revokes links and tokens, and resolves reused email to a new identity', async () => {
+    const email = 'resident@lot6.invalid';
+    const reset = await passwordResets.issue(residentId);
+    const verification = await emailVerification.issue(residentId);
+    await emailVerification.markDelivered(verification.tokenId);
+    const audit = vi.fn(async (client) => {
+      await client.query("INSERT INTO audit_logs(action,entity,entity_id) VALUES('USER_DELETED','user',$1)", [residentId]);
+    });
+
+    await access.setStatus(residentId, 'INACTIVE', adminId, audit, { deleted: true });
+
+    expect(audit).toHaveBeenCalledOnce();
+    expect((await setup.query('SELECT id,email,status,deleted_at,password_hash FROM users WHERE id=$1', [residentId])).rows).toEqual([
+      { id: residentId, email, status: 'INACTIVE', deleted_at: expect.any(Date), password_hash: 'hash' },
+    ]);
+    expect((await setup.query('SELECT active,unlinked_at FROM users_organizations WHERE user_id=$1', [residentId])).rows).toEqual([
+      { active: false, unlinked_at: expect.any(Date) },
+    ]);
+    for (const table of ['password_reset_tokens', 'email_verification_tokens']) {
+      expect((await setup.query(`SELECT used_at FROM ${table} WHERE user_id=$1`, [residentId])).rows).toEqual([
+        { used_at: expect.any(Date) },
+      ]);
+    }
+    expect(await users.findByEmail(email.toUpperCase())).toBeUndefined();
+    const tokenAudit = vi.fn();
+    expect(await passwordResets.consume(reset.rawToken, 'must-not-change', tokenAudit)).toEqual({ state: 'INVALID' });
+    expect(await emailVerification.verify(verification.rawToken, tokenAudit)).toEqual({ state: 'INVALID' });
+    expect(tokenAudit).not.toHaveBeenCalled();
+
+    const created = await access.createManagedUser({
+      name: 'New Resident', email, passwordHash: 'new-password-hash', role: 'RESIDENTE', organizationId, adminId,
+    }, async () => {});
+    expect(created.id).not.toBe(residentId);
+    expect(await users.findByEmail(email.toUpperCase())).toMatchObject({ id: created.id, password_hash: 'new-password-hash' });
+    expect((await setup.query("SELECT entity_id FROM audit_logs WHERE action='USER_DELETED'")).rows).toEqual([{ entity_id: residentId }]);
+  });
+
+  it('reserves an inactive identity email case-insensitively without treating inactivation as deletion', async () => {
+    await access.setStatus(residentId, 'INACTIVE', adminId, async () => {});
+
+    expect(await users.findByEmail('RESIDENT@LOT6.INVALID')).toMatchObject({
+      id: residentId, status: 'INACTIVE', deleted_at: null,
+    });
+    await expect(access.createManagedUser({
+      name: 'Duplicate Resident', email: 'RESIDENT@LOT6.INVALID', passwordHash: 'unused', role: 'RESIDENTE', organizationId, adminId,
+    }, async () => {})).rejects.toMatchObject({ code: '23505' });
+    expect((await setup.query("SELECT id FROM users WHERE LOWER(email)='resident@lot6.invalid'")).rows).toEqual([{ id: residentId }]);
+  });
+
 });

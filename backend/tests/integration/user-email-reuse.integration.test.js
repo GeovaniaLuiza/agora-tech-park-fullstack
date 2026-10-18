@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mail = vi.hoisted(() => ({ sendPasswordReset: vi.fn() }));
+const mail = vi.hoisted(() => ({ sendPasswordReset: vi.fn(), sendInactive: vi.fn() }));
 vi.mock('../../src/services/emailService.js', () => mail);
 import app from '../../src/app.js';
 import { pool, shutdown } from '../../src/db/pool.js';
@@ -21,11 +21,13 @@ let email;
 let ids;
 let formId;
 const authorization = (id) => ({ Authorization: `Bearer ${jwt.sign({ sub: id }, process.env.JWT_SECRET)}` });
-const create = () => request(app).post('/api/admin/users').set(authorization(adminId))
-  .send({ name: 'New Resident', email: email.toUpperCase(), role: 'RESIDENTE', organizationId });
+const roles = ['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE'];
+const create = (role = 'RESIDENTE', value = email.toUpperCase()) => request(app).post('/api/admin/users').set(authorization(adminId))
+  .send({ name: 'New User', email: value, role, organizationId: role === 'RESIDENTE' ? organizationId : null });
 
 beforeEach(async () => {
   mail.sendPasswordReset.mockReset().mockResolvedValue({ accepted: true });
+  mail.sendInactive.mockReset().mockResolvedValue({ accepted: true });
   adminId = randomUUID(); organizationId = randomUUID(); ids = [adminId]; formId = null;
   email = `${randomUUID()}@reuse.invalid`;
   await sql(`INSERT INTO users(id,name,email,password_hash,role,status,email_verified_at)
@@ -43,17 +45,17 @@ afterEach(async () => {
 afterAll(shutdown);
 
 describe('email uniqueness for non-deleted accounts', () => {
-  it.each(['ACTIVE', 'INACTIVE', 'PENDING', 'EMAIL_PENDING', 'REJECTED'])('reserves email for %s accounts, ignoring case', async (status) => {
+  it.each(roles.flatMap((role) => ['ACTIVE', 'INACTIVE', 'PENDING', 'EMAIL_PENDING', 'REJECTED'].map((status) => [role, status])))('reserves email for %s / %s accounts, ignoring case', async (role, status) => {
     await sql(`INSERT INTO users(name,email,password_hash,role,status,email_verified_at)
-      VALUES('Existing',$1,'unused','RESIDENTE',$2,NOW())`, [email, status]);
-    const response = await create();
+      VALUES('Existing',$1,'unused',$2,$3,NOW())`, [email, role, status]);
+    const response = await create(role);
     expect(response.status).toBe(409);
     expect(response.body.code).toBe('EMAIL_ALREADY_EXISTS');
     expect(mail.sendPasswordReset).not.toHaveBeenCalled();
   });
 
-  it('reuses the email with a new identity, preserving history and isolating credentials', async () => {
-    const first = await create();
+  it.each(roles)('%s reuses the email with a new identity, preserving history and isolating credentials', async (role) => {
+    const first = await create(role, email.replace('@reuse.invalid', '@Reuse.Invalid'));
     expect(first.status).toBe(201);
     const oldId = first.body.id;
     ids.push(oldId);
@@ -62,15 +64,20 @@ describe('email uniqueness for non-deleted accounts', () => {
     await verification.markDelivered(oldVerification.tokenId);
     formId = (await sql("INSERT INTO forms(title,created_by) VALUES('Historical form',$1) RETURNING id", [oldId])).rows[0].id;
     await sql("INSERT INTO notifications(user_id,title,message) VALUES($1,'History','Keep me')", [oldId]);
+    // Exercise the same status endpoint as the administration screen.
+    await request(app).patch(`/api/admin/users/${oldId}/status`).set(authorization(adminId)).send({ status: 'INACTIVE' }).expect(200);
+    expect((await sql('SELECT deleted_at FROM users WHERE id=$1', [oldId])).rows[0].deleted_at).toBeNull();
+    expect((await create(role)).status).toBe(409);
     await request(app).delete(`/api/admin/users/${oldId}`).set(authorization(adminId)).expect(204);
     const old = (await sql('SELECT email,status,deleted_at FROM users WHERE id=$1', [oldId])).rows[0];
     expect(old).toMatchObject({ email, status: 'INACTIVE', deleted_at: expect.any(Date) });
     expect((await sql('SELECT created_by FROM forms WHERE id=$1', [formId])).rows[0].created_by).toBe(oldId);
     expect((await sql('SELECT user_id FROM notifications WHERE user_id=$1', [oldId])).rowCount).toBe(1);
-    expect((await sql('SELECT active FROM users_organizations WHERE user_id=$1', [oldId])).rows[0].active).toBe(false);
+    const oldLinks = (await sql('SELECT active FROM users_organizations WHERE user_id=$1', [oldId])).rows;
+    expect(oldLinks).toEqual(role === 'RESIDENTE' ? [{ active: false }] : []);
     expect((await sql("SELECT action FROM audit_logs WHERE entity_id=$1 AND action='USER_DELETED'", [oldId])).rowCount).toBe(1);
     await access.linkOrganization(oldId, organizationId);
-    expect((await sql('SELECT active FROM users_organizations WHERE user_id=$1', [oldId])).rows[0].active).toBe(false);
+    expect((await sql('SELECT active FROM users_organizations WHERE user_id=$1', [oldId])).rows).toEqual(oldLinks);
     expect(await users.findByEmail(email)).toBeUndefined();
     expect(await users.findPublicProfile(oldId)).toBeNull();
     expect((await access.listUsers()).some(({ id }) => id === oldId)).toBe(false);
@@ -79,9 +86,11 @@ describe('email uniqueness for non-deleted accounts', () => {
     expect((await resets.consume(oldReset, 'must-not-change', async () => {})).state).toBe('INVALID');
     expect((await verification.verify(oldVerification.rawToken, async () => {})).state).toBe('INVALID');
 
-    const second = await create();
+    const second = await create(role);
     expect(second.status).toBe(201);
     expect(second.body.id).not.toBe(oldId);
+    expect((await sql('SELECT status,deleted_at,role FROM users WHERE id=$1', [second.body.id])).rows[0]).toEqual({ status: 'ACTIVE', deleted_at: null, role });
+    expect((await sql('SELECT deleted_at FROM users WHERE id=$1', [oldId])).rows[0].deleted_at).toBeInstanceOf(Date);
     const runtimeSql = await readFile(new URL('../../../database/runtime/ensure_auth_schema.sql', import.meta.url), 'utf8');
     await sql(runtimeSql.slice(runtimeSql.indexOf('\n') + 1));
     expect((await users.findByEmail(email.toUpperCase())).id).toBe(second.body.id);
@@ -91,7 +100,7 @@ describe('email uniqueness for non-deleted accounts', () => {
     const login = await request(app).post('/api/auth/login').send({ email, password });
     expect(login.status).toBe(200);
     expect(login.body.user.id).toBe(second.body.id);
-    expect((await create()).status).toBe(409);
+    expect((await create(role)).status).toBe(409);
   });
 
   it('rolls deletion, links and token revocation back if auditing fails', async () => {

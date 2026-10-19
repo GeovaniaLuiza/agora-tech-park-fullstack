@@ -1,4 +1,9 @@
+<<<<<<< HEAD
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+=======
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+>>>>>>> origin/main
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 
@@ -10,6 +15,9 @@ const auth = vi.hoisted(() => ({
   },
 }));
 const api = vi.hoisted(() => ({
+  getNotifications: vi.fn(),
+  markNotificationRead: vi.fn(),
+  getAccessRequest: vi.fn(),
   getAccessRequests: vi.fn(),
   getIndicators: vi.fn(),
   getIndicatorHistory: vi.fn(),
@@ -37,6 +45,9 @@ vi.mock('./contexts/AuthContext', () => ({ useAuth: () => auth.value }));
 vi.mock('./contexts/AuthContext.jsx', () => ({ useAuth: () => auth.value }));
 vi.mock('./services/api', async (original) => ({
   ...(await original()),
+  getNotifications: api.getNotifications,
+  markNotificationRead: api.markNotificationRead,
+  getAccessRequest: api.getAccessRequest,
   getAccessRequests: api.getAccessRequests,
   getIndicators: api.getIndicators,
   getIndicatorHistory: api.getIndicatorHistory,
@@ -63,6 +74,9 @@ vi.mock('./services/api', async (original) => ({
 import App from './App';
 
 beforeEach(() => {
+<<<<<<< HEAD
+  api.getNotifications.mockResolvedValue([]);
+=======
   vi.clearAllMocks();
   api.getForms.mockResolvedValue([]);
   api.getForm.mockResolvedValue({ id: 'form-1', title: 'Coleta existente', status: 'DRAFT' });
@@ -71,6 +85,7 @@ beforeEach(() => {
   api.getFormRespondents.mockResolvedValue([]);
   api.updateForm.mockResolvedValue({ id: 'form-1' });
   api.publishForm.mockResolvedValue({ notificationSummary: { sent: 1, failed: 0 } });
+>>>>>>> origin/main
   api.getAccessRequests.mockResolvedValue([]);
   api.getIndicators.mockResolvedValue([]);
   api.getIndicatorHistory.mockResolvedValue([]);
@@ -373,6 +388,35 @@ describe('busca e seleção explícita de respondentes', () => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('roteamento principal', () => {
+  it.each(['resolve', 'reject'])('preserva requestId no clique com layout e guards reais e PATCH lento: %s', async (outcome) => {
+    const link = '/admin/solicitacoes?requestId=req-123';
+    const notification = { id: 'notification-123', title: 'Nova solicitação de acesso', message: 'Pessoa aguarda análise.', link, read_at: null };
+    api.getNotifications.mockResolvedValue([notification]);
+    api.getAccessRequest.mockResolvedValue({ id: 'req-123', name: 'Pessoa selecionada', email: 'pessoa@test.com' });
+    let resolveRead;
+    let rejectRead;
+    api.markNotificationRead.mockReturnValue(new Promise((resolve, reject) => { resolveRead = resolve; rejectRead = reject; }));
+    window.history.replaceState({}, '', '/admin/solicitacoes');
+    render(<App />);
+    const pushState = vi.spyOn(window.history, 'pushState');
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Notificações' }));
+    await user.click(await screen.findByRole('button', { name: /Nova solicitação de acesso/ }));
+    expect(`${window.location.pathname}${window.location.search}`).toBe(link);
+    expect(screen.queryByLabelText('Painel de notificações')).toBeNull();
+    expect(await screen.findByLabelText('Solicitação de Pessoa selecionada')).toBeTruthy();
+
+    await act(async () => {
+      if (outcome === 'resolve') resolveRead({ ...notification, read_at: '2026-10-19T12:00:00Z' });
+      else rejectRead(new Error('Falha no PATCH'));
+    });
+    expect(`${window.location.pathname}${window.location.search}`).toBe(link);
+    expect(pushState).toHaveBeenCalledTimes(1);
+    expect(pushState.mock.calls[0][2]).toBe(link);
+    expect(replaceState).not.toHaveBeenCalled();
+  });
+
   it('preserva centerId ao redirecionar a rota /indicadores', async () => {
     api.getInnovationCenters.mockResolvedValue([
       { id: 'blumenau', code: 'CI_BLUMENAU', name: 'Centro de Inovação de Blumenau' },

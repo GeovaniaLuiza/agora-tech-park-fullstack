@@ -12,8 +12,8 @@ async function assertOrganizationAccess(user, organizationId) {
   }
 }
 
-async function validateCollection(formId, organizationId) {
-  const form = await responses.submissionContext(formId, organizationId);
+async function validateCollection(formId, organizationId, userId) {
+  const form = await responses.submissionContext(formId, organizationId, userId);
   if (!form) throw serviceError(404, 'Formulário não encontrado', 'FORM_NOT_FOUND');
   if (form.status !== 'ACTIVE') throw serviceError(409, 'Esta coleta não está aberta', 'FORM_NOT_ACTIVE');
   const now = new Date();
@@ -38,7 +38,7 @@ async function validateAnswers(formId, answers, requireComplete) {
     if (question.type === 'NUMBER' && !/^-?\d+$/.test(value)) throw serviceError(422, `Resposta inválida para "${question.label}"`, 'INVALID_ANSWER');
     if (question.type === 'DECIMAL' && !Number.isFinite(Number(value.replace(',', '.')))) throw serviceError(422, `Resposta inválida para "${question.label}"`, 'INVALID_ANSWER');
     if (question.type === 'OPTION' && !question.options.includes(value)) throw serviceError(422, `Opção inválida para "${question.label}"`, 'INVALID_OPTION');
-    normalized.push({ questionId: question.id, value, indicator_id: question.indicator_id || null });
+    normalized.push({ questionId: question.id, value, indicator_id: question.indicator_id || null, questionType: question.type });
   }
   if (requireComplete) {
     const answered = new Set(normalized.map((answer) => answer.questionId));
@@ -51,16 +51,16 @@ async function validateAnswers(formId, answers, requireComplete) {
 async function write(formId, body, user, submit) {
   if (user.role !== 'RESIDENTE') throw serviceError(403, 'Apenas residentes preenchem respostas', 'FORBIDDEN');
   await assertOrganizationAccess(user, body.organizationId);
-  const form = await validateCollection(formId, body.organizationId);
+  const form = await validateCollection(formId, body.organizationId, user.sub);
   const answers = await validateAnswers(formId, body.answers, submit);
   const result = await (submit ? responses.submit : responses.saveDraft)({
     formId,
-    organizationId: body.organizationId,
+    organizationId: form.organization_id,
     userId: user.sub,
     answers,
     processSubmission: submit ? async (responseId, client) => {
       const indicatorsUpdated = form.indicator_year
-        ? await processLinkedAnswers({ responseId, organizationId: body.organizationId,
+        ? await processLinkedAnswers({ responseId, organizationId: form.organization_id,
           centerId: form.innovation_center_id, year: form.indicator_year,
           month: form.indicator_month, userId: user.sub, answers }, client)
         : 0;
@@ -69,6 +69,7 @@ async function write(formId, body, user, submit) {
       return indicatorsUpdated;
     } : null,
   });
+  if (result.legacyConflict) throw serviceError(409, 'Esta organização possui uma resposta histórica sem proprietário confirmado. Solicite revisão administrativa.', 'LEGACY_RESPONSE_REVIEW_REQUIRED');
   if (result.conflict) throw serviceError(409, 'A resposta já foi enviada e precisa ser reaberta antes de ser alterada', 'RESPONSE_ALREADY_SUBMITTED');
   if (submit) responsesSubmitted.inc();
   if (!submit) await record({ userId: user.sub, action: 'RESPONSE_DRAFT_SAVED', entity: 'response',
@@ -81,19 +82,25 @@ export const submit = (formId, body, user) => write(formId, body, user, true);
 
 export async function history(organizationId, user) {
   await assertOrganizationAccess(user, organizationId);
-  return responses.history(organizationId);
+  return responses.history(organizationId, user.role === 'RESIDENTE' ? user.sub : null);
 }
 
-export async function get(formId, organizationId, user) {
+export async function get(formId, organizationId, user, responseId = null) {
   await assertOrganizationAccess(user, organizationId);
-  const response = await responses.findByFormAndOrganization(formId, organizationId);
+  const response = await responses.findByFormAndOrganization(formId, organizationId, user.role === 'RESIDENTE' ? user.sub : null, responseId);
+  if (response?.ambiguous) throw serviceError(409, 'Selecione uma resposta pelo identificador para consultar este formulário.', 'RESPONSE_SELECTION_REQUIRED');
   if (!response) throw serviceError(404, 'Resposta não encontrada', 'RESPONSE_NOT_FOUND');
   return { ...response, answers: await responses.getAnswers(response.id) };
 }
 
 export async function reopen(responseId, user) {
-  const response = await responses.reopen(responseId, user.sub);
+  if (!['ADMIN', 'PESQUISADOR'].includes(user.role)) throw serviceError(403, 'Permissão insuficiente', 'FORBIDDEN');
+  const response = await responses.reopen(responseId, user.sub, async (context, client) => {
+    if (context.indicator_year) await processLinkedAnswers({ responseId,
+      organizationId: context.organization_id, centerId: context.innovation_center_id,
+      year: context.indicator_year, month: context.indicator_month, userId: user.sub, answers: [] }, client);
+    await record({ userId: user.sub, action: 'RESPONSE_REOPENED', entity: 'response', entityId: responseId }, client);
+  });
   if (!response) throw serviceError(409, 'A resposta não está enviada ou não existe', 'RESPONSE_NOT_SUBMITTED');
-  await record({ userId: user.sub, action: 'RESPONSE_REOPENED', entity: 'response', entityId: responseId });
   return response;
 }

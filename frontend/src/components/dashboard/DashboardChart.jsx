@@ -5,9 +5,9 @@ const colors = ['#234fbd', '#19a86b', '#dc7a22', '#7c3aed'];
 
 const valueLabel = (value, unit) => unit === 'BRL' ? formatCurrency(value) : formatNumber(value);
 
-export default function DashboardChart({ title, subtitle, series = [], type = 'line', height = 230 }) {
+export default function DashboardChart({ title, subtitle, series = [], type = 'line', height = 230, headerControls }) {
   const all = series.flatMap((item) => item.points.map((point) => Number(point.value)));
-  if (!all.length) return <div className="chart-empty">Sem dados para o gráfico.</div>;
+  if (!all.length && !headerControls) return <div className="chart-empty">Sem dados para o gráfico.</div>;
   const minValue = Math.min(0, ...all);
   const maxValue = Math.max(1, ...all);
   const range = maxValue - minValue || 1;
@@ -17,10 +17,15 @@ export default function DashboardChart({ title, subtitle, series = [], type = 'l
   const zeroY = y(0);
   const barWidth = Math.min(18, 36 / Math.max(series.length, 1));
   const summary = series.map((item) => `${item.name}: ${item.points.map((point) => `${monthLabels[point.month - 1]} ${valueLabel(point.value, item.unit)}`).join(', ')}`).join('. ');
+  const legend = <div className="chart-legend">{series.map((item, index) => <span key={item.code}><i style={{ background: colors[index % colors.length] }} />{item.name}</span>)}</div>;
   return <article className="panel dashboard-chart-card">
-    <header><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div><div className="chart-legend">{series.map((item, index) => <span key={item.code}><i style={{ background: colors[index % colors.length] }} />{item.name}</span>)}</div></header>
+    <header>
+      <div className="chart-header-row"><h3>{title}</h3>{headerControls || legend}</div>
+      {subtitle && <p>{subtitle}</p>}
+      {headerControls && legend}
+    </header>
     <div className="dashboard-chart" style={{ minHeight: height }}>
-      <svg viewBox="0 0 600 230" role="img" aria-label={`${title}. ${summary}`}>
+      {all.length ? <svg viewBox="0 0 600 230" role="img" aria-label={`${title}. ${summary}`}>
         {[0, .25, .5, .75, 1].map((ratio) => { const value = minValue + range * ratio; return <g key={ratio}><line x1={left} x2={left + width} y1={y(value)} y2={y(value)} stroke="#e5eaf1" /><text x={left - 7} y={y(value) + 4} textAnchor="end">{formatNumber(value, { notation: Math.abs(value) >= 1000000 ? 'compact' : 'standard', maximumFractionDigits: 1 })}</text></g>; })}
         <line x1={left} x2={left + width} y1={zeroY} y2={zeroY} stroke={minValue < 0 ? '#8b96a8' : '#dfe6ee'} />
         {type === 'line' ? series.map((item, index) => {
@@ -32,8 +37,8 @@ export default function DashboardChart({ title, subtitle, series = [], type = 'l
           return <rect key={point.month} x={x(point.month) + offset - barWidth / 2} y={barY} width={barWidth - 2} height={barHeight} rx="2" fill={colors[seriesIndex % colors.length]}><title>{monthLabels[point.month - 1]}: {valueLabel(point.value, item.unit)}</title></rect>;
         })}</g>)}
         {monthLabels.map((label, index) => <text key={label} x={x(index + 1)} y="218" textAnchor="middle">{label}</text>)}
-      </svg>
+      </svg> : <div className="chart-empty">Sem dados para o gráfico.</div>}
     </div>
-    <details className="chart-accessible-summary"><summary>Ver resumo dos dados</summary><p>{summary}</p></details>
+    {all.length > 0 && <details className="chart-accessible-summary"><summary>Ver resumo dos dados</summary><p>{summary}</p></details>}
   </article>;
 }

@@ -3,12 +3,12 @@ import { pool, query } from '../db/pool.js';
 const publicColumns = 'u.id,u.name,u.email,u.role,u.status,u.avatar_data,u.email_verified_at,u.approved_at,u.last_login_at,u.created_at';
 
 export async function findByEmail(email) {
-  const { rows } = await query('SELECT * FROM users WHERE email=$1', [email]);
+  const { rows } = await query('SELECT * FROM users WHERE LOWER(email)=LOWER($1) AND deleted_at IS NULL', [email]);
   return rows[0];
 }
 
 export async function findById(id) {
-  const { rows } = await query(`SELECT ${publicColumns} FROM users u WHERE u.id=$1`, [id]);
+  const { rows } = await query(`SELECT ${publicColumns} FROM users u WHERE u.id=$1 AND u.deleted_at IS NULL`, [id]);
   return rows[0];
 }
 
@@ -34,7 +34,7 @@ export async function findPublicProfile(id) {
 
 export async function updateAvatar(userId, avatarData) {
   const { rows } = await query(
-    `UPDATE users SET avatar_data=$2, updated_at=NOW() WHERE id=$1
+    `UPDATE users SET avatar_data=$2, updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL
      RETURNING id,name,email,role,status,avatar_data,email_verified_at,approved_at,last_login_at,created_at`,
     [userId, avatarData],
   );
@@ -77,7 +77,7 @@ export async function recordLogin(userId, audit) {
 export async function findByOrganization(organizationId) {
   const { rows } = await query(`SELECT ${publicColumns} FROM users u
     JOIN users_organizations uo ON uo.user_id=u.id
-    WHERE uo.organization_id=$1 AND uo.active`, [organizationId]);
+    WHERE uo.organization_id=$1 AND uo.active AND u.deleted_at IS NULL`, [organizationId]);
   return rows;
 }
 

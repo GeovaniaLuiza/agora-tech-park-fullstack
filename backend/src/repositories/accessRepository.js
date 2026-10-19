@@ -7,7 +7,7 @@ const columns = `u.id,u.name,u.email,u.role,u.status,u.requested_company_name,
 export async function listPending() {
   const { rows } = await query(`SELECT ${columns},o.id AS existing_organization_id,o.name AS existing_organization_name
     FROM users u LEFT JOIN organizations o ON o.cnpj=u.requested_company_cnpj
-    WHERE u.status='PENDING' AND u.email_verified_at IS NOT NULL ORDER BY u.created_at`);
+    WHERE u.deleted_at IS NULL AND u.status='PENDING' AND u.email_verified_at IS NOT NULL ORDER BY u.created_at`);
   return rows;
 }
 
@@ -18,7 +18,7 @@ export async function listUsers({ status = null, role = null } = {}) {
     FROM users u
     LEFT JOIN users_organizations uo ON uo.user_id=u.id
     LEFT JOIN organizations o ON o.id=uo.organization_id
-    WHERE ($1::user_status IS NULL OR u.status=$1)
+    WHERE u.deleted_at IS NULL AND ($1::user_status IS NULL OR u.status=$1)
       AND ($2::user_role IS NULL OR u.role=$2)
     GROUP BY u.id ORDER BY u.created_at DESC`, [status, role]);
   return rows;
@@ -48,7 +48,7 @@ export async function createManagedUser({ name, email, passwordHash, role, organ
 }
 
 export async function findRequest(id, client = { query }) {
-  const { rows } = await client.query(`SELECT ${columns} FROM users u WHERE u.id=$1`, [id]);
+  const { rows } = await client.query(`SELECT ${columns} FROM users u WHERE u.id=$1 AND u.deleted_at IS NULL`, [id]);
   return rows[0];
 }
 
@@ -124,22 +124,28 @@ async function protectLastActiveAdmin(client, userId) {
   }
 }
 
-export async function setStatus(userId, status, approvedBy = null, audit) {
+export async function setStatus(userId, status, approvedBy = null, audit, { deleted = false } = {}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     if (status === 'INACTIVE') await protectLastActiveAdmin(client, userId);
     const { rows } = await client.query(`UPDATE users SET status=$2::user_status,
+    deleted_at=CASE WHEN $4::boolean THEN NOW() ELSE deleted_at END,
     approved_by=CASE WHEN $2::user_status='ACTIVE' THEN COALESCE(approved_by,$3) ELSE approved_by END,
     approved_at=CASE WHEN $2::user_status='ACTIVE' THEN COALESCE(approved_at,NOW()) ELSE approved_at END,
     inactivated_at=CASE
       WHEN $2::user_status='ACTIVE' THEN NULL
       WHEN $2::user_status='INACTIVE' AND status<>'INACTIVE' THEN NOW()
       ELSE inactivated_at END
-    WHERE id=$1 RETURNING id,name,email,role,status`, [userId, status, approvedBy]);
+    WHERE id=$1 AND deleted_at IS NULL RETURNING id,name,email,role,status`, [userId, status, approvedBy, deleted]);
     if (!rows[0]) {
       await client.query('ROLLBACK');
       return null;
+    }
+    if (deleted) {
+      await client.query('UPDATE users_organizations SET active=FALSE,unlinked_at=COALESCE(unlinked_at,NOW()) WHERE user_id=$1 AND active', [userId]);
+      await client.query('UPDATE email_verification_tokens SET used_at=COALESCE(used_at,NOW()) WHERE user_id=$1 AND used_at IS NULL', [userId]);
+      await client.query('UPDATE password_reset_tokens SET used_at=COALESCE(used_at,NOW()) WHERE user_id=$1 AND used_at IS NULL', [userId]);
     }
     await audit(client);
     await client.query('COMMIT');
@@ -155,7 +161,7 @@ export async function setRole(userId, role, audit) {
   try {
     await client.query('BEGIN');
     if (role !== 'ADMIN') await protectLastActiveAdmin(client, userId);
-    const { rows } = await client.query('UPDATE users SET role=$2 WHERE id=$1 RETURNING id,name,email,role,status', [userId, role]);
+    const { rows } = await client.query('UPDATE users SET role=$2 WHERE id=$1 AND deleted_at IS NULL RETURNING id,name,email,role,status', [userId, role]);
     if (!rows[0]) {
       await client.query('ROLLBACK');
       return null;
@@ -170,8 +176,9 @@ export async function setRole(userId, role, audit) {
 }
 
 export async function linkOrganization(userId, organizationId) {
-  await query(`INSERT INTO users_organizations(user_id,organization_id,active,unlinked_at)
-    VALUES($1,$2,TRUE,NULL)
+  await query(`WITH live_user AS (SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE)
+    INSERT INTO users_organizations(user_id,organization_id,active,unlinked_at)
+    SELECT id,$2,TRUE,NULL FROM live_user WHERE TRUE
     ON CONFLICT(user_id,organization_id) DO UPDATE SET active=TRUE,linked_at=NOW(),unlinked_at=NULL`, [userId, organizationId]);
 }
 

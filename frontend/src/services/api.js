@@ -167,6 +167,7 @@ export const getMe = () => apiRequest('/auth/me');
 export const updateAvatar = (avatarData) => apiRequest('/auth/me/avatar', { method: 'PATCH', body: JSON.stringify({ avatarData }) });
 export const getForms = () => apiRequest('/forms');
 export const getForm = (id) => apiRequest(`/forms/${id}`);
+export const getFormOrganizations = (id) => apiRequest(`/forms/${id}/organizations`);
 export const createForm = (payload) => apiRequest('/forms', { method: 'POST', body: JSON.stringify(payload) });
 export const updateForm = (id, payload) => apiRequest(`/forms/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 export const publishForm = (id, organizationIds = [], recipientIds = []) => apiRequest(`/forms/${id}/publish`, { method: 'POST', body: JSON.stringify({ organizationIds, recipientIds }) });

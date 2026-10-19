@@ -1,11 +1,13 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { homeForRole, isKnownRole } from '../config/access';
+import { isKnownRole } from '../config/access';
+import { loginDestination } from '../utils/loginDestination';
 
 export function PublicOnlyRoute() {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <AuthLoading />;
-  return user ? <Navigate to={homeForRole(user.role)} replace /> : <Outlet />;
+  return user ? <Navigate to={loginDestination(user, location.state?.from)} replace /> : <Outlet />;
 }
 
 export function ProtectedRoute({ roles }) {

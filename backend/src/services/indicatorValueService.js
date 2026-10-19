@@ -1,6 +1,7 @@
 import * as repository from '../repositories/indicatorValueRepository.js';
 import { record } from '../repositories/auditRepository.js';
 import { serviceError } from '../utils/validation.js';
+import { recompute } from './indicatorCalculationService.js';
 
 function monthBounds(year, month) {
   const start = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -28,13 +29,28 @@ export function normalizeIndicatorValue(definition, rawValue) {
 export async function processLinkedAnswers({ responseId, organizationId, centerId, year, month, userId, answers }, client) {
   const bounds = monthBounds(year, month);
   const changed = [];
-  for (const answer of answers.filter((item) => item.indicator_id)) {
+  const linked = answers.filter((item) => item.indicator_id && ['NUMBER', 'DECIMAL'].includes(item.questionType));
+  await repository.lockFormPeriod(centerId, year, client);
+  if (await repository.hasLegacyFormValues({ centerId, year, responseId,
+    indicatorIds: linked.map((item) => item.indicator_id) }, client)) {
+    throw serviceError(409, 'Valores anteriores precisam de revisão explícita antes desta publicação', 'LEGACY_FORM_VALUES_REQUIRE_REVIEW');
+  }
+  const withdrawn = await repository.deactivateMissingContributions({ responseId, questionIds: linked.map((item) => item.questionId), userId }, client);
+  if (!linked.length && !withdrawn?.length) return 0;
+  const affectedCodes = new Set((withdrawn || []).map((item) => item.code));
+  for (const answer of linked) {
     const definition = await repository.findDefinition(answer.indicator_id, client);
     if (!definition?.active) throw serviceError(422, 'Indicador vinculado inexistente ou inativo', 'INVALID_INDICATOR_LINK');
     if (definition.calculation_type !== 'MANUAL') throw serviceError(422, `${definition.name} não pode ser coletado manualmente`, 'READ_ONLY_INDICATOR');
+    const strategies = ['SUM', 'COUNT', 'AVERAGE', 'LAST_VALUE'];
+    if (!strategies.includes(definition.aggregation_type) || !strategies.includes(definition.annual_aggregation)
+        || ['TEXT', 'BOOLEAN', 'JSON'].includes(definition.value_type)) {
+      throw serviceError(422, 'Indicador sem regra numérica de agregação suportada', 'UNSUPPORTED_FORM_AGGREGATION');
+    }
     const value = normalizeIndicatorValue(definition, answer.value);
+    affectedCodes.add(definition.code);
     const saved = await repository.upsertFormValue({ ...value, indicatorId: definition.id, organizationId,
-      centerId, year, month, periodStart: bounds.start, periodEnd: bounds.end, responseId, userId }, client);
+      centerId, year, month, periodStart: bounds.start, periodEnd: bounds.end, responseId, questionId: answer.questionId, userId }, client);
     await repository.upsertAnnualValue({ indicatorId: definition.id, centerId, year,
       sourceType: 'FORM_RESPONSE', responseId, userId }, client);
     changed.push(saved.id);
@@ -55,6 +71,11 @@ export async function processLinkedAnswers({ responseId, organizationId, centerI
       await record({ userId, action: 'INDICATOR_RECALCULATED', entity: 'indicator_value', entityId: derived.id,
         details: { responseId, indicatorCode: 'RESULTADO_ANUAL_CENTRO', year, month } }, client);
     }
+  } else {
+    await repository.clearDerivedResult({ centerId, year, month, responseId, userId }, client);
   }
+  // Keep the existing central annual calculation in sync, including removal of
+  // SYSTEM_CALCULATION annual values previously derived from withdrawn answers.
+  await recompute(centerId, year, userId, client, [...affectedCodes]);
   return changed.length;
 }

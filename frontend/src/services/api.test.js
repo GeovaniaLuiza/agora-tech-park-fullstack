@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiRequest, confirmIndicatorImport, getConfirmedImportIndicators, publishForm, tokenStore } from './api';
+import { apiRequest, confirmIndicatorImport, getConfirmedImportIndicators, getFormOrganizations, publishForm, tokenStore } from './api';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL?.trim() || 'http://localhost:3002/api';
 describe('consulta de eventos confirmados', () => {
@@ -117,6 +117,16 @@ describe('erros da API', () => {
 
 describe('publicação de formulário', () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  it('consulta as organizações salvas independentemente da existência de respondentes', async () => {
+    const organizations = [{ id: 'org-1', name: 'Empresa A' }];
+    const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers(), text: async () => JSON.stringify(organizations) });
+    vi.stubGlobal('fetch', fetch);
+    await expect(getFormOrganizations('form-1')).resolves.toEqual(organizations);
+    expect(fetch.mock.calls[0][0]).toBe(`${apiBaseUrl}/forms/form-1/organizations`);
+    expect(fetch.mock.calls[0][1].method || 'GET').toBe('GET');
+    expect(fetch.mock.calls[0][1].body).toBeUndefined();
+  });
 
   it('envia organizações e residentes selecionados no mesmo comando', async () => {
     const fetch = vi.fn().mockResolvedValue({

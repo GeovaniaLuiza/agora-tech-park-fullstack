@@ -6,6 +6,19 @@ vi.mock('../contexts/AuthContext', () => ({ useAuth: () => state.value }));
 import { ProtectedRoute, PublicOnlyRoute } from './RouteGuards';
 afterEach(cleanup);
 describe('proteção de rotas', () => {
+  it.each([
+    ['/resident/forms/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/respond', 'Coleta convidada'],
+    ['https://externo.invalid', 'Painel residente'],
+    ['//externo.invalid', 'Painel residente'],
+  ])('preserva somente o destino autenticado de convite: %s', (from, expected) => {
+    state.value = { user: { role: 'RESIDENTE' }, loading: false };
+    render(<MemoryRouter initialEntries={[{ pathname: '/login', state: { from } }]}><Routes>
+      <Route element={<PublicOnlyRoute />}><Route path="/login" element={<p>Login</p>} /></Route>
+      <Route path="/resident/forms/:id/respond" element={<p>Coleta convidada</p>} />
+      <Route path="/residente" element={<p>Painel residente</p>} />
+    </Routes></MemoryRouter>);
+    expect(screen.getByText(expected)).toBeTruthy();
+  });
   it('exibe loading durante restauração', () => {
     state.value = { user: null, loading: true };
     render(<MemoryRouter initialEntries={['/private']}><Routes><Route element={<ProtectedRoute />}><Route path="/private" element={<p>Privado</p>} /></Route></Routes></MemoryRouter>);

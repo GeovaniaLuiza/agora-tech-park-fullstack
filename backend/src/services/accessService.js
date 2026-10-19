@@ -144,7 +144,7 @@ export async function deleteUser(userId, admin) {
   if (!current) throw serviceError(404, 'Usuário não encontrado');
   if (String(userId) === String(admin.sub)) throw serviceError(422, 'O administrador atual não pode excluir a própria conta');
   const user = await access.setStatus(userId, USER_STATUS.INACTIVE, admin.sub, (client) =>
-    auditRepository.record({ userId: admin.sub, action: 'USER_DELETED', entity: 'user', entityId: userId, details: { logical: true } }, client))
+    auditRepository.record({ userId: admin.sub, action: 'USER_DELETED', entity: 'user', entityId: userId, details: { logical: true } }, client), { deleted: true })
     .catch(handleAdminMutationError);
   if (!user) throw serviceError(404, 'Usuário não encontrado');
 }

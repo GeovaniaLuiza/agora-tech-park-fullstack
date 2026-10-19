@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Building2, Check, CheckSquare, Edit3, Hash, List, Plus, Search, Trash2, Type, X,
@@ -12,7 +12,7 @@ import { useInnovationCenterSelection } from './hooks/useInnovationCenterSelecti
 import {
   addFormQuestion, addQuestionOption, archiveForm, clearAudit,
   createForm, duplicateForm, getAudit, getEligibleFormRecipients, getForm,
-  getFormQuestions, getFormResponse, getFormIndicatorDefinitions, getInnovationCenters, getOrganizations, getQuestionOptions,
+  getFormQuestions, getFormResponse, getFormIndicatorDefinitions, getFormOrganizations, getInnovationCenters, getOrganizations, getQuestionOptions,
   getResponseHistory, getFormRespondents, publishForm, saveFormAudience, saveResponseDraft, submitResponse,
   createOrganization, updateOrganization, inactivateOrganization, updateForm, updateFormQuestion,
 } from './services/api';
@@ -61,6 +61,7 @@ const ErrorMessage = ({ message }) => message ? <div className="error" role="ale
 function Forms({ resident = false }) {
   const { forms, loading, error, reload } = useForms();
   const navigate = useNavigate();
+  const location = useLocation();
   const [actionError, setActionError] = useState('');
   const [search, setSearch] = useState('');
   const visible = forms.filter((form) => form.title.toLowerCase().includes(search.toLowerCase()));
@@ -70,6 +71,7 @@ function Forms({ resident = false }) {
   };
   if (loading) return <div className="content">Carregando formulários...</div>;
   return <div className="content">
+    {location.state?.formMessage && <div className="success-message" role="status">{location.state.formMessage}</div>}
     <div className="toolbar"><label className="field-search"><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar formulário..." /></label>{!resident && <Button className="push" onClick={() => navigate('/forms/new')}><Plus />Criar novo formulário</Button>}</div>
     <ErrorMessage message={error || actionError} />
     <section className="forms-grid">{visible.map((form) => <FormCard
@@ -87,6 +89,41 @@ function Forms({ resident = false }) {
 
 const questionTypes = [[Type, 'Texto', 'TEXT'], [Hash, 'Número', 'NUMBER'], [List, 'Escolha', 'OPTION'], [CheckSquare, 'Decimal', 'DECIMAL']];
 const emptyQuestion = (type = 'TEXT') => ({ label: '', type, required: true, options: '', indicatorId: '' });
+const normalizeRecipientSearch = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+
+function formValidation(form, questions, centerId, shouldPublish) {
+  const invalid = (message, fields) => ({ message, fields });
+  const title = form.title.trim();
+  const filledQuestions = questions.filter((question) => question.label.trim());
+  if (title.length < 3) {
+    return invalid('Informe um título com pelo menos 3 caracteres.', ['title']);
+  }
+  if (questions.some((question) => question.label.trim() && question.label.trim().length < 3)) {
+    return invalid('Toda pergunta preenchida deve ter pelo menos 3 caracteres.', questions.flatMap((question, index) => question.label.trim() && question.label.trim().length < 3 ? [`question-${index}`] : []));
+  }
+  if (shouldPublish && !filledQuestions.length) {
+    return invalid('Inclua ao menos uma pergunta antes de enviar.', questions.map((_, index) => `question-${index}`));
+  }
+  if (shouldPublish && (!form.startDate || !form.endDate)) {
+    return invalid('Defina as datas de início e fim antes de enviar.', [!form.startDate && 'startDate', !form.endDate && 'endDate'].filter(Boolean));
+  }
+  if (form.startDate && form.endDate && form.startDate > form.endDate) {
+    return invalid('A data final deve ser igual ou posterior à data inicial.', ['startDate', 'endDate']);
+  }
+  if (filledQuestions.some((question) => question.type === 'OPTION' && !question.options.split(',').some((value) => value.trim()))) {
+    return invalid('Informe ao menos uma opção para cada pergunta de escolha.', questions.flatMap((question, index) => question.label.trim() && question.type === 'OPTION' && !question.options.split(',').some((value) => value.trim()) ? [`options-${index}`] : []));
+  }
+  if ((form.indicatorMonth || (shouldPublish && filledQuestions.some((question) => question.indicatorId)))
+      && (!centerId || !form.indicatorYear || !form.indicatorMonth)) {
+    return invalid('Para coletar indicadores, informe o Centro de Inovação, o ano e o mês de referência.', [!centerId && 'center', !form.indicatorYear && 'year', !form.indicatorMonth && 'month'].filter(Boolean));
+  }
+  return null;
+}
+
+function FormEditorRoute() {
+  const { formId } = useParams();
+  return <Create key={formId || 'new'} />;
+}
 
 function Create() {
   const { formId } = useParams();
@@ -100,18 +137,27 @@ function Create() {
   const [organizations, setOrganizations] = useState([]);
   const [targets, setTargets] = useState([]);
   const [residents, setResidents] = useState([]);
+  const [loadedRecipientOrganizations, setLoadedRecipientOrganizations] = useState([]);
+  const [savedRecipients, setSavedRecipients] = useState([]);
   const [recipientIds, setRecipientIds] = useState([]);
-  const recipientSearch = '';
-  const [, setSuccess] = useState('');
+  const [emailInvitations, setEmailInvitations] = useState(false);
+  const [formStatus, setFormStatus] = useState(formId ? null : 'DRAFT');
+  const [recipientSearch, setRecipientSearch] = useState('');
+  const [recipientPickerOpen, setRecipientPickerOpen] = useState(false);
+  const recipientPickerRef = useRef(null);
+  const recipientSearchRef = useRef(null);
+  const savedFormId = useRef(null);
+  const savingRef = useRef(false);
+  const [recipientError, setRecipientError] = useState('');
+  const [invalidFields, setInvalidFields] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
     getOrganizations().then(setOrganizations).catch((reason) => setError(reason.message));
     getInnovationCenters().then(setCenters).catch((reason) => setError(reason.message));
     getFormIndicatorDefinitions().then(setIndicatorDefinitions).catch((reason) => setError(reason.message));
-    getEligibleFormRecipients().then(setResidents).catch((reason) => setError(reason.message));
     if (formId) {
-      Promise.all([getForm(formId), getFormQuestions(formId), getFormRespondents(formId)]).then(async ([loaded, loadedQuestions, savedRespondents]) => {
+      Promise.all([getForm(formId), getFormQuestions(formId), getFormRespondents(formId), getFormOrganizations(formId)]).then(async ([loaded, loadedQuestions, savedRespondents, savedOrganizations]) => {
         setForm({
           title: loaded.title,
           description: loaded.description || '',
@@ -126,83 +172,140 @@ function Create() {
           options: question.type === 'OPTION' ? (await getQuestionOptions(formId, question.id)).map((option) => option.value).join(', ') : '',
         })));
         setQuestions(withOptions);
+        setSavedRecipients(savedRespondents.map((respondent) => ({ id: respondent.user_id, name: respondent.name || 'Respondente indisponível', email: respondent.email || '' })));
         setRecipientIds(savedRespondents.map((respondent) => respondent.user_id));
-        setTargets([...new Set(savedRespondents.map((respondent) => respondent.organization_id))]);
+        setTargets(savedOrganizations.map((organization) => organization.id));
+        setFormStatus(loaded.status);
       }).catch((reason) => setError(reason.message));
     }
   }, [formId]);
-  const visibleResidents = (targets.length
-    ? residents.filter((resident) => resident.organizations.some((organization) => targets.includes(organization.id)))
-    : residents).filter((resident) => `${resident.name} ${resident.email}`.toLowerCase().includes(recipientSearch.toLowerCase()));
+  useEffect(() => {
+    let active = true;
+    if (!targets.length) {
+      return () => { active = false; };
+    }
+    getEligibleFormRecipients(targets)
+      .then((eligible) => {
+        if (!active) return;
+        setResidents(eligible);
+        setLoadedRecipientOrganizations(targets);
+        setRecipientIds((current) => {
+          const next = current.filter((id) => eligible.some((resident) => resident.id === id));
+          if (!next.length && current.length) setEmailInvitations(false);
+          return next;
+        });
+      })
+      .catch((reason) => {
+        if (!active) return;
+        setResidents([]);
+        setLoadedRecipientOrganizations(targets);
+        setError(reason.message);
+      });
+    return () => { active = false; };
+  }, [targets]);
+  useEffect(() => {
+    if (!recipientPickerOpen) return undefined;
+    const closeOutside = (event) => {
+      if (!recipientPickerRef.current?.contains(event.target)) setRecipientPickerOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [recipientPickerOpen]);
+  useEffect(() => {
+    if (recipientPickerOpen) recipientSearchRef.current?.focus();
+  }, [recipientPickerOpen]);
+  const recipientLoading = targets.length > 0
+    && (targets.length !== loadedRecipientOrganizations.length || targets.some((id, index) => loadedRecipientOrganizations[index] !== id));
+  const eligibleResidents = targets.length && !recipientLoading ? residents : [];
+  const search = normalizeRecipientSearch(recipientSearch.trim());
+  const visibleResidents = eligibleResidents.filter((resident) => normalizeRecipientSearch(`${resident.name} ${resident.email}`).includes(search));
+  const selectedResidents = recipientIds.map((id) => residents.find((resident) => resident.id === id)
+    || savedRecipients.find((recipient) => recipient.id === id) || { id, name: 'Respondente indisponível', email: '' });
   const toggleTarget = (organizationId) => {
     const next = targets.includes(organizationId) ? targets.filter((id) => id !== organizationId) : [...targets, organizationId];
+    setLoadedRecipientOrganizations([]);
     setTargets(next);
-    if (next.length) setRecipientIds((selected) => selected.filter((id) => residents.find((resident) => resident.id === id)?.organizations.some((organization) => next.includes(organization.id))));
+    setRecipientSearch('');
+    setRecipientPickerOpen(next.length > 0);
+    if (!next.length) setResidents([]);
+    selectRecipients(next.length ? recipientIds.filter((id) => residents.find((resident) => resident.id === id)?.organizations.some((organization) => next.includes(organization.id))) : []);
   };
-  const toggleRecipient = (residentId) => setRecipientIds((selected) => selected.includes(residentId) ? selected.filter((id) => id !== residentId) : [...selected, residentId]);
+  const canEdit = formStatus === 'DRAFT';
+  const canSendEmail = canEdit && !recipientLoading && targets.length > 0
+    && targets.every((id) => organizations.some((organization) => organization.id === id && organization.status !== 'INACTIVE'))
+    && recipientIds.length > 0 && recipientIds.every((id) => eligibleResidents.some((resident) => resident.id === id));
+  const canSaveAndSend = canSendEmail && emailInvitations && !formValidation(form, questions, centerId, true);
+  const selectRecipients = (selected) => {
+    setRecipientIds(selected);
+    setRecipientError('');
+    if (!selected.length) setEmailInvitations(false);
+  };
+  const toggleRecipient = (residentId) => {
+    selectRecipients(recipientIds.includes(residentId) ? recipientIds.filter((id) => id !== residentId) : [...recipientIds, residentId]);
+  };
   const updateQuestion = (index, patch) => setQuestions(questions.map((question, current) => current === index ? { ...question, ...patch } : question));
   const save = async (shouldPublish) => {
+    if (savingRef.current || !canEdit) return;
+    setError(''); setRecipientError(''); setInvalidFields([]);
+    if (shouldPublish && !recipientIds.length) {
+      setRecipientError('Selecione ao menos um respondente para enviar o formulário.');
+      return;
+    }
+    if (shouldPublish && !emailInvitations) {
+      setRecipientError('Marque o envio de convite por e-mail antes de enviar o formulário.');
+      return;
+    }
+    const validation = formValidation(form, questions, centerId, shouldPublish);
+    if (validation) {
+      setError(validation.message);
+      setInvalidFields(validation.fields);
+      return;
+    }
     const title = form.title.trim();
     const filledQuestions = questions.filter((question) => question.label.trim());
-    if (title.length < 3) {
-      setError('Informe um título com pelo menos 3 caracteres.');
-      return;
-    }
-    if (questions.some((question) => question.label.trim() && question.label.trim().length < 3)) {
-      setError('Toda pergunta preenchida deve ter pelo menos 3 caracteres.');
-      return;
-    }
-    if (shouldPublish && !filledQuestions.length) {
-      setError('Inclua ao menos uma pergunta antes de publicar.');
-      return;
-    }
-    if (shouldPublish && (!form.startDate || !form.endDate)) {
-      setError('Defina as datas de início e fim antes de publicar.');
-      return;
-    }
-    if (filledQuestions.some((question) => question.type === 'OPTION' && !question.options.split(',').some((value) => value.trim()))) {
-      setError('Informe ao menos uma opção para cada pergunta de escolha.');
-      return;
-    }
-    if (shouldPublish && !recipientIds.length) {
-      setError('Selecione ao menos um residente ativo para receber o formulário.');
-      return;
-    }
-    if (shouldPublish && filledQuestions.some((question) => question.indicatorId)
-        && (!centerId || !form.indicatorYear || !form.indicatorMonth)) {
-      setError('Para coletar indicadores, informe o Centro de Inovação, o ano e o mês de referência.');
-      return;
-    }
-    setSaving(true); setError(''); setSuccess('');
+    savingRef.current = true;
+    setSaving(true);
     try {
       const hasIndicatorPeriod = Boolean(form.indicatorMonth);
       const payloadForm = { ...form, title,
         innovationCenterId: hasIndicatorPeriod ? centerId : null,
         indicatorYear: hasIndicatorPeriod ? Number(form.indicatorYear) : null,
         indicatorMonth: hasIndicatorPeriod ? Number(form.indicatorMonth) : null };
-      const saved = formId ? await updateForm(formId, payloadForm) : await createForm(payloadForm);
+      const existingId = formId || savedFormId.current;
+      const saved = existingId ? await updateForm(existingId, payloadForm) : await createForm(payloadForm);
+      savedFormId.current = saved.id;
       for (const [position, question] of filledQuestions.entries()) {
         const payload = { label: question.label, type: question.type, required: question.required, position, indicatorId: question.indicatorId || null };
         const savedQuestion = question.id
           ? await updateFormQuestion(saved.id, question.id, payload)
           : await addFormQuestion(saved.id, payload);
-        if (!question.id && question.type === 'OPTION') {
-          for (const option of question.options.split(',').map((value) => value.trim()).filter(Boolean)) {
-            await addQuestionOption(saved.id, savedQuestion.id, option);
+        const trackQuestion = (patch) => setQuestions((current) => current.map((item) => item === question || item.id === savedQuestion.id ? { ...item, id: savedQuestion.id, ...patch } : item));
+        if (!question.id) trackQuestion(question.type === 'OPTION' ? { savedOptionCount: 0 } : {});
+        if (question.type === 'OPTION' && (!question.id || question.savedOptionCount !== undefined)) {
+          const options = question.options.split(',').map((value) => value.trim()).filter(Boolean);
+          for (let index = question.savedOptionCount || 0; index < options.length; index += 1) {
+            await addQuestionOption(saved.id, savedQuestion.id, options[index]);
+            trackQuestion({ savedOptionCount: index + 1 });
           }
         }
       }
       await saveFormAudience(saved.id, targets, recipientIds);
+      let formMessage = 'Formulário salvo com sucesso.';
       if (shouldPublish) {
         const published = await publishForm(saved.id, targets, recipientIds);
         const summary = published.notificationSummary;
-        setSuccess(`Formulário criado com sucesso e publicado. ${recipientIds.length} respondente(s) selecionado(s). ${summary.sent} e-mail(s) enviado(s)${summary.failed ? `; ${summary.failed} envio(s) falharam.` : '.'}`);
-        setTimeout(() => navigate('/forms'), 1400);
-      } else {
-        setSuccess('Rascunho salvo. Nenhum e-mail foi enviado.');
-        setTimeout(() => navigate('/forms'), 0);
+        formMessage = summary.failed
+          ? `Formulário salvo. ${summary.sent} convites enviados e ${summary.failed} falharam.`
+          : `Formulário salvo e enviado para ${summary.sent} respondente(s).`;
       }
-    } catch (reason) { setError(reason.message === 'Erro interno do servidor' ? 'Não foi possível criar o formulário. Verifique o título, o período e os campos obrigatórios e tente novamente.' : reason.message); } finally { setSaving(false); }
+      navigate('/forms', { state: { formMessage } });
+    } catch (reason) {
+      if (['RESIDENT_RECIPIENT_REQUIRED', 'INELIGIBLE_RESIDENT_RECIPIENT', 'RESPONDENT_ORGANIZATION_REQUIRED'].includes(reason.code)) {
+        setRecipientError(reason.message);
+      } else {
+        setError(reason.message === 'Erro interno do servidor' ? 'Não foi possível concluir a operação. Verifique os dados e tente novamente.' : reason.message);
+      }
+    } finally { savingRef.current = false; setSaving(false); }
   };
   const categories = [...new Set(indicatorDefinitions.map((item) => item.category))];
   const availableIndicators = indicatorDefinitions.filter((item) => !indicatorCategory || item.category === indicatorCategory);
@@ -221,20 +324,93 @@ function Create() {
   };
   const selectedIndicatorCount = questions.filter((question) => question.indicatorId).length;
   return <div className="content builder-layout">
-    <aside className="panel toolbox form-settings indicator-catalog-panel">
-      <h4>INDICADORES DA PLANILHA 2026</h4>
-      <p className="indicator-catalog-help">Selecione os indicadores que serão coletados neste formulário. Os valores mensais alimentam os indicadores e o Dashboard.</p>
-      <label>Categoria<select value={indicatorCategory} onChange={(event) => setIndicatorCategory(event.target.value)}><option value="">Todas</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
-      <div className="indicator-selection-summary"><strong>{selectedIndicatorCount}</strong><span>indicador(es) selecionado(s)</span></div>
-      <div className="indicator-catalog">{availableIndicators.map((definition) => { const selected = questions.some((question) => question.indicatorId === definition.id); return <label className={`indicator-option ${selected ? 'selected' : ''}`} key={definition.id}><input type="checkbox" checked={selected} onChange={() => toggleIndicator(definition)} /><span><strong>{definition.name}</strong><small>{definition.category} · {definition.unit} · {definition.aggregation_type}</small></span></label>; })}</div>
-      <hr /><h4>PERÍODO DOS DADOS</h4>
-      <label>Centro<select value={centerId} onChange={(event) => { setCenterId(event.target.value); setForm({ ...form, innovationCenterId: event.target.value }); }}><option value="">Selecione</option>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label>
-      <div className="date-grid"><label>Ano<input type="number" min="2000" max="2200" step="1" value={form.indicatorYear} onChange={(event) => setForm({ ...form, indicatorYear: event.target.value })} /></label><label>Mês<select value={form.indicatorMonth} onChange={(event) => setForm({ ...form, indicatorMonth: event.target.value })}><option value="">Nenhum</option>{Array.from({ length: 12 }, (_, index) => <option value={index + 1} key={index + 1}>{index + 1}</option>)}</select></label></div>
-      <small>Este período representa os dados coletados e pode ser diferente do prazo de resposta.</small>
-    </aside>
-    <aside className="panel toolbox form-settings"><h4>TIPOS DE PERGUNTA</h4>{questionTypes.map(([Icon, label, type]) => <button type="button" key={type} onClick={() => setQuestions([...questions, emptyQuestion(type)])}><span><Icon /></span>{label}</button>)}<hr /><h4>CONFIGURAÇÕES</h4><div className="date-grid"><label>Início<input type="date" value={form.startDate} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></label><label>Fim<input type="date" value={form.endDate} onChange={(event) => setForm({ ...form, endDate: event.target.value })} /></label></div><fieldset className="recipient-fieldset"><legend>Organizações destinatárias</legend>{organizations.filter((organization) => organization.status !== 'INACTIVE').map((organization) => <label className="recipient-option" key={organization.id}><input type="checkbox" checked={targets.includes(organization.id)} onChange={() => toggleTarget(organization.id)} /><span><strong>{organization.name}</strong><small>{organization.cnpj || 'Organização ativa'}</small></span></label>)}</fieldset><fieldset className="recipient-fieldset"><legend>Residentes respondentes</legend><p>Somente residentes ativos, com e-mail verificado e vínculo válido podem receber a coleta.</p><div className="recipient-list">{visibleResidents.map((resident) => <label className="recipient-option" key={resident.id}><input type="checkbox" checked={recipientIds.includes(resident.id)} onChange={() => toggleRecipient(resident.id)} /><span><strong>{resident.name}</strong><small>{resident.email}<br />{resident.organizations.map((organization) => organization.name).join(', ')}</small></span></label>)}{!visibleResidents.length && <small className="recipient-empty">Nenhum residente elegível para a organização selecionada.</small>}</div></fieldset><div className={`recipient-summary ${recipientIds.length ? 'ready' : ''}`}><strong>{recipientIds.length}</strong><span>residente(s) selecionado(s)</span></div></aside>
-    <main className="panel builder"><ErrorMessage message={error} /><div className="builder-heading"><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Título do formulário" /><textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Descrição" /></div>{questions.map((question, index) => <article className="question" key={question.id || index}><small>#{index + 1} <span>{question.type}</span></small><input value={question.label} onChange={(event) => updateQuestion(index, { label: event.target.value })} placeholder="Texto da pergunta" /><select value={question.type} onChange={(event) => updateQuestion(index, { type: event.target.value })}>{questionTypes.map(([, label, type]) => <option value={type} key={type}>{label}</option>)}</select>{question.type === 'OPTION' && <input value={question.options} onChange={(event) => updateQuestion(index, { options: event.target.value })} placeholder="Opções separadas por vírgula" />}</article>)}<Button type="button" variant="dashed" onClick={() => setQuestions([...questions, emptyQuestion()])}><Plus />Adicionar pergunta</Button><div className="toolbar"><Button type="button" disabled={saving} onClick={() => save(false)}>{saving ? 'Salvando...' : 'Salvar rascunho'}</Button><Button type="button" disabled={saving} onClick={() => save(true)}>Publicar</Button></div></main>
-    <aside className="panel preview"><h4>PRÉ-VISUALIZAÇÃO</h4><div><strong>{form.title || 'Novo formulário'}</strong><small>{questions.length} pergunta(s)</small>{questions.map((question, index) => <label key={question.id || index}>{question.label || 'Pergunta sem título'}<input disabled /></label>)}</div></aside>
+    <div className="builder-settings">
+      <aside className="panel toolbox form-settings indicator-catalog-panel">
+        <h4>INDICADORES DA PLANILHA 2026</h4>
+        <p className="indicator-catalog-help">Selecione os indicadores numéricos que serão coletados neste formulário. Somente perguntas vinculadas alimentam os indicadores e o Dashboard, conforme a agregação do catálogo.</p>
+        <label>Categoria<select value={indicatorCategory} onChange={(event) => setIndicatorCategory(event.target.value)}><option value="">Todas</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
+        <div className="indicator-selection-summary"><strong>{selectedIndicatorCount}</strong><span>indicador(es) selecionado(s)</span></div>
+        <div className="indicator-catalog">{availableIndicators.map((definition) => {
+          const selected = questions.some((question) => question.indicatorId === definition.id);
+          return <label className={`indicator-option ${selected ? 'selected' : ''}`} key={definition.id}><input type="checkbox" checked={selected} disabled={saving || !canEdit} onChange={() => toggleIndicator(definition)} /><span><strong>{definition.name}</strong><small>{definition.category} · {definition.unit} · {definition.aggregation_type}</small></span></label>;
+        })}</div>
+        <hr /><h4>PERÍODO DOS DADOS</h4>
+        <label>Centro<select value={centerId} disabled={saving || !canEdit} aria-invalid={invalidFields.includes('center')} onChange={(event) => { setCenterId(event.target.value); setForm({ ...form, innovationCenterId: event.target.value }); }}><option value="">Selecione</option>{centers.map((center) => <option value={center.id} key={center.id}>{center.name}</option>)}</select></label>
+        <div className="date-grid"><label>Ano<input type="number" min="2000" max="2200" step="1" disabled={saving || !canEdit} value={form.indicatorYear} aria-invalid={invalidFields.includes('year')} onChange={(event) => setForm({ ...form, indicatorYear: event.target.value })} /></label><label>Mês<select value={form.indicatorMonth} disabled={saving || !canEdit} aria-invalid={invalidFields.includes('month')} onChange={(event) => setForm({ ...form, indicatorMonth: event.target.value })}><option value="">Nenhum</option>{Array.from({ length: 12 }, (_, index) => <option value={index + 1} key={index + 1}>{index + 1}</option>)}</select></label></div>
+        <small>Este período representa os dados coletados e pode ser diferente do prazo de resposta.</small>
+      </aside>
+      <aside className="panel toolbox form-settings">
+        <h4>TIPOS DE PERGUNTA</h4>{questionTypes.map(([Icon, label, type]) => <button type="button" key={type} disabled={saving || !canEdit} onClick={() => setQuestions([...questions, emptyQuestion(type)])}><span><Icon /></span>{label}</button>)}
+        <hr /><h4>CONFIGURAÇÕES</h4>
+        <div className="date-grid"><label>Início<input type="date" disabled={saving || !canEdit} value={form.startDate} aria-invalid={invalidFields.includes('startDate')} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></label><label>Fim<input type="date" disabled={saving || !canEdit} value={form.endDate} aria-invalid={invalidFields.includes('endDate')} onChange={(event) => setForm({ ...form, endDate: event.target.value })} /></label></div>
+        <fieldset className="recipient-fieldset" aria-describedby="recipient-organizations-help"><legend>Organizações destinatárias</legend>
+          <p id="recipient-organizations-help" className="recipient-organizations-help">Selecione uma ou mais organizações para definir quais residentes poderão receber o formulário.</p>
+          {organizations.filter((organization) => organization.status !== 'INACTIVE').map((organization) => <label className="recipient-option" key={organization.id}><input type="checkbox" disabled={saving || !canEdit} checked={targets.includes(organization.id)} onChange={() => toggleTarget(organization.id)} /><span><strong>{organization.name}</strong><small>{organization.cnpj || 'Organização ativa'}</small></span></label>)}
+        </fieldset>
+        <fieldset className="recipient-fieldset"><legend>RESPONDENTES</legend>
+          <p id="recipient-search-help">Somente residentes ativos, com e-mail válido e vínculo ativo em uma das organizações destinatárias selecionadas podem receber o formulário.</p>
+          <label id="recipient-picker-label" htmlFor="recipient-picker-trigger">Selecionar respondentes</label>
+          <div className="recipient-picker" ref={recipientPickerRef} onKeyDown={(event) => { if (event.key === 'Escape' && recipientPickerOpen) { setRecipientPickerOpen(false); document.getElementById('recipient-picker-trigger')?.focus(); } }}>
+            <button id="recipient-picker-trigger" className="recipient-picker-trigger" type="button" disabled={saving || !canEdit || !targets.length || recipientLoading} aria-haspopup="true" aria-expanded={recipientPickerOpen} aria-controls="recipient-picker-options" aria-labelledby="recipient-picker-label" aria-describedby="recipient-search-help recipient-availability" onClick={() => setRecipientPickerOpen((open) => !open)}>
+              <span>{recipientLoading ? 'Carregando respondentes...' : 'Selecione um ou mais respondentes'}</span><span className="recipient-picker-chevron" aria-hidden="true">{recipientPickerOpen ? '▴' : '▾'}</span>
+            </button>
+            <p id="recipient-availability" className="recipient-availability" role="status">{!targets.length
+              ? 'Selecione ao menos uma organização destinatária para visualizar os respondentes vinculados.'
+              : recipientLoading ? 'Carregando respondentes elegíveis...'
+                : eligibleResidents.length ? `${eligibleResidents.length} respondente(s) disponível(is)`
+                  : 'Nenhum respondente com vínculo ativo e e-mail válido foi encontrado para as organizações selecionadas.'}</p>
+            {recipientPickerOpen && <div className="recipient-picker-popover">
+              <label className="recipient-picker-search-label" htmlFor="recipient-search">Buscar por nome ou e-mail</label>
+              <div className="recipient-search-control">
+                <Search aria-hidden="true" />
+                <input ref={recipientSearchRef} id="recipient-search" type="search" placeholder="Buscar por nome ou e-mail..." value={recipientSearch} disabled={saving || !canEdit} onChange={(event) => setRecipientSearch(event.target.value)} aria-controls="recipient-picker-options" aria-describedby="recipient-search-help recipient-availability" />
+                {recipientSearch && <button type="button" disabled={saving || !canEdit} onClick={() => setRecipientSearch('')} aria-label="Limpar busca de respondentes"><X aria-hidden="true" /></button>}
+              </div>
+              <div id="recipient-picker-options" className="recipient-list" role="group" aria-labelledby="recipient-picker-label" aria-describedby={recipientError ? 'recipient-error' : undefined}>
+                {eligibleResidents.length > 0 && !visibleResidents.length ? <small className="recipient-empty">Nenhum respondente encontrado para esta busca.</small>
+                        : visibleResidents.map((resident) => <label className="recipient-option" key={resident.id}><input type="checkbox" disabled={saving || !canEdit} checked={recipientIds.includes(resident.id)} onChange={() => toggleRecipient(resident.id)} /><span><strong>{resident.name}</strong><small>{resident.email}<br />{resident.organizations.filter((organization) => targets.includes(organization.id)).map((organization) => organization.name).join(', ')}</small></span></label>)}
+              </div>
+              {targets.length > 0 && !recipientLoading && eligibleResidents.length > 0 && <p id="recipient-search-summary" className="recipient-search-summary" role="status">{visibleResidents.length} respondente(s) encontrado(s)</p>}
+            </div>}
+            <p id="form-email-count" className="recipient-selection-count" aria-live="polite">{recipientIds.length} respondente(s) selecionado(s)</p>
+            {selectedResidents.length > 0 && <ul className="selected-recipients" aria-label="Respondentes selecionados">{selectedResidents.map((resident) => <li key={resident.id}><span><strong>{resident.name}</strong><small>{resident.email}</small></span><button type="button" disabled={saving || !canEdit} onClick={() => toggleRecipient(resident.id)} aria-label={`Remover respondente ${resident.name}${resident.email ? ` (${resident.email})` : ''}`}><X aria-hidden="true" /></button></li>)}</ul>}
+          </div>
+          {recipientError && <p id="recipient-error" className="error" role="alert">{recipientError}</p>}
+          <small>O formulário pode ser salvo sem selecionar respondentes.</small>
+        </fieldset>
+        <fieldset className={`form-delivery ${emailInvitations && canSendEmail ? 'enabled' : ''}`}>
+          <legend>ENVIO DO FORMULÁRIO</legend>
+          <label className="form-delivery-option" htmlFor="send-form-email">
+            <input id="send-form-email" type="checkbox" checked={emailInvitations} disabled={saving || !canSendEmail} onChange={(event) => setEmailInvitations(event.target.checked)} aria-describedby="form-email-help form-email-count form-email-availability" />
+            <span>Enviar formulário por e-mail aos respondentes selecionados</span>
+          </label>
+          <p id="form-email-help">Os respondentes receberão um e-mail com link direto para acessar e responder o formulário.</p>
+          <p id="form-email-availability">{!canEdit && formStatus
+            ? 'Este formulário não está em rascunho. Convites já enviados não serão reenviados por esta configuração; o reenvio é uma ação separada.'
+            : !recipientIds.length ? 'Selecione ao menos um respondente para habilitar o envio por e-mail.'
+              : emailInvitations ? 'Envio por e-mail habilitado. Clique em Salvar e enviar para confirmar.' : 'Envio por e-mail desativado. Salvar não envia convites.'}</p>
+        </fieldset>
+      </aside>
+    </div>
+    <main className="panel builder">
+      <div className="builder-scroll">
+        <ErrorMessage message={error} />
+        <div className="builder-heading"><input value={form.title} disabled={saving || !canEdit} aria-invalid={invalidFields.includes('title')} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Título do formulário" /><textarea value={form.description} disabled={saving || !canEdit} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Descrição" /></div>
+        {questions.map((question, index) => <article className="question" key={question.id || index}>
+          <small>#{index + 1} <span>{question.type}</span></small>
+          <input value={question.label} disabled={saving || !canEdit} aria-invalid={invalidFields.includes(`question-${index}`)} onChange={(event) => updateQuestion(index, { label: event.target.value })} placeholder="Texto da pergunta" />
+          <select value={question.type} disabled={saving || !canEdit} aria-label={`Tipo da pergunta ${index + 1}`} onChange={(event) => updateQuestion(index, { type: event.target.value })}>{questionTypes.map(([, label, type]) => <option value={type} key={type}>{label}</option>)}</select>
+          {question.type === 'OPTION' && <input value={question.options} disabled={saving || !canEdit} aria-invalid={invalidFields.includes(`options-${index}`)} onChange={(event) => updateQuestion(index, { options: event.target.value })} placeholder="Opções separadas por vírgula" />}
+        </article>)}
+        <Button type="button" variant="dashed" disabled={saving || !canEdit} onClick={() => setQuestions([...questions, emptyQuestion()])}><Plus />Adicionar pergunta</Button>
+      </div>
+      <footer className="toolbar builder-actions" aria-label="Ações do formulário">
+        <Button type="button" variant="secondary" disabled={saving} onClick={() => navigate('/forms')}>Cancelar</Button>
+        <Button type="button" variant={emailInvitations && canSendEmail ? 'secondary' : 'primary'} disabled={saving || !canEdit} onClick={() => save(false)}>{saving ? 'Salvando...' : formId ? 'Salvar alterações' : 'Salvar formulário'}</Button>
+        <Button type="button" variant={emailInvitations && canSendEmail ? 'primary' : 'secondary'} disabled={saving || !canSaveAndSend} onClick={() => save(true)}>Salvar e enviar</Button>
+      </footer>
+    </main>
+    <aside className="panel preview"><h4>PRÉ-VISUALIZAÇÃO</h4><div className="preview-scroll"><strong>{form.title || 'Novo formulário'}</strong><small>{questions.length} pergunta(s)</small>{questions.map((question, index) => <label key={question.id || index}>{question.label || 'Pergunta sem título'}<input disabled aria-label={`Pré-visualização da pergunta ${index + 1}`} /></label>)}</div></aside>
   </div>;
 }
 
@@ -366,7 +542,7 @@ export default function App() {
     <Route element={<ProtectedRoute />}><Route path="/unauthorized" element={<Unauthorized />} /><Route path="/unknown-profile" element={<UnknownProfile />} /><Route path="/" element={<HomeRedirect />} />
       <Route element={<AppShell />}>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/dashboard" element={<DashboardPage />} /></Route>
-        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/pesquisa" element={<Navigate to="/forms" replace />} /><Route path="/forms" element={<Forms />} /><Route path="/forms/new" element={<Create />} /><Route path="/forms/:formId/edit" element={<Create />} /></Route>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/pesquisa" element={<Navigate to="/forms" replace />} /><Route path="/forms" element={<Forms />} /><Route path="/forms/new" element={<FormEditorRoute />} /><Route path="/forms/:formId/edit" element={<FormEditorRoute />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR', 'RESIDENTE']} />}><Route path="/indicators" element={<IndicatorsPage />} /><Route path="/indicadores" element={<IndicatorsRedirect />} /></Route><Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR', 'GESTOR']} />}><Route path="/organizations" element={<Residents />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicators/catalog" element={<IndicatorCatalogPage />} /></Route>
         <Route element={<ProtectedRoute roles={['ADMIN', 'PESQUISADOR']} />}><Route path="/indicadores/importar-eventos" element={<IndicatorImportPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/importar-residentes" element={<IndicatorImportPage key="RESIDENTS" type="RESIDENTS" />} /><Route path="/indicadores/eventos" element={<ImportedIndicatorsPage key="EVENTS" type="EVENTS" />} /><Route path="/indicadores/residentes" element={<ImportedIndicatorsPage key="RESIDENTS" type="RESIDENTS" />} /></Route>

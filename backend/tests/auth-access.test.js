@@ -77,6 +77,15 @@ beforeEach(() => {
 });
 
 describe('autenticação e solicitação de acesso', () => {
+  it('rejects login if the account is deleted before profile loading', async () => {
+    userRepo.findByEmail.mockResolvedValue({ ...resident, password_hash: passwordHash });
+    userRepo.findPublicProfile.mockResolvedValueOnce(null);
+    const response = await request(app).post('/api/auth/login').send({ email: resident.email, password: 'Senha123' });
+    expect(response.status).toBe(401);
+    expect(response.body.token).toBeUndefined();
+    expect(userRepo.recordLogin).not.toHaveBeenCalled();
+  });
+
   it('realiza login válido sem expor password_hash', async () => {
     userRepo.findByEmail.mockResolvedValue({ ...activeUser, password_hash: passwordHash });
     const response = await request(app).post('/api/auth/login').send({ email: ' ADMIN@AGORA.TEST ', password: 'Senha123' });
@@ -475,7 +484,7 @@ describe('RBAC administrativo e isolamento do residente', () => {
     it('usa setStatus e auditoria transacional também para excluir conta já inativa', async () => {
       accessRepo.findRequest.mockResolvedValue({ ...resident, status: 'INACTIVE' });
       expect((await mutate('delete', resident)).status).toBe(204);
-      expect(accessRepo.setStatus).toHaveBeenCalledWith(resident.id, 'INACTIVE', activeUser.id, expect.any(Function));
+      expect(accessRepo.setStatus).toHaveBeenCalledWith(resident.id, 'INACTIVE', activeUser.id, expect.any(Function), { deleted: true });
       expect(auditRepo.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_DELETED', details: { logical: true } }), client);
     });
 

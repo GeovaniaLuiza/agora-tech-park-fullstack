@@ -83,7 +83,7 @@ export async function verify(rawToken, audit) {
     await client.query('BEGIN');
     const result = await client.query(`SELECT t.id,t.user_id,t.purpose,t.expires_at,t.used_at,u.name,u.email,u.status
       FROM email_verification_tokens t JOIN users u ON u.id=t.user_id
-      WHERE t.token_hash=$1 AND t.delivery_status='DELIVERED' FOR UPDATE`, [hash(rawToken)]);
+      WHERE u.deleted_at IS NULL AND t.token_hash=$1 AND t.delivery_status='DELIVERED' FOR UPDATE`, [hash(rawToken)]);
     const token = result.rows[0];
     if (!token) { await client.query('ROLLBACK'); return { state: 'INVALID' }; }
     if (token.purpose !== EMAIL_VERIFICATION_PURPOSE) { await client.query('ROLLBACK'); return { state: 'INVALID' }; }

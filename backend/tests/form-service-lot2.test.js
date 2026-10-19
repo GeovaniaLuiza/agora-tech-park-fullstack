@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   forms: { findById: vi.fn(), findState: vi.fn(), update: vi.fn(), setStatus: vi.fn(), duplicate: vi.fn(), respondent: vi.fn(), recordDelivery: vi.fn(), addQuestion: vi.fn(), updateQuestion: vi.fn(), removeQuestion: vi.fn(), addQuestionOption: vi.fn(), findDefinitionById: vi.fn(), indicatorAlreadyLinked: vi.fn() },
   audit: vi.fn(), sendFormInvitation: vi.fn(),
+  eligible: vi.fn(),
 }));
 vi.mock('../src/repositories/formRepository.js', () => mocks.forms);
 vi.mock('../src/repositories/auditRepository.js', () => ({ record: mocks.audit }));
 vi.mock('../src/services/emailService.js', () => ({ sendFormInvitation: mocks.sendFormInvitation }));
+vi.mock('../src/repositories/userRepository.js', () => ({ findEligibleFormRecipients: mocks.eligible }));
 
 import { archiveForm, closeForm, createQuestion, createQuestionOption, deleteQuestion, duplicateForm, editQuestion, resendInvitation, updateForm } from '../src/services/formService.js';
 
@@ -21,19 +23,29 @@ beforeEach(() => {
   mocks.forms.update.mockResolvedValue({ id: formId, title: 'Atualizada' });
   mocks.forms.setStatus.mockResolvedValue({ id: formId, status: 'CLOSED' });
   mocks.forms.duplicate.mockResolvedValue({ id: 'duplicada' });
-  mocks.forms.respondent.mockResolvedValue({ id: residentId, email: 'ana@example.com', organization_name: 'Empresa' });
+  mocks.forms.respondent.mockResolvedValue({ id: 'assignment-id', user_id: residentId, organization_id: 'org-1', email: 'ana@example.com', organization_name: 'Empresa' });
+  mocks.eligible.mockResolvedValue([{ id: residentId, email: 'ana@example.com' }]);
   mocks.forms.recordDelivery.mockResolvedValue();
   mocks.forms.addQuestion.mockResolvedValue({ id: 'question-1' });
   mocks.forms.updateQuestion.mockResolvedValue({ id: 'question-1' });
   mocks.forms.removeQuestion.mockResolvedValue(true);
   mocks.forms.addQuestionOption.mockResolvedValue({ id: 'option-1', value: 'Sim' });
-  mocks.forms.findDefinitionById.mockResolvedValue({ id: 'indicator-1', active: true, calculation_type: 'MANUAL', value_type: 'INTEGER', name: 'Empregos' });
+  mocks.forms.findDefinitionById.mockResolvedValue({ id: 'indicator-1', active: true, calculation_type: 'MANUAL', value_type: 'INTEGER', aggregation_type: 'SUM', annual_aggregation: 'SUM', name: 'Empregos' });
   mocks.forms.indicatorAlreadyLinked.mockResolvedValue(false);
   mocks.sendFormInvitation.mockResolvedValue();
   mocks.audit.mockResolvedValue();
 });
 
 describe('formService lote 2', () => {
+  it.each([
+    { value_type: 'TEXT' }, { value_type: 'BOOLEAN' }, { value_type: 'JSON' },
+    { aggregation_type: 'MANUAL' }, { annual_aggregation: 'DERIVED' },
+  ])('rejects a form mapping with unsupported collection rules: %j', async (override) => {
+    mocks.forms.findDefinitionById.mockResolvedValueOnce({ active: true, calculation_type: 'MANUAL', value_type: 'INTEGER', aggregation_type: 'SUM', annual_aggregation: 'SUM', ...override });
+    await expect(createQuestion(formId, { indicatorId: 'indicator-1' }, manager)).rejects.toMatchObject({ status: 422, code: 'UNSUPPORTED_FORM_AGGREGATION' });
+    expect(mocks.forms.addQuestion).not.toHaveBeenCalled();
+    expect(mocks.forms.indicatorAlreadyLinked).not.toHaveBeenCalled();
+  });
   it('atualiza apenas rascunho, normaliza período e audita', async () => {
     const result = await updateForm(formId, { title: 'Atualizada', innovationCenterId: 'center-1', indicatorYear: '2026', indicatorMonth: '2' }, manager);
     expect(result.title).toBe('Atualizada');
@@ -81,10 +93,17 @@ describe('formService lote 2', () => {
     const result = await resendInvitation(formId, residentId, manager);
     expect(result).toMatchObject({ respondentId: residentId, requested: 1, sent: 1, failed: 0 });
     expect(mocks.sendFormInvitation).toHaveBeenCalledWith(expect.objectContaining({ formId, email: 'ana@example.com' }));
+    expect(mocks.forms.recordDelivery).toHaveBeenCalledWith(formId, residentId, { status: 'SENT' });
     mocks.forms.findById.mockResolvedValueOnce({ id: formId, status: 'DRAFT' });
     await expect(resendInvitation(formId, residentId, manager)).rejects.toMatchObject({ code: 'FORM_NOT_ACTIVE' });
     mocks.forms.respondent.mockResolvedValueOnce(null);
     await expect(resendInvitation(formId, residentId, manager)).rejects.toMatchObject({ code: 'FORM_RESPONDENT_NOT_FOUND' });
+  });
+
+  it('bloqueia reenvio quando o vínculo ou a elegibilidade foi revogado', async () => {
+    mocks.eligible.mockResolvedValue([]);
+    await expect(resendInvitation(formId, residentId, manager)).rejects.toMatchObject({ code: 'INELIGIBLE_RESIDENT_RECIPIENT' });
+    expect(mocks.sendFormInvitation).not.toHaveBeenCalled();
   });
 
   it('cria pergunta vinculada a indicador manual usando tipo compatível', async () => {

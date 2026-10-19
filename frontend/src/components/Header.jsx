@@ -15,15 +15,15 @@ export default function Header({ title, subtitle, setOpen }) {
   useEffect(() => {
     getNotifications().then(setNotifications).catch(() => setNotifications([]));
   }, []);
-  const openNotification = async (notification) => {
-    if (!notification.read_at) {
-      try {
-        const updated = await markNotificationRead(notification.id);
-        setNotifications((items) => items.map((item) => item.id === updated.id ? updated : item));
-      } catch { /* a navegação continua mesmo se a leitura não puder ser registrada */ }
-    }
+  const openNotification = (notification) => {
     setNotificationsOpen(false);
     if (notification.link) navigate(notification.link);
+    if (!notification.read_at) {
+      // O registro de leitura não deve atrasar nem substituir a navegação.
+      void markNotificationRead(notification.id).then((updated) => {
+        setNotifications((items) => items.map((item) => item.id === updated.id ? updated : item));
+      }).catch(() => { /* a notificação permanece não lida se o registro falhar */ });
+    }
   };
   return (
     <header className="topbar">
@@ -35,9 +35,9 @@ export default function Header({ title, subtitle, setOpen }) {
           <button className="bell" aria-label="Notificações" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((current) => !current)}><Bell />{notifications.some((item) => !item.read_at) && <i />}</button>
           {notificationsOpen && <section className="header-popover notification-popover" aria-label="Painel de notificações">
             <strong>Notificações</strong>
-            {notifications.map((notification) => <button className={notification.read_at ? '' : 'unread'} key={notification.id} onClick={() => openNotification(notification)}><strong>{notification.title}</strong><span>{notification.message}</span></button>)}
+            {notifications.map((notification) => <button type="button" className={notification.read_at ? '' : 'unread'} key={notification.id} onClick={() => openNotification(notification)}><strong>{notification.title}</strong><span>{notification.message}</span></button>)}
             {!notifications.length && <p>Nenhuma notificação nova.</p>}
-            {user?.role === 'ADMIN' && <button onClick={() => { setNotificationsOpen(false); navigate('/admin/solicitacoes'); }}>Ver solicitações de acesso</button>}
+            {user?.role === 'ADMIN' && <button type="button" onClick={() => { setNotificationsOpen(false); navigate('/admin/solicitacoes'); }}>Ver solicitações de acesso</button>}
           </section>}
         </div>
         <button className="profile-button" aria-label="Abrir meu perfil" onClick={() => navigate('/perfil')}>

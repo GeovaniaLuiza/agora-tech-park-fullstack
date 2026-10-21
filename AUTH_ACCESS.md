@@ -10,6 +10,7 @@
 - Somente contas com e-mail confirmado e status `ACTIVE` podem autenticar.
 - Somente `ADMIN` pode aprovar, rejeitar, alterar perfil/status e confirmar o vínculo com uma organização.
 - O backend revalida perfil e status no PostgreSQL em cada requisição autenticada.
+- Logout e redefinição de senha revogam todas as sessões da conta por `users.session_version` (migration `022`). Consulte [ciclo de vida e limitações das sessões](docs/SESSION_SECURITY.md).
 - Um `RESIDENTE` só consulta ou envia respostas para organizações presentes em `users_organizations`.
 
 ## Endpoints

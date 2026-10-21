@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import * as users from '../repositories/userRepository.js';
 import * as verificationTokens from '../repositories/emailVerificationRepository.js';
@@ -48,7 +49,7 @@ export async function login({ email, password }, ipAddress) {
   }
   await users.recordLogin(user.id, (client) =>
     record({ userId: user.id, action: 'USER_LOGIN', entityId: user.id, ipAddress }, client));
-  const token = jwt.sign({ sub: user.id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
+  const token = jwt.sign({ sub: user.id, sv: user.session_version, jti: crypto.randomUUID() }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h', algorithm: 'HS256' });
   return { token, user: profile };
 }
 
@@ -208,5 +209,6 @@ export async function updateAvatar(userId, avatarData) {
   await record({ userId, action: 'USER_AVATAR_UPDATED', entity: 'user', entityId: userId });
   return { ...profile, organizations: await users.organizationsForUser(userId) };
 }
-export const logout = (userId, ipAddress) =>
-  record({ userId, action: 'USER_LOGOUT', entityId: userId, ipAddress });
+export const logout = (userId, ipAddress, sessionVersion) =>
+  users.revokeSessions(userId, sessionVersion, (client) =>
+    record({ userId, action: 'USER_LOGOUT', entityId: userId, ipAddress }, client));

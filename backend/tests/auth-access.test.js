@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const userRepo = vi.hoisted(() => ({
-  findByEmail: vi.fn(), findById: vi.fn(), findPublicProfile: vi.fn(),
+  findByEmail: vi.fn(), findById: vi.fn(), findPublicProfile: vi.fn(), findAuthenticationProfile: vi.fn(), revokeSessions: vi.fn(),
   createPending: vi.fn(), hasOrganization: vi.fn(), organizationsForUser: vi.fn(), recordLogin: vi.fn(), findActiveAdminIds: vi.fn(),
 }));
 const auditRepo = vi.hoisted(() => ({ record: vi.fn(), list: vi.fn() }));
@@ -37,7 +37,7 @@ vi.mock('../src/services/emailService.js', () => emailService);
 
 import app from '../src/app.js';
 
-const activeUser = { id: '11111111-1111-1111-1111-111111111111', name: 'Admin', email: 'admin@agora.test', role: 'ADMIN', status: 'ACTIVE', email_verified_at: new Date().toISOString() };
+const activeUser = { id: '11111111-1111-1111-1111-111111111111', name: 'Admin', email: 'admin@agora.test', role: 'ADMIN', status: 'ACTIVE', session_version: 0, email_verified_at: new Date().toISOString() };
 const resident = { ...activeUser, id: '44444444-4444-4444-4444-444444444444', role: 'RESIDENTE', email: 'resident@agora.test' };
 let passwordHash;
 const tokenFor = (user, expiresIn = '1h') => jwt.sign({ sub: user.id }, process.env.JWT_SECRET, { expiresIn });
@@ -49,6 +49,8 @@ beforeEach(() => {
   userRepo.findById.mockImplementation(async (id) => id === activeUser.id ? activeUser : resident);
   userRepo.findPublicProfile.mockImplementation(async (id) => ({ ...(id === activeUser.id ? activeUser : resident), organizations: id === activeUser.id ? [] : [{ id: '55555555-5555-5555-5555-555555555555' }] }));
   userRepo.recordLogin.mockImplementation(async (_id, audit) => audit({ query: vi.fn() }));
+  userRepo.findAuthenticationProfile.mockImplementation((id) => userRepo.findPublicProfile(id));
+  userRepo.revokeSessions.mockImplementation(async (_id, _version, audit) => audit({ query: vi.fn() }));
   userRepo.findActiveAdminIds.mockResolvedValue([activeUser.id]);
   notificationRepo.createMany.mockResolvedValue([]);
   accessRepo.organizationExists.mockResolvedValue(true);
@@ -379,7 +381,7 @@ describe('autenticação e solicitação de acesso', () => {
     const logoutResponse = await request(app).post('/api/auth/logout').set('Authorization', `Bearer ${loginResponse.body.token}`);
     expect(logoutResponse.status).toBe(204);
     expect(auditRepo.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_LOGIN' }), expect.any(Object));
-    expect(auditRepo.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_LOGOUT' }));
+    expect(auditRepo.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_LOGOUT' }), expect.any(Object));
     expect(JSON.stringify(loginResponse.body)).not.toMatch(/password_hash|rawToken|token_hash/);
   });
   it.each(['REJECTED', 'INACTIVE'])('bloqueia login de conta %s', async (status) => {

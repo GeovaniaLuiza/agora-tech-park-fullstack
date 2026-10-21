@@ -107,13 +107,20 @@ describe('PostgreSQL-backed JWT lifecycle', () => {
   });
 
   it('rejects expired/forged JWTs and a legacy JWT after revocation', async () => {
-    await me(sign(0, { expiresIn: '-1s' })).expect(401);
+    const expired = await me(sign(0, { expiresIn: '-1s' })).expect(401);
+    expect(expired.body).toMatchObject({ code: 'TOKEN_EXPIRED' });
     const forged = jwt.sign({ sub: id, sv: 0 }, 'another-secret', { expiresIn: '1h' });
-    await me(forged).expect(401);
+    const invalid = await me(forged).expect(401);
+    expect(invalid.body).toMatchObject({ code: 'INVALID_TOKEN' });
     const legacy = jwt.sign({ sub: id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    await me(legacy).expect(200);
+    const authenticated = await me(legacy).expect(200);
+    expect(authenticated.body.user).toMatchObject({ id, role: 'ADMIN' });
+    expect(await version()).toBe(0);
     await logout(legacy).expect(204);
-    await me(legacy).expect(401);
+    expect(await version()).toBe(1);
+    const revoked = await me(legacy).expect(401);
+    expect(revoked.body).toMatchObject({ code: 'SESSION_REVOKED' });
+    expect(revoked.body).not.toHaveProperty('user');
   });
 
   it.each(['GESTOR', 'PESQUISADOR', 'RESIDENTE'])('uses the current %s role for administrative RBAC', async (role) => {

@@ -127,7 +127,11 @@ describe('protected UI and cross-tab logout', () => {
     tokenStore.clear();
     fetchMock.mockResolvedValueOnce(response(401, {}));
     fireEvent.click(screen.getByText('Exportar'));
-    await screen.findByText('Login necessário');
+    expect((await screen.findByText('Login necessário')).textContent).toBe('Login necessário');
+    expect(screen.queryByText('Operação administrativa')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Exportar' })).toBeNull();
+    expect(tokenStore.get()).toBeNull();
+    expect(localStorage.getItem(LOGOUT_STORAGE_KEY)).toBeTruthy();
   });
   it('invalidates a 401 before attempting to read a broken response body', async () => {
     operation = () => apiRequest('/admin/users'); mount(); await screen.findByText('Operação administrativa');

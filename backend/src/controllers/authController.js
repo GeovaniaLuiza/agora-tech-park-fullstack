@@ -14,4 +14,4 @@ export async function forgotPassword(req,res,next){try{res.status(202).json(awai
 export async function resetPassword(req,res,next){try{res.json(await authService.resetPassword(req.body.token,req.body.password,req.ip));}catch(error){next(error);}}
 export async function me(req,res,next){try{res.json({user:await authService.me(req.user.sub)});}catch(error){next(error);}}
 export async function updateAvatar(req,res,next){try{res.json({user:await authService.updateAvatar(req.user.sub, req.body.avatarData ?? null)});}catch(error){next(error);}}
-export async function logout(req,res,next){try{await authService.logout(req.user.sub,req.ip);res.sendStatus(204);}catch(error){next(error);}}
+export async function logout(req,res,next){try{await authService.logout(req.user.sub,req.ip,req.sessionVersion);res.sendStatus(204);}catch(error){next(error);}}

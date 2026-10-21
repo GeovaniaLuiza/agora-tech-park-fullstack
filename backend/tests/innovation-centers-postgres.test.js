@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import names from './fixtures/innovation-center-names.json' with { type: 'json' };
 
 // Keep real authentication/authorization; isolate only profile lookup from unrelated tables.
-const profile = vi.hoisted(() => ({ findPublicProfile: vi.fn() }));
+const profile = vi.hoisted(() => { const findPublicProfile = vi.fn(); return { findPublicProfile, findAuthenticationProfile: findPublicProfile }; });
 vi.mock('../src/repositories/userRepository.js', () => profile);
 dotenv.config({ quiet: true });
 const { pool, shutdown } = await import('../src/db/pool.js');
@@ -40,7 +40,7 @@ beforeEach(async () => {
   querySpy = vi.spyOn(pool, 'query').mockImplementation((...args) => setup.query(...args));
   await setup.query(`TRUNCATE ${tables.join(', ')}`);
   await setup.query("INSERT INTO innovation_centers(id,code,name,municipality,state) VALUES($1,'CI_JOINVILLE',$2,'Joinville','SC')", [joinvilleId, names[10]]);
-  profile.findPublicProfile.mockResolvedValue({ id: randomUUID(), role: 'ADMIN', status: 'ACTIVE', email_verified_at: new Date(), organizations: [{}] });
+  profile.findPublicProfile.mockResolvedValue({ id: randomUUID(), role: 'ADMIN', status: 'ACTIVE', session_version: 0, email_verified_at: new Date(), organizations: [{}] });
 });
 
 afterAll(async () => {

@@ -4,7 +4,8 @@ const api = vi.hoisted(() => ({
   getMe: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
-  tokenStore: { get: vi.fn(), set: vi.fn(), clear: vi.fn() },
+  LOGOUT_STORAGE_KEY: 'agora:logout',
+  tokenStore: { get: vi.fn(), set: vi.fn(), clear: vi.fn(), notifyLogout: vi.fn() },
 }));
 vi.mock('../services/api', () => api);
 import { AuthProvider, useAuth } from './AuthContext';

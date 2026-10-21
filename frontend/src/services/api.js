@@ -1,5 +1,6 @@
 ﻿const BASE_URL = import.meta.env.VITE_API_URL?.trim() || (import.meta.env.DEV ? 'http://localhost:3002/api' : '');
 const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 30000;
+export const LOGOUT_STORAGE_KEY = 'agora:logout';
 
 export const tokenStore = {
   get: () => {
@@ -21,6 +22,9 @@ export const tokenStore = {
     try { localStorage.removeItem('token'); } catch { /* armazenamento indisponível */ }
     try { sessionStorage.removeItem('token'); } catch { /* armazenamento indisponível */ }
   },
+  notifyLogout: () => {
+    try { localStorage.setItem(LOGOUT_STORAGE_KEY, crypto.randomUUID()); } catch { /* local logout still works */ }
+  },
 };
 
 export class ApiError extends Error {
@@ -35,14 +39,16 @@ export class ApiError extends Error {
 const publicAuthPaths = new Set(['/auth/login', '/auth/register-request', '/auth/verify-email', '/auth/resend-verification', '/auth/forgot-password', '/auth/reset-password']);
 function invalidateSession(status, token, path) {
   // A delayed response for an old token must not clear a newer login.
-  if (status === 401 && token && tokenStore.get() === token && !publicAuthPaths.has(path.split('?')[0])) {
+  if (status === 401 && tokenStore.get() === token && !publicAuthPaths.has(path.split('?')[0])) {
     tokenStore.clear();
+    tokenStore.notifyLogout();
     window.dispatchEvent(new Event('auth:unauthorized'));
   }
 }
 
 export async function apiRequest(path, options = {}) {
-  const token = tokenStore.get();
+  const token = options.headers?.Authorization?.startsWith('Bearer ')
+    ? options.headers.Authorization.slice(7) : tokenStore.get();
   const controller = new AbortController();
   const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS;
   const fetchOptions = {
@@ -67,6 +73,8 @@ export async function apiRequest(path, options = {}) {
     clearTimeout(timeoutId);
   }
 
+  // Invalidate on the HTTP status even if reading the error body fails.
+  if (!response.ok) invalidateSession(response.status, token, path);
   const rawBody = response.status === 204 ? '' : await response.text();
   let data = null;
   if (rawBody) {
@@ -74,7 +82,6 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!response.ok) {
-    invalidateSession(response.status, token, path);
     const retryAfterSeconds = Number(data?.retryAfter ?? data?.retryAfterSeconds ?? response.headers.get('Retry-After')) || undefined;
     throw new ApiError(data?.message || 'Não foi possível concluir a operação', response.status, data?.code, {
       retryAfterSeconds,
@@ -162,7 +169,9 @@ export const verifyEmail = (token) => apiRequest('/auth/verify-email', { method:
 export const resendVerification = (email) => apiRequest('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) });
 export const forgotPassword = (email) => apiRequest('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
 export const resetPassword = (token, password, confirmPassword) => apiRequest('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password, confirmPassword }) });
-export const logout = () => apiRequest('/auth/logout', { method: 'POST', body: '{}' });
+export const logout = (token = tokenStore.get()) => apiRequest('/auth/logout', {
+  method: 'POST', body: '{}', headers: token ? { Authorization: 'Bearer ' + token } : {},
+});
 export const getMe = () => apiRequest('/auth/me');
 export const updateAvatar = (avatarData) => apiRequest('/auth/me/avatar', { method: 'PATCH', body: JSON.stringify({ avatarData }) });
 export const getForms = () => apiRequest('/forms');
@@ -280,6 +289,7 @@ export async function downloadIndicatorReport(format, filters = {}) {
     headers: token ? { Authorization: 'Bearer ' + token } : {},
   });
   if (!response.ok) {
+    invalidateSession(response.status, token, '/indicators/export/' + format);
     let data = {};
     try { data = await response.json(); } catch { /* resposta controlada abaixo */ }
     throw new ApiError(data.message || 'Não foi possível exportar o relatório', response.status, data.code);
@@ -296,6 +306,7 @@ export async function downloadDashboardSpreadsheet(filters = {}) {
     headers: token ? { Authorization: 'Bearer ' + token } : {},
   });
   if (!response.ok) {
+    invalidateSession(response.status, token, '/dashboard/export');
     let data = {};
     try { data = await response.json(); } catch { /* resposta controlada abaixo */ }
     throw new ApiError(data.message || 'Não foi possível exportar a planilha', response.status, data.code);

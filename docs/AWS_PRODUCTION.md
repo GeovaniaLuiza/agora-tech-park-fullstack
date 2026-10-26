@@ -178,7 +178,7 @@ A role de deploy permanece com as permissões necessárias para `ssm:SendCommand
 
 ## Recuperação com preservação da revogação
 
-O runtime extrai também `scripts/verify-session-recovery.mjs` e `deploy/aws/session-recovery-contract.json` do mesmo SHA aprovado, abortando se estiverem ausentes. A política não vem da release candidata. O verificador compara o inventário completo e hashes SHA-256 do backend com o backend revisado em `08b7ae3`, incluindo todo `backend/src`, package/lockfile e migration 022. Não executa código da candidata. Mudanças futuras do backend exigem revisão explícita do contrato e homologação; não regenerar fingerprints automaticamente para fazer uma candidata passar.
+O runtime extrai também `scripts/verify-session-recovery.mjs` e `deploy/aws/session-recovery-contract.json` do mesmo SHA aprovado, abortando se estiverem ausentes. A política não vem da release candidata. O verificador compara o inventário completo e hashes SHA-256 do backend com o código revisado em `08b7ae3` e as dependências aprovadas em `reviewedDependencyUpdate`, incluindo todo `backend/src`, package/lockfile e migration 022. Não executa código da candidata. Mudanças futuras do backend exigem revisão explícita do contrato e homologação; não regenerar fingerprints automaticamente para fazer uma candidata passar.
 
 O script prioriza `/opt/agora/recovery`, quando existir e for compatível, e depois considera a anterior. Antes da seleção, normaliza caminhos dentro de releases, valida SHA/HEAD, frontend e marcador de release. Verifica novamente a candidata imediatamente antes da restauração. Ter a migration ou um marcador autodeclarado não é prova de compatibilidade. A recuperação selecionada é preservada pela retenção.
 

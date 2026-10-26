@@ -26,6 +26,15 @@ test('the reviewed backend satisfies the trusted contract without executing cand
   assert.ok(Object.keys(contract.files).includes('backend/src/server.js'));
 });
 
+test('rejects the pre-advisory dependency manifest even when revocation source is unchanged', async (t) => {
+  const directory = await candidate(t);
+  const path = join(directory, 'backend/package.json');
+  const manifest = JSON.parse(await readFile(path, 'utf8'));
+  manifest.dependencies.zod = '^4.6.5';
+  await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`);
+  await assert.rejects(verifySessionRecovery(directory, contractPath), /Unapproved session recovery file: backend\/package.json/);
+});
+
 for (const path of [
   'backend/src/middlewares/auth.js', 'backend/src/repositories/userRepository.js',
   'backend/src/repositories/passwordResetRepository.js', 'backend/src/server.js',

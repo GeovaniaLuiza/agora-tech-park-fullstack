@@ -2,8 +2,8 @@
   "version": 1,
   "reviewedBackendCommit": "08b7ae3d67103ceb0a8f9c2082b32e8d48dd412f",
   "files": {
-    "backend/package-lock.json": "9d4495c202707824868a98c15199e867be8b65c6e7f62301108bbe7d094ed003",
-    "backend/package.json": "c369279360d1a48835502d2a62357d319e2befba8f30f2b3f2bd14f4774f95d0",
+    "backend/package-lock.json": "4f32b14f452aa50593ab1dafe6f68285955fbb9b09f50399cdceeceef8a9eb30",
+    "backend/package.json": "98bcbcf15fe2ce79db51963723685a3641807c230a1ef18596f64d5807e9f6f3",
     "backend/src/app.js": "d9f2b30e067ee6c680cff477d6494e2e2daf62d6de99f79ad89390e9028da6b6",
     "backend/src/config/database.js": "513644ce5ddf8b682897cb7b88db8910922f92eb6aef029138b0c6bf16541128",
     "backend/src/config/environment.js": "e7d1fceb16eb5c474515f86b24012d475e9db971bbf3a7a1e40e02ac7a52ac97",
@@ -94,5 +94,27 @@
     "backend/src/services/spreadsheetParser.js": "fec19c336afb3d4164460cc2bc31a194dd94a415073971fdc1320efed102bfea",
     "backend/src/utils/validation.js": "41d7305ec957ddf6a0a05b5259c247fd3200d0c936dd63b9e380e8432058b488",
     "database/migrations/022_user_session_version.sql": "dd639cff49a04b267bb801489ada7c07592823784d1cc10377f2ddd0e3bc399e"
+  },
+  "reviewedDependencyUpdate": {
+    "baselineCommit": "133df3579e037819fca358478c5250493129528b",
+    "advisories": [
+      "GHSA-mrhx-c7xc-m3w5",
+      "GHSA-27r3-jxmh-p828"
+    ],
+    "packages": {
+      "zod": {
+        "from": "4.6.5",
+        "to": "4.6.6"
+      },
+      "body-parser": {
+        "from": "2.3.0",
+        "to": "2.4.0"
+      },
+      "qs": {
+        "from": "6.16.0",
+        "to": "6.16.1",
+        "reason": "Required by body-parser 2.4.0"
+      }
+    }
   }
 }

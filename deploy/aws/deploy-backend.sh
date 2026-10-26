@@ -17,6 +17,8 @@ PREVIOUS_RELEASE=""
 RECOVERY_RELEASE=""
 RECOVERY_LINK="$APP_ROOT/recovery"
 SESSION_FLOOR="$APP_ROOT/shared/session-revocation-required"
+RECOVERY_APPROVAL="$APP_ROOT/shared/session-recovery-approved.json"
+REVOCATION_ACTIVE=0
 RUNTIME_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 RECOVERY_VERIFIER="$RUNTIME_DIR/../../scripts/verify-session-recovery.mjs"
 RECOVERY_CONTRACT="$RUNTIME_DIR/session-recovery-contract.json"
@@ -87,7 +89,7 @@ health_check() {
 require_session_revocation() {
   # This persistent floor is written before activation and is never rolled back.
   if [[ ! -f "$SESSION_FLOOR" ]]; then
-    (umask 077; printf 'session-version-v1\n' > "$SESSION_FLOOR.next")
+    (umask 077; printf 'session-version-v1\n' > "$SESSION_FLOOR.next") || return 1
     mv -Tf "$SESSION_FLOOR.next" "$SESSION_FLOOR"
   fi
 }
@@ -99,11 +101,18 @@ verified_session_backend() {
     && [[ "$candidate" == "$RELEASES_ROOT/$candidate_sha" ]] \
     && valid_backend_release "$candidate" \
     && [[ "$(git -C "$candidate" rev-parse HEAD)" == "$candidate_sha" ]] \
-    && node "$RECOVERY_VERIFIER" "$candidate" "$RECOVERY_CONTRACT"
+    && {
+      if [[ "${2:-}" == prepared ]]; then
+        node "$RECOVERY_VERIFIER" "$candidate" "$RECOVERY_CONTRACT" "$RECOVERY_APPROVAL" \
+          && [[ "$(realpath -e -- "$candidate/backend/.env")" == "$(realpath -e -- "$ENV_FILE")" ]]
+      else
+        node "$RECOVERY_VERIFIER" "$candidate" "$RECOVERY_CONTRACT"
+      fi
+    }
 }
 
 safe_recovery_release() {
-  valid_joint_release "$1" && verified_session_backend "$1"
+  valid_joint_release "$1" && verified_session_backend "$1" "${2:-}"
 }
 
 select_recovery() {
@@ -111,7 +120,7 @@ select_recovery() {
   RECOVERY_RELEASE=""
   for target in "$RECOVERY_LINK" "$fallback"; do
     [[ -n "$target" && -e "$target" ]] || continue
-    if path="$(release_path "$target")" && [[ "$path" != "$RELEASE_DIR" ]] && safe_recovery_release "$path"; then
+    if path="$(release_path "$target")" && [[ "$path" != "$RELEASE_DIR" ]] && safe_recovery_release "$path" prepared; then
       RECOVERY_RELEASE="$path"
       return 0
     fi
@@ -120,8 +129,12 @@ select_recovery() {
   return 1
 }
 
+recovery_not_ready() {
+  echo "SESSION_DEPLOY_NOT_READY: approved recovery and operational rehearsal are required; no cutover performed, active API/current/session floor preserved; migrations are not reversed (revocation_active=$REVOCATION_ACTIVE)." >&2
+}
+
 block_recovery() {
-  echo "SESSION_RECOVERY_BLOCKED: no verified revocation-compatible recovery; unsafe restoration refused." >&2
+  echo "SESSION_RECOVERY_BLOCKED: recovery could not complete safely; unsafe restoration refused." >&2
   echo "Preserve the database and shared/session-revocation-required. Prepare a verified recovery release; see docs/SESSION_SECURITY.md." >&2
   # A failed restart may have left an old process running. Never keep serving it.
   if ! systemctl stop "$SERVICE_NAME"; then
@@ -143,14 +156,10 @@ elif [[ -e "$CURRENT_LINK" ]]; then
   exit 4
 fi
 
-# A migration file is not evidence that revocation was ever enforced.
+# Detect the transition state without writing a floor or stopping the API.
+# An incoming dependency fingerprint is not a verdict on the active backend.
 if [[ -f "$SESSION_FLOOR" || -f "$PREVIOUS_RELEASE/backend/src/config/sessionSchema.js" ]]; then
-  require_session_revocation
-  if [[ "$ACTION" == deploy && -n "$PREVIOUS_RELEASE" ]] && ! verified_session_backend "$PREVIOUS_RELEASE"; then
-    echo "Active release violates the persistent session floor; activation refused." >&2
-    block_recovery
-    exit 7
-  fi
+  REVOCATION_ACTIVE=1
 fi
 
 if [[ "$ACTION" == rollback ]]; then
@@ -158,7 +167,11 @@ if [[ "$ACTION" == rollback ]]; then
     echo "Rollback refused: requested SHA is not the active release." >&2
     exit 4
   fi
-  require_session_revocation
+  if [[ "$REVOCATION_ACTIVE" == 0 ]]; then
+    recovery_not_ready
+    echo "Rollback before revocation activation is refused; use the approved first-deploy procedure." >&2
+    exit 7
+  fi
   if ! select_recovery "$PREVIOUS_LINK"; then
     block_recovery
     exit 7
@@ -168,6 +181,8 @@ if [[ "$ACTION" == rollback ]]; then
     echo "Cannot stop active API; recovery was not activated." >&2
     exit 5
   fi
+  # A failure to persist the floor must never activate another release.
+  if ! require_session_revocation; then block_recovery; exit 5; fi
   if ! ln -sfn "$rollback_release" "$APP_ROOT/current.next" \
     || ! mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"; then
     echo "Recovery activation failed; current preserved for operational inspection." >&2
@@ -192,6 +207,11 @@ if [[ "$PREVIOUS_RELEASE" == "$RELEASE_DIR" ]]; then
   fi
   echo "Active release is missing, invalid or unhealthy; preserved for investigation." >&2
   exit 5
+fi
+
+if ! select_recovery "$PREVIOUS_RELEASE"; then
+  recovery_not_ready
+  exit 7
 fi
 
 if [[ -n "$PREVIOUS_RELEASE" ]]; then
@@ -247,7 +267,8 @@ if ! safe_recovery_release "$RELEASE_DIR"; then
   exit 7
 fi
 if ! select_recovery "$PREVIOUS_RELEASE"; then
-  echo "No verified recovery release available; any post-activation failure will stop the API instead of restoring unsafe code." >&2
+  recovery_not_ready
+  exit 7
 fi
 
 rm -rf -- "$RELEASE_DIR/frontend/node_modules"
@@ -276,8 +297,18 @@ fi
 echo "Validating migrations"
 npm run migrate:dry --prefix "$RELEASE_DIR/backend"
 
+if ! select_recovery "$PREVIOUS_RELEASE"; then
+  recovery_not_ready
+  exit 7
+fi
+
 echo "Applying pending migrations"
 npm run migrate --prefix "$RELEASE_DIR/backend"
+
+if ! select_recovery "$PREVIOUS_RELEASE"; then
+  recovery_not_ready
+  exit 7
+fi
 
 # Stop the old process before publishing the new frontend/backend pair. A short
 # maintenance interval is preferable to serving a legacy authenticator at cutover.

@@ -123,6 +123,55 @@ describe('PostgreSQL-backed JWT lifecycle', () => {
     expect(revoked.body).not.toHaveProperty('user');
   });
 
+  it('preserves the latest generation when reconciling an older restored user', async () => {
+    const token = (await login()).body.token;
+    await logout(token).expect(204);
+    const preservedVersion = await version();
+    // Only this disposable schema models the older backup. Traffic/issuers must
+    // remain stopped operationally until reconciliation and validation finish.
+    await setup.query('UPDATE users SET session_version=0 WHERE id=$1', [id]);
+    await setup.query('UPDATE users SET session_version=GREATEST(session_version,$2) WHERE id=$1', [id, preservedVersion]);
+    expect(await version()).toBe(preservedVersion);
+    expect((await me(token).expect(401)).body).toMatchObject({ code: 'SESSION_REVOKED' });
+    const fresh = await login();
+    expect(fresh.status).toBe(200);
+    expect(jwt.verify(fresh.body.token, process.env.JWT_SECRET).sv).toBe(preservedVersion);
+    await logout(fresh.body.token).expect(204);
+    expect(await version()).toBe(preservedVersion + 1);
+    // Reapplying the saved state must never reduce a newer generation.
+    await setup.query('UPDATE users SET session_version=GREATEST(session_version,$2) WHERE id=$1', [id, preservedVersion]);
+    expect(await version()).toBe(preservedVersion + 1);
+    await me(fresh.body.token).expect(401);
+  });
+
+  it('keeps persisted revocation across recovery and rejects pre-restore JWTs after global key rotation', async () => {
+    const signedBeforeFailure = (await login()).body.token;
+    await logout(signedBeforeFailure).expect(204);
+    expect(await version()).toBe(1);
+    const recoveredRequest = await me(signedBeforeFailure).expect(401);
+    expect(recoveredRequest.body).toMatchObject({ code: 'SESSION_REVOKED' });
+    // Simulate restoring an older snapshot only in this test's isolated schema.
+    // When the generation cannot be recovered, operations must rotate the key
+    // before reopening any issuer/API; application rollback never does this UPDATE.
+    await setup.query('UPDATE users SET session_version=0 WHERE id=$1', [id]);
+    const previousSecret = process.env.JWT_SECRET;
+    try {
+      process.env.JWT_SECRET = 'isolated-restore-new-signing-key-at-least-32-characters';
+      const oldToken = await me(signedBeforeFailure).expect(401);
+      expect(oldToken.body).toMatchObject({ code: 'INVALID_TOKEN' });
+      const fresh = await login();
+      expect(fresh.status).toBe(200);
+      expect(jwt.verify(fresh.body.token, process.env.JWT_SECRET).sv).toBe(0);
+      await me(fresh.body.token).expect(200);
+      await logout(fresh.body.token).expect(204);
+      expect(await version()).toBe(1);
+      const revokedAgain = await me(fresh.body.token).expect(401);
+      expect(revokedAgain.body).toMatchObject({ code: 'SESSION_REVOKED' });
+    } finally {
+      process.env.JWT_SECRET = previousSecret;
+    }
+  });
+
   it.each(['GESTOR', 'PESQUISADOR', 'RESIDENTE'])('uses the current %s role for administrative RBAC', async (role) => {
     const token = sign();
     const organizationId = randomUUID();

@@ -14,6 +14,12 @@ PREVIOUS_LINK="$APP_ROOT/previous"
 BACKUP_DIR="$APP_ROOT/backups"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 PREVIOUS_RELEASE=""
+RECOVERY_RELEASE=""
+RECOVERY_LINK="$APP_ROOT/recovery"
+SESSION_FLOOR="$APP_ROOT/shared/session-revocation-required"
+RUNTIME_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+RECOVERY_VERIFIER="$RUNTIME_DIR/../../scripts/verify-session-recovery.mjs"
+RECOVERY_CONTRACT="$RUNTIME_DIR/session-recovery-contract.json"
 
 if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "A full 40-character Git commit SHA is required." >&2
@@ -78,6 +84,51 @@ health_check() {
   curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-connrefused "$HEALTH_URL" >/dev/null
 }
 
+require_session_revocation() {
+  # This persistent floor is written before activation and is never rolled back.
+  if [[ ! -f "$SESSION_FLOOR" ]]; then
+    (umask 077; printf 'session-version-v1\n' > "$SESSION_FLOOR.next")
+    mv -Tf "$SESSION_FLOOR.next" "$SESSION_FLOOR"
+  fi
+}
+
+verified_session_backend() {
+  local candidate="$1" candidate_sha
+  candidate_sha="$(basename "$candidate")"
+  [[ "$candidate_sha" =~ ^[0-9a-f]{40}$ ]] \
+    && [[ "$candidate" == "$RELEASES_ROOT/$candidate_sha" ]] \
+    && valid_backend_release "$candidate" \
+    && [[ "$(git -C "$candidate" rev-parse HEAD)" == "$candidate_sha" ]] \
+    && node "$RECOVERY_VERIFIER" "$candidate" "$RECOVERY_CONTRACT"
+}
+
+safe_recovery_release() {
+  valid_joint_release "$1" && verified_session_backend "$1"
+}
+
+select_recovery() {
+  local fallback="$1" target path
+  RECOVERY_RELEASE=""
+  for target in "$RECOVERY_LINK" "$fallback"; do
+    [[ -n "$target" && -e "$target" ]] || continue
+    if path="$(release_path "$target")" && [[ "$path" != "$RELEASE_DIR" ]] && safe_recovery_release "$path"; then
+      RECOVERY_RELEASE="$path"
+      return 0
+    fi
+    echo "Recovery candidate rejected: $target" >&2
+  done
+  return 1
+}
+
+block_recovery() {
+  echo "SESSION_RECOVERY_BLOCKED: no verified revocation-compatible recovery; unsafe restoration refused." >&2
+  echo "Preserve the database and shared/session-revocation-required. Prepare a verified recovery release; see docs/SESSION_SECURITY.md." >&2
+  # A failed restart may have left an old process running. Never keep serving it.
+  if ! systemctl stop "$SERVICE_NAME"; then
+    echo "CRITICAL: could not stop API; isolate API traffic operationally before recovery." >&2
+  fi
+}
+
 if ! RELEASE_DIR="$(release_path "$RELEASE_DIR")"; then
   echo "Invalid release destination." >&2
   exit 4
@@ -92,21 +143,40 @@ elif [[ -e "$CURRENT_LINK" ]]; then
   exit 4
 fi
 
+# A migration file is not evidence that revocation was ever enforced.
+if [[ -f "$SESSION_FLOOR" || -f "$PREVIOUS_RELEASE/backend/src/config/sessionSchema.js" ]]; then
+  require_session_revocation
+  if [[ "$ACTION" == deploy && -n "$PREVIOUS_RELEASE" ]] && ! verified_session_backend "$PREVIOUS_RELEASE"; then
+    echo "Active release violates the persistent session floor; activation refused." >&2
+    block_recovery
+    exit 7
+  fi
+fi
+
 if [[ "$ACTION" == rollback ]]; then
-  if [[ "$PREVIOUS_RELEASE" != "$RELEASE_DIR" || ! -L "$PREVIOUS_LINK" ]]; then
-    echo "Rollback refused: requested SHA is not the active release or previous is absent." >&2
+  if [[ "$PREVIOUS_RELEASE" != "$RELEASE_DIR" ]]; then
+    echo "Rollback refused: requested SHA is not the active release." >&2
     exit 4
   fi
-  if ! rollback_release="$(release_path "$PREVIOUS_LINK")" \
-    || [[ "$rollback_release" == "$RELEASE_DIR" ]] \
-    || ! valid_joint_release "$rollback_release"; then
-    echo "Rollback refused: previous joint release is invalid." >&2
-    exit 4
+  require_session_revocation
+  if ! select_recovery "$PREVIOUS_LINK"; then
+    block_recovery
+    exit 7
   fi
-  ln -sfn "$rollback_release" "$APP_ROOT/current.next"
-  mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"
+  rollback_release="$RECOVERY_RELEASE"
+  if ! systemctl stop "$SERVICE_NAME"; then
+    echo "Cannot stop active API; recovery was not activated." >&2
+    exit 5
+  fi
+  if ! ln -sfn "$rollback_release" "$APP_ROOT/current.next" \
+    || ! mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"; then
+    echo "Recovery activation failed; current preserved for operational inspection." >&2
+    block_recovery
+    exit 5
+  fi
   if ! systemctl restart "$SERVICE_NAME" || ! health_check; then
     echo "Rollback failed: previous release restart or health check failed." >&2
+    block_recovery
     exit 5
   fi
   echo "Joint release restored: $(basename "$rollback_release"). Database migrations were not reversed."
@@ -115,7 +185,8 @@ if [[ "$ACTION" == rollback ]]; then
 fi
 
 if [[ "$PREVIOUS_RELEASE" == "$RELEASE_DIR" ]]; then
-  if valid_joint_release "$RELEASE_DIR" && health_check; then
+  if safe_recovery_release "$RELEASE_DIR" && health_check; then
+    require_session_revocation
     echo "Joint SHA $RELEASE_SHA is already active and healthy; no changes made."
     exit 0
   fi
@@ -170,6 +241,15 @@ if ! valid_joint_release "$RELEASE_DIR"; then
   exit 4
 fi
 
+# Validate the candidate with the trusted runtime contract, before touching DB.
+if ! safe_recovery_release "$RELEASE_DIR"; then
+  echo "Candidate does not satisfy the session revocation contract; deploy aborted." >&2
+  exit 7
+fi
+if ! select_recovery "$PREVIOUS_RELEASE"; then
+  echo "No verified recovery release available; any post-activation failure will stop the API instead of restoring unsafe code." >&2
+fi
+
 rm -rf -- "$RELEASE_DIR/frontend/node_modules"
 
 set -a
@@ -199,6 +279,15 @@ npm run migrate:dry --prefix "$RELEASE_DIR/backend"
 echo "Applying pending migrations"
 npm run migrate --prefix "$RELEASE_DIR/backend"
 
+# Stop the old process before publishing the new frontend/backend pair. A short
+# maintenance interval is preferable to serving a legacy authenticator at cutover.
+trap 'status=$?; trap - ERR; echo "SESSION_ACTIVATION_FAILED: preserve DB/session floor; inspect current and follow docs/SESSION_SECURITY.md before restarting." >&2; block_recovery; exit "$status"' ERR
+if ! systemctl stop "$SERVICE_NAME"; then
+  echo "Cannot stop old API; candidate was not activated." >&2
+  exit 5
+fi
+# Persist the floor before any activation, even if restart subsequently fails.
+require_session_revocation
 if [[ -n "$PREVIOUS_RELEASE" ]]; then
   ln -sfn "$PREVIOUS_RELEASE" "$APP_ROOT/previous.next"
   mv -Tf "$APP_ROOT/previous.next" "$PREVIOUS_LINK"
@@ -210,8 +299,8 @@ mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"
 
 if ! systemctl restart "$SERVICE_NAME" || ! health_check; then
   echo "Application restart or health failed; attempting application recovery." >&2
-  if [[ -n "$PREVIOUS_RELEASE" ]] && valid_joint_release "$PREVIOUS_RELEASE"; then
-    if ln -sfn "$PREVIOUS_RELEASE" "$APP_ROOT/current.next" \
+  if select_recovery "$PREVIOUS_RELEASE"; then
+    if ln -sfn "$RECOVERY_RELEASE" "$APP_ROOT/current.next" \
       && mv -Tf "$APP_ROOT/current.next" "$CURRENT_LINK"; then
       recovery_restart=0
       systemctl restart "$SERVICE_NAME" || recovery_restart=$?
@@ -219,16 +308,19 @@ if ! systemctl restart "$SERVICE_NAME" || ! health_check; then
         echo "Application recovery succeeded." >&2
       else
         echo "Application recovery failed: restart or health check failed." >&2
+        block_recovery
       fi
     else
       echo "Application recovery failed: could not restore current." >&2
+      block_recovery
     fi
   else
-    echo "No valid previous release; application rollback is unavailable." >&2
+    block_recovery
   fi
   echo "Database migrations were not reversed; inspect them before the next attempt." >&2
   exit 5
 fi
+trap - ERR
 
 # Validate all protected destinations before deleting anything.
 CURRENT_REAL="$(release_path "$CURRENT_LINK")"
@@ -242,7 +334,7 @@ find "$APP_ROOT/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
   | cut -d' ' -f2- \
   | while IFS= read -r old_release; do
       old_real="$(release_path "$old_release")" || exit 4
-      if [[ "$old_real" != "$CURRENT_REAL" && "$old_real" != "$PREVIOUS_RELEASE" && "$old_real" != "$RELEASE_DIR" ]]; then
+      if [[ "$old_real" != "$CURRENT_REAL" && "$old_real" != "$PREVIOUS_RELEASE" && "$old_real" != "$RELEASE_DIR" && "$old_real" != "$RECOVERY_RELEASE" ]]; then
         rm -rf -- "$old_release"
       fi
     done

@@ -4,14 +4,28 @@ import { readFile, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 const windows = process.platform === 'win32';
 const shell = windows ? 'C:/Program Files/Git/bin/bash.exe' : 'bash';
 const source = (await readFile(new URL('../deploy/aws/deploy-backend.sh', import.meta.url), 'utf8')).replaceAll('\r', '');
-// Only relocate the allowed root in the test copy; production keeps its /opt restriction.
+// Relocate the allowed root and verifier in the isolated copy; production keeps
+// its /opt restriction and the SHA-bound runtime layout.
 const guard = '[[ ! "$APP_ROOT" =~ ^/opt/[a-zA-Z0-9._-]+$ ]]';
 assert.ok(source.includes(guard));
-const isolated = source.replace(guard, '[[ "$APP_ROOT" != "$TEST_ROOT" ]]');
+const isolated = source.replace(guard, '[[ "$APP_ROOT" != "$TEST_ROOT" ]]')
+  .replace('$RUNTIME_DIR/../../scripts/verify-session-recovery.mjs', '$RUNTIME_DIR/verify-session-recovery.mjs');
+const fixtureFiles = {
+  'backend/src/server.js': 'original\n', 'backend/package.json': '{}\n',
+  'backend/package-lock.json': '{}\n', 'database/migrations/022_user_session_version.sql': '-- fixture session version\n',
+};
+const fixtureContract = { version: 1, files: Object.fromEntries(Object.entries(fixtureFiles)
+  .map(([path, text]) => [path, createHash('sha256').update(text).digest('hex')])) };
+const workflow = (await readFile(new URL('../.github/workflows/cd-production.yml', import.meta.url), 'utf8')).replaceAll('\r', '');
+const smokeDriver = workflow.split('      - name: Production smoke tests\n        run: |\n')[1]
+  .split('\n').map(line => line.replace(/^ {10}/, '')).join('\n');
+assert.ok(smokeDriver.includes('prepare-deploy-runtime.mjs rollback'));
+const verifier = await readFile(new URL('./verify-session-recovery.mjs', import.meta.url), 'utf8');
 
 const harness = String.raw`
 set -Eeuo pipefail
@@ -29,6 +43,9 @@ make_release() {
   mkdir -p "$1/backend/src"
   printf 'original\n' > "$1/backend/src/server.js"
   printf '{}\n' > "$1/backend/package.json"
+  printf '{}\n' > "$1/backend/package-lock.json"
+  mkdir -p "$1/database/migrations"
+  printf '%s\n' '-- fixture session version' > "$1/database/migrations/022_user_session_version.sql"
 }
 make_joint_release() {
   make_release "$1"
@@ -41,6 +58,20 @@ make_joint_release "$previous"
 ln -s "$previous" "$APP_ROOT/current"
 [[ -L "$APP_ROOT/current" ]] || { echo 'Native symlinks required for these tests'; exit 90; }
 case "$SCENARIO" in
+  unsafe_restart|unsafe_health|unsafe_before_migrations|unsafe_after_migrations|unsafe_after_activation|legacy_migration_only|explicit_recovery)
+    printf 'legacy without revocation\n' > "$previous/backend/src/server.js"
+    if [[ "$SCENARIO" != legacy_migration_only ]]; then rm "$previous/database/migrations/022_user_session_version.sql"; fi
+    if [[ "$SCENARIO" == explicit_recovery ]]; then
+      recovery="$APP_ROOT/releases/$(printf 'c%.0s' {1..40})"
+      make_joint_release "$recovery"
+      ln -s "$recovery" "$APP_ROOT/recovery"
+    fi
+    ;;
+  floor_unsafe_before_migrations)
+    printf 'legacy without revocation\n' > "$previous/backend/src/server.js"
+    touch "$APP_ROOT/shared/session-revocation-required"
+    ;;
+  floor_safe_before_migrations) touch "$APP_ROOT/shared/session-revocation-required" ;;
   active*) make_joint_release "$candidate"; ln -sfn "releases/$sha" "$APP_ROOT/current" ;;
   existing) make_joint_release "$candidate" ;;
   first*) rm "$APP_ROOT/current" ;;
@@ -49,10 +80,11 @@ case "$SCENARIO" in
     make_joint_release "$previous"
     ln -sfn "$previous" "$APP_ROOT/current"
     ;;
-  rollback_command)
+  rollback_command|smoke_safe|smoke_unsafe)
     make_joint_release "$candidate"
     ln -sfn "$candidate" "$APP_ROOT/current"
     ln -s "$previous" "$APP_ROOT/previous"
+    if [[ "$SCENARIO" == smoke_unsafe ]]; then printf 'legacy without revocation\n' > "$previous/backend/src/server.js"; fi
     ;;
   rollback_invalid)
     make_joint_release "$candidate"
@@ -83,6 +115,12 @@ git() {
   fi
 }
 node() {
+  if [[ "$1" == scripts/smoke-test.mjs ]]; then
+    if [[ "$RELEASE_SHA" == "$sha" ]]; then echo 'simulated public smoke failure' >&2; return 1; fi
+    return 0
+  fi
+  if [[ "$1" == scripts/prepare-deploy-runtime.mjs ]]; then printf '{}\n'; return; fi
+  if [[ "$1" == *verify-session-recovery.mjs ]]; then command node "$@"; return; fi
   local script="$1"
   local dir="$2"
   local rel_dir="$candidate"
@@ -134,17 +172,18 @@ npm() {
     ci) [[ "$event" != "ci:backend" ]] ;;
     "ci:frontend") [[ "$event" != "ci:frontend" ]] ;;
     build|"build:frontend") [[ "$event" != "build:frontend" ]] ;;
-    "migrate:dry") [[ "$step" != "migrate:dry" ]] ;;
+    "migrate:dry"|unsafe_before_migrations|floor_safe_before_migrations) [[ "$step" != "migrate:dry" ]] ;;
     migrate) [[ "$step" != migrate ]] ;;
     *) return 0 ;;
   esac
 }
 systemctl() {
+  if [[ "$1" == stop ]]; then echo stop >> "$TRACE"; return 0; fi
   local active count
   active=$(realpath "$APP_ROOT/current")
   echo "restart:$active" >> "$TRACE"
   count=$(grep -c '^restart:' "$TRACE")
-  [[ "$SCENARIO" != restart && "$SCENARIO" != rollback_restart && "$SCENARIO" != first_restart && "$SCENARIO" != rollback_joint ]] || [[ "$count" -gt 1 && "$SCENARIO" != rollback_restart ]]
+  [[ "$SCENARIO" != restart && "$SCENARIO" != rollback_restart && "$SCENARIO" != first_restart && "$SCENARIO" != rollback_joint && "$SCENARIO" != unsafe_restart && "$SCENARIO" != explicit_recovery ]] || [[ "$count" -gt 1 && "$SCENARIO" != rollback_restart ]]
 }
 curl() {
   local active
@@ -152,12 +191,32 @@ curl() {
   echo "health:$active" >> "$TRACE"
   case "$SCENARIO" in
     active_bad|rollback_health|first_health) return 1 ;;
+    unsafe_health|legacy_migration_only) return 1 ;;
     health|rollback_joint) [[ "$active" == "$previous" ]] ;;
     *) return 0 ;;
   esac
 }
+aws() {
+  if [[ "$2" == send-command ]]; then
+    if bash ./deploy.sh "$sha" rollback > rollback.log 2>&1; then echo Success > rollback.status; else echo Failed > rollback.status; fi
+    echo test-command-id
+  elif [[ "$2" == wait ]]; then
+    [[ "$(cat rollback.status)" == Success ]]
+  elif [[ "$*" == *'--query Status'* ]]; then
+    cat rollback.status
+  else
+    cat rollback.log
+  fi
+}
+export -f aws
 rm() { echo rm >> "$TRACE"; command rm "$@"; }
-export -f git node pg_dump gzip npm systemctl curl rm make_release make_joint_release
+mv() {
+  if [[ "$SCENARIO" == *after_migrations && "$*" == *current.next* ]]; then return 1; fi
+  command mv "$@" || return
+  if [[ "$*" == *current.next* ]]; then echo activation >> "$TRACE"; fi
+  if [[ "$SCENARIO" == unsafe_after_activation && "$*" == *current.next* ]]; then return 1; fi
+}
+export -f git node pg_dump gzip npm systemctl curl rm mv make_release make_joint_release
 export previous candidate sha
 # Windows has no flock. Model contention explicitly; Linux uses the real flock.
 if [[ "$SIMULATE_FLOCK" == 1 ]]; then
@@ -192,7 +251,9 @@ if [[ "$SCENARIO" == concurrent ]]; then
   status=$?
   cat first.log
 else
-  if [[ "$SCENARIO" == rollback_command || "$SCENARIO" == rollback_invalid ]]; then
+  if [[ "$SCENARIO" == smoke_* ]]; then
+    RELEASE_SHA="$sha" RUNNER_TEMP="$PWD" EC2_INSTANCE_ID=isolated-test bash ./smoke.sh
+  elif [[ "$SCENARIO" == rollback_command || "$SCENARIO" == rollback_invalid || "$SCENARIO" == smoke_* ]]; then
     bash ./deploy.sh "$sha" rollback
   else
     bash ./deploy.sh "$sha"
@@ -204,6 +265,8 @@ echo "STATUS:$status"
 echo "CURRENT:$(realpath -m "$APP_ROOT/current")"
 echo "PREVIOUS:$previous"
 echo "CANDIDATE:$candidate"
+[[ ! -f "$APP_ROOT/shared/session-revocation-required" ]] || echo SESSION_FLOOR_PRESENT
+[[ ! -e "$APP_ROOT/recovery" ]] || echo "RECOVERY:$(realpath "$APP_ROOT/recovery")"
 if [[ -f "$APP_ROOT/current/frontend/dist/release.json" ]]; then
   echo "CURRENT_MARKER:$(grep '"sha"' "$APP_ROOT/current/frontend/dist/release.json")"
 fi
@@ -217,6 +280,9 @@ cat "$TRACE"
 
 const failureStages = ['clone', 'wrong_sha', 'ci', 'ci:frontend', 'build', 'validator', 'missing_dist', 'missing_index', 'backup', 'gzip', 'migrate:dry', 'migrate'];
 for (const scenario of [
+  'unsafe_restart', 'unsafe_health', 'unsafe_before_migrations', 'floor_unsafe_before_migrations',
+  'after_migrations', 'explicit_recovery', 'smoke_safe', 'smoke_unsafe',
+  'unsafe_after_migrations', 'unsafe_after_activation', 'legacy_migration_only', 'floor_safe_before_migrations',
   'new', 'active', 'active_bad', 'existing', 'clone', 'wrong_sha', 'ci', 'ci:frontend', 'build', 'validator',
   'missing_dist', 'missing_index', 'backup', 'gzip', 'migrate:dry', 'migrate',
   'restart', 'health', 'rollback_restart', 'rollback_health', 'rollback_joint',
@@ -226,7 +292,11 @@ for (const scenario of [
     const directory = await mkdtemp(join(tmpdir(), 'agora-deploy-test-'));
     t.after(() => rm(directory, { recursive: true, force: true }));
     await writeFile(join(directory, 'deploy.sh'), isolated);
-    const result = spawnSync(shell, ['-c', harness], {
+    await writeFile(join(directory, 'smoke.sh'), 'set -Eeuo pipefail\n' + smokeDriver);
+    await writeFile(join(directory, 'verify-session-recovery.mjs'), verifier);
+    await writeFile(join(directory, 'session-recovery-contract.json'), JSON.stringify(fixtureContract));
+    await writeFile(join(directory, 'harness.sh'), harness);
+    const result = spawnSync(shell, ['harness.sh'], {
       cwd: directory, encoding: 'utf8', timeout: 20_000,
       env: { ...process.env, SCENARIO: scenario, SIMULATE_FLOCK: windows ? '1' : '0' },
     });
@@ -234,7 +304,15 @@ for (const scenario of [
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const output = result.stdout;
     const trace = output.split('\n').filter(line => /^(git|backup|ci(:.*)?|build(:.*)?|node:.*|migrate(:dry)?|rm|restart:.*|health:.*)$/.test(line));
+    const lifecycle = output.split('\n').filter(line => /^(stop|activation|restart:.*)$/.test(line));
+    if (lifecycle.includes('activation')) {
+      assert.ok(lifecycle.indexOf('stop') >= 0 && lifecycle.indexOf('stop') < lifecycle.indexOf('activation'),
+        'the old API must stop before the first activation');
+    }
     const value = name => output.match(new RegExp(`^${name}:(.*)$`, 'm'))?.[1];
+    if (scenario.startsWith('unsafe_') || scenario === 'smoke_unsafe' || scenario === 'legacy_migration_only') {
+      assert.ok(!trace.includes(`restart:${value('PREVIOUS')}`), 'an incompatible backend must never be restarted');
+    }
     const success = ['new', 'active', 'retention', 'concurrent', 'rollback_command', 'legacy_marker'].includes(scenario);
     assert.equal(value('STATUS') === '0', success, output + result.stderr);
     if (!scenario.startsWith('first')) assert.match(output, /PREVIOUS_PRESERVED/);
@@ -243,7 +321,9 @@ for (const scenario of [
       assert.ok(trace.every(line => line.startsWith('health:')), trace.join('\n'));
     }
     if (scenario === 'active') assert.match(output, /already active and healthy/);
-    if (scenario === 'rollback_command') {
+    if (scenario === 'smoke_safe') assert.match(result.stderr, /previous joint release .* restored and verified/);
+    if (scenario === 'smoke_unsafe') assert.match(result.stderr, /SESSION_RECOVERY_BLOCKED_OR_FAILED/);
+    if (scenario === 'rollback_command' || scenario === 'smoke_safe') {
       assert.equal(value('CURRENT'), value('PREVIOUS'));
       assert.match(output, /Joint release restored/);
       assert.match(output, new RegExp(`^ROLLBACK_SHA=${'b'.repeat(40)}$`, 'm'));
@@ -292,7 +372,7 @@ for (const scenario of [
       assert.match(result.stderr, scenario.startsWith('rollback_restart') || scenario === 'rollback_health' ? /Application recovery failed/ : /Application recovery succeeded/);
       assert.match(result.stderr, /Database migrations were not reversed/);
     }
-    if (scenario.startsWith('first')) assert.match(result.stderr, /No valid previous release/);
+    if (scenario.startsWith('first')) assert.match(result.stderr, /SESSION_RECOVERY_BLOCKED/);
     if (['new', 'retention'].includes(scenario)) {
       assert.equal(value('CURRENT'), value('CANDIDATE'));
       assert.match(output, /CANDIDATE_PRESERVED/);
@@ -301,6 +381,46 @@ for (const scenario of [
       assert.ok(trace.includes('rm'));
       assert.match(output, /build_env:\/api/);
       assert.match(output, /validate_env:\/api/);
+    }
+    if (['unsafe_restart', 'unsafe_health', 'smoke_unsafe', 'unsafe_after_activation', 'legacy_migration_only'].includes(scenario)) {
+      assert.equal(value('CURRENT'), value('CANDIDATE'));
+      assert.match(output, /SESSION_FLOOR_PRESENT/);
+      assert.match(result.stderr, /SESSION_RECOVERY_BLOCKED/);
+      assert.ok(!trace.includes(`restart:${value('PREVIOUS')}`));
+      assert.match(output, /^stop$/m);
+      assert.equal(lifecycle.at(-1), 'stop', 'blocked recovery must leave the API stopped');
+    }
+    if (scenario === 'floor_unsafe_before_migrations') {
+      assert.equal(value('CURRENT'), value('PREVIOUS'));
+      assert.match(result.stderr, /Active release violates the persistent session floor/);
+      assert.ok(!trace.includes('backup'));
+      assert.ok(!trace.some(line => line.startsWith('restart:')));
+      assert.match(output, /^stop$/m);
+    }
+    if (scenario === 'unsafe_before_migrations') {
+      assert.equal(value('CURRENT'), value('PREVIOUS'));
+      assert.ok(!trace.includes('migrate'));
+      assert.doesNotMatch(output, /SESSION_FLOOR_PRESENT/);
+    }
+    if (['after_migrations', 'unsafe_after_migrations'].includes(scenario)) {
+      assert.equal(value('CURRENT'), value('PREVIOUS'));
+      assert.ok(trace.includes('migrate'));
+      assert.match(output, /SESSION_FLOOR_PRESENT/);
+      assert.ok(!trace.some(line => line.startsWith('restart:')));
+      assert.match(result.stderr, /SESSION_ACTIVATION_FAILED/);
+      assert.equal(lifecycle.at(-1), 'stop', 'unexpected cutover failure must leave the API stopped');
+    }
+    if (scenario === 'floor_safe_before_migrations') {
+      assert.equal(value('CURRENT'), value('PREVIOUS'));
+      assert.match(output, /SESSION_FLOOR_PRESENT/);
+      assert.ok(!trace.includes('migrate'));
+      assert.ok(!trace.some(line => line.startsWith('restart:')));
+    }
+    if (scenario === 'explicit_recovery') {
+      assert.equal(value('CURRENT'), value('RECOVERY'));
+      assert.ok(trace.includes(`restart:${value('RECOVERY')}`));
+      assert.ok(!trace.includes(`restart:${value('PREVIOUS')}`));
+      assert.match(result.stderr, /Application recovery succeeded/);
     }
     if (scenario === 'retention') assert.equal(Number(value('COUNT')), 7);
   });

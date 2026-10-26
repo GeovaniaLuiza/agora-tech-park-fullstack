@@ -1,0 +1,2 @@
+# Shell runtimes must remain executable by Linux Bash after Windows checkouts.
+*.sh text eol=lf

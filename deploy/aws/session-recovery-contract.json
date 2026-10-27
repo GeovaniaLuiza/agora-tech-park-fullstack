@@ -2,8 +2,8 @@
   "version": 1,
   "reviewedBackendCommit": "08b7ae3d67103ceb0a8f9c2082b32e8d48dd412f",
   "files": {
-    "backend/package-lock.json": "4f32b14f452aa50593ab1dafe6f68285955fbb9b09f50399cdceeceef8a9eb30",
-    "backend/package.json": "98bcbcf15fe2ce79db51963723685a3641807c230a1ef18596f64d5807e9f6f3",
+    "backend/package-lock.json": "0cdeac024e736d48971a95e537398c6eb7301ba9e24fde6efeb2527bc385a2be",
+    "backend/package.json": "762032d236f5f56b5adb589cc4d04f304b647ed28788053d00a439974fee30b6",
     "backend/src/app.js": "d9f2b30e067ee6c680cff477d6494e2e2daf62d6de99f79ad89390e9028da6b6",
     "backend/src/config/database.js": "513644ce5ddf8b682897cb7b88db8910922f92eb6aef029138b0c6bf16541128",
     "backend/src/config/environment.js": "e7d1fceb16eb5c474515f86b24012d475e9db971bbf3a7a1e40e02ac7a52ac97",
@@ -116,5 +116,43 @@
         "reason": "Required by body-parser 2.4.0"
       }
     }
+  },
+  "reviewedDependencySecurityUpdate": {
+    "baselineCommit": "71510099622bcd82b08b039b8839e78dfaf2cfa1",
+    "advisories": [
+      "GHSA-8c8m-p3m8-cjg8",
+      "GHSA-m943-m63m-w62w",
+      "GHSA-85x2-q946-cp5h",
+      "GHSA-rxp7-6hxx-x8q5",
+      "GHSA-qxg6-89mg-rqv8",
+      "GHSA-xp26-3454-mjgp"
+    ],
+    "packages": {
+      "nodemailer": {
+        "from": "10.0.12",
+        "to": "10.1.4",
+        "scope": "backend runtime"
+      },
+      "ip-address": {
+        "from": "10.7.2",
+        "to": "10.7.4",
+        "scope": "backend runtime, via express-rate-limit ^10.2.0 dependency range"
+      },
+      "vitest": {
+        "from": "5.0.2",
+        "to": "5.0.3",
+        "scope": "backend and frontend development; includes @vitest/mocker, @vitest/spy and @vitest/coverage-v8"
+      },
+      "why-is-node-running": {
+        "from": "3.2.2",
+        "to": "3.2.1",
+        "scope": "development only; exact version required by vitest 5.0.3"
+      }
+    },
+    "fingerprintsUpdated": [
+      "backend/package.json",
+      "backend/package-lock.json"
+    ],
+    "sourceAndMigrationUnchanged": true
   }
 }

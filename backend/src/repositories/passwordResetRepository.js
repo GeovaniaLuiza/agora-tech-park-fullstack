@@ -34,7 +34,7 @@ export async function consume(rawToken, passwordHash, audit) {
     if (token.used_at) { await client.query('ROLLBACK'); return { state: 'USED' }; }
     if (new Date(token.expires_at) <= new Date()) { await client.query('ROLLBACK'); return { state: 'EXPIRED' }; }
     await client.query('UPDATE password_reset_tokens SET used_at=NOW() WHERE id=$1', [token.id]);
-    await client.query('UPDATE users SET password_hash=$1 WHERE id=$2', [passwordHash, token.user_id]);
+    await client.query('UPDATE users SET password_hash=$1,session_version=session_version+1 WHERE id=$2', [passwordHash, token.user_id]);
     await audit(client, token);
     await client.query('COMMIT');
     return { state: 'RESET' };

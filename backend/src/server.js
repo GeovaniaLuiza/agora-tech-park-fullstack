@@ -5,9 +5,11 @@ import { verifyConnection } from './services/emailService.js';
 import { shutdown } from './db/pool.js';
 import { logger } from './observability/logger.js';
 import { validateEnvironment } from './config/environment.js';
+import { assertSessionSchemaReady } from './config/sessionSchema.js';
 
 async function start() {
   const config = validateEnvironment();
+  await assertSessionSchemaReady();
   try {
     await verifyConnection();
     logger.info({ event: 'email_provider_verified', provider: config.EMAIL_PROVIDER }, 'Email provider verified');
@@ -29,7 +31,8 @@ async function start() {
   process.once('SIGINT', () => stop('SIGINT'));
 }
 
-start().catch((error) => {
+start().catch(async (error) => {
   logger.fatal({ event: 'api_start_failed', err: error }, 'API failed to start');
   process.exitCode = 1;
+  await shutdown();
 });

@@ -34,11 +34,16 @@ function git(cwd, args) {
   return result.stdout.trim();
 }
 
-async function createOrigin(root, { runtime = runtimeStub, includeRuntime = true } = {}) {
+async function createOrigin(root, { runtime = runtimeStub, includeRuntime = true, includePolicy = true } = {}) {
   const origin = join(root, 'origin');
   await mkdir(join(origin, 'deploy', 'aws'), { recursive: true });
   await writeFile(join(origin, 'README.md'), 'agora\n', 'utf8');
   if (includeRuntime) await writeFile(join(origin, RUNTIME_PATH), runtime, 'utf8');
+  if (includePolicy) {
+    await mkdir(join(origin, 'scripts'), { recursive: true });
+    await writeFile(join(origin, 'scripts/verify-session-recovery.mjs'), 'export const version = 1;\n');
+    await writeFile(join(origin, 'deploy/aws/session-recovery-contract.json'), '{"version":1}\n');
+  }
   git(origin, ['init', '--quiet', '.']);
   git(origin, ['add', '-A']);
   git(origin, ['-c', 'user.email=ci@example.com', '-c', 'user.name=CI', '-c', 'commit.gpgsign=false',
@@ -46,19 +51,19 @@ async function createOrigin(root, { runtime = runtimeStub, includeRuntime = true
   return { sha: git(origin, ['rev-parse', 'HEAD']), url: pathToFileURL(origin).href };
 }
 
-async function runBootstrap(root, { sha, action = 'deploy', url = REPOSITORY_URL, shimDir }) {
+async function runBootstrap(root, { sha, action = 'deploy', url = REPOSITORY_URL, shimDir, recoveryActiveSha }) {
   await mkdir(join(root, 'tmp'), { recursive: true });
   const driver = [
     'set -Eeuo pipefail',
     'real_git="$(command -v git)"',
     'export AGORA_RELEASE_SHA="$1" AGORA_DEPLOY_ACTION="$2" REPOSITORY_URL="$3"',
-    'export TMPDIR="$4" AGORA_RUNTIME_MARKER="$5"',
+    'export TMPDIR="$(cd "$4" && pwd)" AGORA_RUNTIME_MARKER="$5"',
     'export PATH="$6:$PATH" REAL_GIT="$real_git"',
     'bash "$7/bootstrap.sh"',
   ].join('\n');
   return spawnSync(shell, ['-c', driver, 'agora-bootstrap',
     sha, action, url, join(root, 'tmp'), join(root, 'marker.txt'), shimDir || root, root],
-  { encoding: 'utf8', cwd: root });
+  { encoding: 'utf8', cwd: root, env: { ...process.env, AGORA_RECOVERY_ACTIVE_SHA: recoveryActiveSha || '' } });
 }
 
 async function marker(root) {
@@ -93,7 +98,7 @@ test('bootstrap runs the approved commit from a temporary directory and cleans u
 
   assert.notEqual(executedPath, RUNTIME_PATH);
   assert.doesNotMatch(executedPath, /\/opt\/agora\/bin\//);
-  assert.match(executedPath, /agora-deploy-runtime\.[A-Za-z0-9]+\/deploy-backend\.sh$/);
+  assert.match(executedPath, /agora-deploy-runtime\.[A-Za-z0-9]+\/deploy\/aws\/deploy-backend\.sh$/);
   await assert.rejects(stat(executedPath), 'the executed temporary copy must not survive');
   await assertCleanup(root);
 });
@@ -109,7 +114,7 @@ test('rollback reuses the same temporary bootstrap', async (t) => {
   const [passedSha, passedAction, executedPath] = (await marker(root)).split('|');
   assert.equal(passedSha, sha);
   assert.equal(passedAction, 'rollback');
-  assert.match(executedPath, /agora-deploy-runtime\.[A-Za-z0-9]+\/deploy-backend\.sh$/);
+  assert.match(executedPath, /agora-deploy-runtime\.[A-Za-z0-9]+\/deploy\/aws\/deploy-backend\.sh$/);
   await assertCleanup(root);
 
   const deploy = buildInvocation({ releaseSha: sha, action: 'deploy' });
@@ -251,7 +256,7 @@ test('bootstrap fetches and extracts only the approved commit', () => {
   assert.match(bootstrap, /git -C "\$repository" show "\$release_sha:\$runtime_path" > "\$runtime"/);
   assert.match(bootstrap, /if \[\[ ! -s "\$runtime" \]\]; then/);
   assert.match(bootstrap, /^bash -n "\$runtime"$/m);
-  assert.match(bootstrap, /^bash "\$runtime" "\$release_sha" "\$action"$/m);
+  assert.match(bootstrap, /^bash "\$runtime" "\$recovery_active_sha" "\$action"$/m);
   assert.ok(bootstrap.indexOf('bash -n "$runtime"') < bootstrap.indexOf('bash "$runtime"'),
     'syntax validation must precede execution');
 });
@@ -286,4 +291,32 @@ test('production CD never reaches the persistent runtime', async () => {
   assert.match(workflow, /node scripts\/prepare-deploy-runtime\.mjs deploy/);
   assert.match(workflow, /node scripts\/prepare-deploy-runtime\.mjs rollback/);
   assert.doesNotMatch(workflow, /jq -cn --arg command/);
+});
+
+test('missing trusted recovery policy aborts before the runtime executes', async (t) => {
+  const root = await workspace(t);
+  const { sha, url } = await createOrigin(root, { includePolicy: false });
+  const result = await runBootstrap(root, { sha, url });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Approved release lacks recovery policy/);
+  assert.equal(await marker(root), null);
+  await assertCleanup(root);
+});
+
+test('approved runtime can recover a different active SHA without fetching its legacy runtime', async (t) => {
+  const root = await workspace(t);
+  const { sha, url } = await createOrigin(root);
+  const activeSha = 'e'.repeat(40);
+  const result = await runBootstrap(root, { sha, url, action: 'rollback', recoveryActiveSha: activeSha });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, new RegExp(`Fetching approved release ${sha}`));
+  assert.equal((await marker(root)).split('|')[0], activeSha);
+  assert.equal((await marker(root)).split('|')[1], 'rollback');
+  await assertCleanup(root);
+  const invocation = buildInvocation({ releaseSha: sha, action: 'rollback', recoveryActiveSha: activeSha });
+  assert.match(invocation, new RegExp(`AGORA_RECOVERY_ACTIVE_SHA=${activeSha}`));
+  assert.throws(() => buildInvocation({ releaseSha: sha, recoveryActiveSha: activeSha }), /only for rollback/);
+  const refused = await runBootstrap(root, { sha, url, recoveryActiveSha: activeSha });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /can differ only for rollback/);
 });

@@ -14,7 +14,7 @@ export function ProtectedRoute({ roles }) {
   const { user, loading, sessionRecoveryRequired, sessionError, restoreSession } = useAuth();
   const location = useLocation();
   if (loading) return <AuthLoading />;
-  if (!user && sessionRecoveryRequired) return <div className="route-state" role="alert"><p>{sessionError}</p><button className="button primary" onClick={restoreSession}>Retomar sessão</button></div>;
+  if (sessionRecoveryRequired) return <div className="route-state" role="alert"><p>{sessionError}</p><button className="button primary" onClick={restoreSession}>Retomar sessão</button></div>;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (roles && !isKnownRole(user.role)) return <Navigate to="/unknown-profile" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/unauthorized" replace />;

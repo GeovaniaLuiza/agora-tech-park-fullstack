@@ -66,13 +66,14 @@ describe('autenticação durante operações de importação', () => {
     expect(fetchMock.mock.calls.some(([url]) => /\/auth\/(login|logout|refresh)$/.test(url))).toBe(false);
   });
 
-  it.each([403, 409, 422, 429, 500, 503])('revalidação /me %s preserva usuário e token existentes', async (status) => {
+  it.each([403, 409, 422, 429, 500, 503])('revalidação /me %s bloqueia operação até confirmar a sessão novamente', async (status) => {
     fetchMock.mockResolvedValueOnce(response(status));
     renderImport(() => confirmIndicatorImport('batch'));
     await screen.findByText(user.name);
     fireEvent.click(screen.getByRole('button', { name: 'Verificar sessão' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    await screen.findByText(user.name);
+    await screen.findByRole('button', { name: 'Retomar sessão' });
+    expect(screen.queryByText(user.name)).toBeNull();
     expect(tokenStore.get()).toBe('valid-token');
     expect(screen.queryByRole('button', { name: /^entrar/i })).toBeNull();
   });

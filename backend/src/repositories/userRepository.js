@@ -32,6 +32,27 @@ export async function findPublicProfile(id) {
   return { ...user, organizations: await organizationsForUser(id) };
 }
 
+export async function findAuthenticationProfile(id) {
+  const { rows } = await query(`SELECT ${publicColumns},u.session_version FROM users u WHERE u.id=$1 AND u.deleted_at IS NULL`, [id]);
+  if (!rows[0]) return null;
+  return { ...rows[0], organizations: await organizationsForUser(id) };
+}
+
+export async function revokeSessions(userId, sessionVersion, audit) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // A delayed logout must not revoke a login made after an earlier logout.
+    const result = await client.query(`UPDATE users SET session_version=session_version+1
+      WHERE id=$1 AND session_version=$2 AND deleted_at IS NULL RETURNING id`, [userId, sessionVersion]);
+    if (result.rowCount) await audit(client);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
+}
+
 export async function updateAvatar(userId, avatarData) {
   const { rows } = await query(
     `UPDATE users SET avatar_data=$2, updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL

@@ -45,6 +45,7 @@ afterEach(async () => {
 afterAll(shutdown);
 
 describe('email uniqueness for non-deleted accounts', () => {
+  // Even duplicate-email requests compute a real cost-12 hash before the uniqueness check.
   it.each(roles.flatMap((role) => ['ACTIVE', 'INACTIVE', 'PENDING', 'EMAIL_PENDING', 'REJECTED'].map((status) => [role, status])))('reserves email for %s / %s accounts, ignoring case', async (role, status) => {
     await sql(`INSERT INTO users(name,email,password_hash,role,status,email_verified_at)
       VALUES('Existing',$1,'unused',$2,$3,NOW())`, [email, role, status]);
@@ -52,8 +53,9 @@ describe('email uniqueness for non-deleted accounts', () => {
     expect(response.status).toBe(409);
     expect(response.body.code).toBe('EMAIL_ALREADY_EXISTS');
     expect(mail.sendPasswordReset).not.toHaveBeenCalled();
-  });
+  }, 10_000);
 
+  // This full lifecycle performs several real cost-12 hashes and a real password comparison.
   it.each(roles)('%s reuses the email with a new identity, preserving history and isolating credentials', async (role) => {
     const first = await create(role, email.replace('@reuse.invalid', '@Reuse.Invalid'));
     expect(first.status).toBe(201);
@@ -101,8 +103,9 @@ describe('email uniqueness for non-deleted accounts', () => {
     expect(login.status).toBe(200);
     expect(login.body.user.id).toBe(second.body.id);
     expect((await create(role)).status).toBe(409);
-  });
+  }, 45_000);
 
+  // This rollback scenario also performs two real cost-12 managed-user hashes.
   it('rolls deletion, links and token revocation back if auditing fails', async () => {
     const created = await create();
     expect(created.status).toBe(201);
@@ -112,7 +115,7 @@ describe('email uniqueness for non-deleted accounts', () => {
     expect((await sql('SELECT active FROM users_organizations WHERE user_id=$1', [id])).rows[0].active).toBe(true);
     expect((await sql('SELECT used_at FROM password_reset_tokens WHERE user_id=$1', [id])).rows[0].used_at).toBeNull();
     expect((await create()).status).toBe(409);
-  });
+  }, 10_000);
 
   it('keeps database uniqueness under concurrent inserts with different email casing', async () => {
     const insert = (value) => access.createManagedUser({ name: 'Concurrent', email: value, passwordHash: 'unused', role: 'GESTOR', adminId },

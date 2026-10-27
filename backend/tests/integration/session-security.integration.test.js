@@ -80,6 +80,7 @@ describe('PostgreSQL-backed JWT lifecycle', () => {
     expect(audit.rowCount).toBe(1);
   });
 
+  // Multiple real cost-12 bcrypt operations need a bounded budget on slower CI CPUs.
   it('atomically invalidates all old sessions on reset; only the new password logs in', async () => {
     const first = await login(); const second = await login();
     const reset = await issue(id);
@@ -94,7 +95,7 @@ describe('PostgreSQL-backed JWT lifecycle', () => {
     await me(fresh.body.token).expect(200);
     await request(app).post('/api/auth/reset-password').send({ token: reset.rawToken, password: newPassword, confirmPassword: newPassword }).expect(409);
     expect(await version()).toBe(1);
-  });
+  }, 25_000);
 
   it('rolls back password, reset consumption and revocation together on audit failure', async () => {
     const reset = await issue(id);

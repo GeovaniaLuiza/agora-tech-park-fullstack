@@ -1,9 +1,4 @@
-<<<<<<< HEAD
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-=======
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
->>>>>>> origin/main
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 
@@ -74,9 +69,7 @@ vi.mock('./services/api', async (original) => ({
 import App from './App';
 
 beforeEach(() => {
-<<<<<<< HEAD
   api.getNotifications.mockResolvedValue([]);
-=======
   vi.clearAllMocks();
   api.getForms.mockResolvedValue([]);
   api.getForm.mockResolvedValue({ id: 'form-1', title: 'Coleta existente', status: 'DRAFT' });
@@ -85,7 +78,6 @@ beforeEach(() => {
   api.getFormRespondents.mockResolvedValue([]);
   api.updateForm.mockResolvedValue({ id: 'form-1' });
   api.publishForm.mockResolvedValue({ notificationSummary: { sent: 1, failed: 0 } });
->>>>>>> origin/main
   api.getAccessRequests.mockResolvedValue([]);
   api.getIndicators.mockResolvedValue([]);
   api.getIndicatorHistory.mockResolvedValue([]);

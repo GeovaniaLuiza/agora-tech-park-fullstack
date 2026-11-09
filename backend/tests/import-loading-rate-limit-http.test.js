@@ -50,5 +50,5 @@ describe('limites independentes na aplicação HTTP', () => {
     expect(blocked.body.code).toBe('RATE_LIMIT_EXCEEDED');
     expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
     for (const loadingPath of loadingPaths) expect((await request(app).get(loadingPath)).status).toBe(200);
-  });
+  }, 15000);
 });

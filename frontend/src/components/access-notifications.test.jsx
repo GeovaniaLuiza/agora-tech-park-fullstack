@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -102,6 +102,30 @@ describe('notificações de solicitações de acesso', () => {
     await user.click(screen.getByRole('button', { name: 'Notificações' }));
     await user.click((await screen.findAllByRole('button', { name: /Nova solicitação de acesso/ }))[0]);
     expect(await screen.findByLabelText('Solicitação de Mesmo Nome')).toBeTruthy();
+    expect(screen.getByLabelText('Rota').textContent).toBe(notifications[0].link);
+    expect(screen.queryByLabelText('Painel de notificações')).toBeNull();
+  });
+
+  it.each(['resolve', 'reject'])('carrega a solicitação com leitura pendente e mantém a URL após %s', async (outcome) => {
+    let resolveRead;
+    let rejectRead;
+    api.markNotificationRead.mockReturnValue(new Promise((resolve, reject) => { resolveRead = resolve; rejectRead = reject; }));
+    const user = userEvent.setup();
+    renderFlow();
+    await user.click(screen.getByRole('button', { name: 'Notificações' }));
+    await user.click((await screen.findAllByRole('button', { name: /Nova solicitação de acesso/ }))[0]);
+    expect(screen.getByLabelText('Rota').textContent).toBe(notifications[0].link);
+    expect(screen.queryByLabelText('Painel de notificações')).toBeNull();
+    expect(await screen.findByLabelText('Solicitação de Mesmo Nome')).toBeTruthy();
+    expect(api.getAccessRequest).toHaveBeenCalledExactlyOnceWith(requests[0].id);
+
+    await act(async () => {
+      if (outcome === 'resolve') resolveRead({ ...notifications[0], read_at: '2026-10-19T12:00:00Z' });
+      else rejectRead(new Error('Falha de leitura'));
+    });
+    expect(screen.getByLabelText('Rota').textContent).toBe(notifications[0].link);
+    expect(screen.getByLabelText('Solicitação de Mesmo Nome').textContent).toContain(requests[0].email);
+    expect(screen.queryByLabelText('Painel de notificações')).toBeNull();
   });
 
   it('não marca novamente uma notificação já lida', async () => {

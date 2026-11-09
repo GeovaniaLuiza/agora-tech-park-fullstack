@@ -5,6 +5,7 @@ import request from 'supertest';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 dotenv.config({ quiet: true });
+process.env.JWT_SECRET ||= 'form-indicator-test-secret-at-least-32-characters';
 const { pool, shutdown } = await import('../src/db/pool.js');
 const repository = await import('../src/repositories/indicatorValueRepository.js');
 const responses = await import('../src/repositories/responseRepository.js');

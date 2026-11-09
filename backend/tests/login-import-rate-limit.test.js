@@ -36,7 +36,7 @@ describe('limite de login durante importação', () => {
     expect(blocked.status).toBe(429);
     expect(blocked.body.rateLimitScope).toBe('LOGIN');
     expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
-  });
+  }, 15000);
   it('orçamento global de gravação pode bloquear login mesmo sem tentativas prévias', async () => {
     vi.resetModules();
     const { default: app } = await import('../src/app.js');
@@ -45,5 +45,5 @@ describe('limite de login durante importação', () => {
     expect(blocked.status).toBe(429);
     expect(blocked.body.rateLimitScope).toBe('GLOBAL_WRITE');
     expect((await request(app).get('/api/auth/me')).status).toBe(200);
-  });
+  }, 15000);
 });

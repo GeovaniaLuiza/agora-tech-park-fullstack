@@ -1,4 +1,4 @@
-# Produção AWS de baixo custo
+﻿# Produção AWS de baixo custo
 
 > Este documento define a arquitetura; não autoriza criação de recursos. Verifique região, créditos/Free Tier reais e preços da conta em uso antes de provisionar.
 
@@ -118,7 +118,7 @@ O script preserva `set -Eeuo pipefail` e passa a URI explicitamente por `pg_dump
 
 A retenção só é aplicada ao final de deploy bem-sucedido. `node --test scripts/deploy-backup.test.mjs` exercita o trecho real de backup com `pg_dump` simulado em diretório temporário, verificando conexão explícita, ausência da URI nos logs, sucesso, limpeza em falhas de dump/compressão/validação e preservação de backups anteriores, sem conectar a banco ou executar o restante do deploy.
 
-`test -s` e `gzip -t` confirmam bytes e integridade do arquivo comprimido, mas não comprovam conteúdo SQL útil nem restauração. Os dumps PostgreSQL existentes em `/opt/agora/backups` constituem uma camada complementar de recuperação, porém não foi executado restore lógico de `pg_dump` nesta validação.
+Em 09/11/2026, a integridade dos dumps existentes em `/opt/agora/backups` foi verificada com `gzip -t`, sem erros. O dump lógico criado pelo deploy do commit `c36fe84f3a7041559352d26c4680e2a4a48737fe` foi restaurado com sucesso em um banco PostgreSQL temporário e isolado, `agora_restore_test_20261109`, sem alterar o banco de produção. A restauração recriou 24 tabelas públicas, carregou os dados e preservou o histórico completo de 22 migrations, incluindo `022_user_session_version.sql`. Após a validação, o banco temporário foi removido e permaneceram apenas os bancos de produção e os bancos padrão do PostgreSQL.
 
 ### AWS Backup e restauração de EBS
 
@@ -134,7 +134,7 @@ O volume restaurado foi mantido isolado, não foi anexado à EC2 de produção e
 
 Essa validação comprova backup e restauração no nível de infraestrutura EBS. Ela não deve ser interpretada como teste de restore lógico do PostgreSQL, nem como comprovação de que o snapshot EBS é application-consistent. Também não representa o RTO completo da aplicação: o tempo de aproximadamente 1 minuto refere-se somente à criação do volume EBS restaurado.
 
-Para recuperação de desastre, a estratégia atual combina duas camadas: snapshots EBS automatizados via AWS Backup e dumps lógicos PostgreSQL produzidos pelo fluxo de deploy. Um teste futuro de restore lógico do `pg_dump` pode ampliar a evidência de recuperação em nível de banco, sem invalidar a validação de EBS concluída nesta issue.
+Para recuperação de desastre, a estratégia atual combina duas camadas: snapshots EBS automatizados via AWS Backup e dumps lógicos PostgreSQL produzidos pelo fluxo de deploy. Ambas as camadas tiveram recuperabilidade validada: o restore EBS foi executado em volume isolado e, em 09/11/2026, o restore lógico de `pg_dump` foi executado em banco temporário isolado, sem impacto no banco de produção.
 
 ## AWS Amplify — legado
 

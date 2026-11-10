@@ -40,7 +40,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | RepositÃ³rio GitHub pÃºblico | âœ… IMPLEMENTADO E VALIDADO | API pÃºblica do GitHub: `GeovaniaLuiza/agora-tech-park-fullstack`, `visibility=public`, branch padrÃ£o `main` | A publicidade amplia o impacto do arquivo com possÃ­veis dados pessoais | Tratar o incidente de privacidade antes de qualquer outra publicaÃ§Ã£o |
 | HistÃ³rico contÃ­nuo de commits | ðŸŸ  PARCIAL | `git log`: 19 commits, de 03/08/2026 a 01/09/2026, distribuÃ­dos em 6 dias; 3 autores, incluindo Dependabot | HistÃ³rico curto e concentrado; merges automÃ¡ticos nÃ£o comprovam evoluÃ§Ã£o contÃ­nua do grupo | Manter commits pequenos, autorais e vinculados a decisÃµes/testes |
 | RevisÃ£o por PR | ðŸŸ  PARCIAL | HistÃ³rico contÃ©m merges de PRs | NÃ£o hÃ¡ evidÃªncia consolidada de revisÃ£o humana/aprovaÃ§Ã£o | Documentar o fluxo e usar revisÃ£o entre integrantes |
-| DocumentaÃ§Ã£o essencial | ðŸŸ  PARCIAL | `README.md`, `docs/ARCHITECTURE.md`, `docs/RFC.md`, `docs/REQUIREMENTS.md`, `docs/adr/`, `docs/CI_CD.md`, `docs/MONITORING.md`, `docs/QUALITY.md` | URLs e trade-offs ainda nÃ£o estÃ£o integralmente consolidados; Wiki Ã© avaliada separadamente | Atualizar conforme a evoluÃ§Ã£o da implementaÃ§Ã£o e infraestrutura |
+| Documentação essencial | ✅ IMPLEMENTADO E VALIDADO | `README.md`, `docs/ARCHITECTURE.md`, `docs/RFC.md`, `docs/REQUIREMENTS.md`, `docs/adr/`, `docs/CI_CD.md`, `docs/MONITORING.md` e `docs/QUALITY.md`; URLs atuais, arquitetura vigente e principais decisões/trade-offs estão documentados; `docs/README.md` funciona como índice navegável da documentação | Referências à arquitetura anterior são preservadas apenas como histórico quando aplicável | Manter a documentação atualizada conforme evolução da implantação e infraestrutura |
 | Wiki ou equivalente navegável | ✅ IMPLEMENTADO E VALIDADO | `docs/README.md` funciona como índice navegável da documentação versionada no repositório, com 24 links locais verificados e nenhum link quebrado; o `README.md` principal referencia esse ponto de entrada | A GitHub Wiki permanece desabilitada, mas o requisito é atendido pelo equivalente navegável mantido junto ao código | Manter o índice e os links atualizados quando documentos forem criados, movidos ou removidos |
 | Requisitos e casos de uso completos | âœ… IMPLEMENTADO E VALIDADO | `docs/REQUIREMENTS.md` documenta 9 RFs, 8 RNFs e 8 casos de uso, com critÃ©rios de aceite e matriz de rastreabilidade | RF-004, RF-005 e RF-007 possuem cobertura automatizada insuficiente, explicitada no documento | Manter a matriz de rastreabilidade alinhada Ã  evoluÃ§Ã£o do sistema |
 | Arquitetura C4 ou equivalente | âœ… IMPLEMENTADO E VALIDADO | `docs/ARCHITECTURE.md` contÃ©m trÃªs diagramas Mermaid verificÃ¡veis: visÃ£o de contexto e visÃ£o de containers equivalentes ao C4, alÃ©m da visÃ£o de deployment; componentes, ambientes e fluxos correspondem Ã  produÃ§Ã£o validada | Nenhuma lacuna observada neste requisito | Manter os diagramas alinhados Ã  arquitetura efetivamente implantada |
@@ -263,7 +263,7 @@ URL: `https://github.com/GeovaniaLuiza/agora-tech-park-fullstack`
 
 ### AplicaÃ§Ã£o, backend e health
 
-Status tÃ©cnico: `ATENDIDO`; registro completo de URLs: `PARCIAL`
+Status técnico: `ATENDIDO`; registro completo de URLs: `ATENDIDO`
 Application URL: https://agora-techpark.duckdns.org
 Backend URL: `https://agora-techpark.duckdns.org/api`
 Health URL: `https://agora-techpark.duckdns.org/api/health`

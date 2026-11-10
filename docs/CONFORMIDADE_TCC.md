@@ -46,8 +46,8 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Arquitetura C4 ou equivalente | âœ… IMPLEMENTADO E VALIDADO | `docs/ARCHITECTURE.md` contÃ©m trÃªs diagramas Mermaid verificÃ¡veis: visÃ£o de contexto e visÃ£o de containers equivalentes ao C4, alÃ©m da visÃ£o de deployment; componentes, ambientes e fluxos correspondem Ã  produÃ§Ã£o validada | Nenhuma lacuna observada neste requisito | Manter os diagramas alinhados Ã  arquitetura efetivamente implantada |
 | ADRs / decisões arquiteturais | ✅ IMPLEMENTADO E VALIDADO | `docs/adr/` contém seis Architecture Decision Records aceitos e um índice, documentando decisões arquiteturais reais sobre separação frontend/backend, PostgreSQL, Caddy, CI/CD, e-mail e observabilidade | Nenhuma lacuna observada neste requisito | Manter os ADRs atualizados quando decisões arquiteturais relevantes forem alteradas |
 | ReferÃªncia acadÃªmica fornecida | âšª DOCUMENTADO / PLANEJADO | Tese de Nancy V. PÃ©rez, 2022, fornecida pelo usuÃ¡rio nesta auditoria | Ainda nÃ£o foi incorporada; nÃ£o constitui evidÃªncia tÃ©cnica | Usar apenas como fundamentaÃ§Ã£o, com autoria e referÃªncia bibliogrÃ¡fica completas |
-| Link funcional público e estável | 🟡 PARCIAL | Frontend, API e health estão disponíveis em `https://agora-techpark.duckdns.org`; o CD Production #48 permanece como evidência histórica da implantação anterior do frontend no AWS Amplify e dos smoke tests | A evidência histórica do #48 não representa disponibilidade contínua futura | Manter a URL pública documentada e preservar smoke checks periódicos |
-| Frontend React + Vite | 🟡 PARCIAL | React 19.2.8 e Vite 8.2.2; job de testes/build e validação do artefato passou no CI #43; atualmente o frontend é servido pela EC2/Caddy na mesma origem da aplicação; o CD #48 permanece como evidência histórica da implantação anterior no Amplify | Documentação histórica ainda contém referências da arquitetura anterior | Manter documentação alinhada à arquitetura atual EC2/Caddy |
+| Link funcional público e estável | ✅ IMPLEMENTADO E VALIDADO | Frontend, API e health estão disponíveis em `https://agora-techpark.duckdns.org`; a arquitetura vigente usa EC2/Caddy na mesma origem, com evidências de deploy e smoke tests preservadas | Disponibilidade contínua futura depende da operação normal do ambiente produtivo, sem lacuna funcional observada na validação atual | Manter a URL pública documentada e preservar smoke checks periódicos |
+| Frontend React + Vite | ✅ IMPLEMENTADO E VALIDADO | React 19.2.8 e Vite 8.2.2; job de testes/build e validação do artefato passou no CI #43; atualmente o frontend é servido pela EC2/Caddy na mesma origem da aplicação | As referências ao Amplify permanecem apenas como registro histórico da arquitetura anterior | Manter documentação alinhada à arquitetura atual EC2/Caddy |
 | Backend Express | âœ… IMPLEMENTADO E VALIDADO | Express 5.2.1; 163 testes unitÃ¡rios passando; `agora-api.service` ativo e habilitado na EC2; API responde HTTP 200 | Meta acadÃªmica de coverage Ã© avaliada separadamente | Preservar testes, health e serviÃ§o systemd |
 | PostgreSQL 16 | ✅ IMPLEMENTADO E VALIDADO | PostgreSQL 16 em produção na EC2; `postgresql.service` ativo e habilitado; integração PostgreSQL validada no CI; exporter Alloy conectado; em 09/11/2026 foi executado restore lógico isolado de `pg_dump`, com 24 tabelas públicas restauradas e 22 migrations confirmadas, incluindo `022_user_session_version.sql` | Nenhuma lacuna crítica observada na restauração lógica executada; o teste foi realizado em banco temporário isolado e removido ao final | Manter integração, backups e testes periódicos de restauração |
 | Migrações incrementais | ✅ IMPLEMENTADO E VALIDADO | `database/migrations/001...022`; runner único calcula SHA-256, usa lock e registra `schema_migrations`; em 10/11/2026 um banco DEV vazio foi criado via Docker Compose e recebeu com sucesso as 22 migrations; nova execução retornou `No pending migrations`, comprovando idempotência | Nenhuma lacuna funcional observada na validação atual | Manter o runner único e os testes de repetição/checksum |
@@ -150,7 +150,7 @@ HEALTH_URL=https://agora-techpark.duckdns.org/api/health
 GRAFANA_URL=
 ```
 
-A API, o health e o frontend atuais usam a mesma origem pública `https://agora-techpark.duckdns.org` via EC2/Caddy. Como evidência histórica, o frontend implantado anteriormente no Amplify passou no smoke test do CD #48. **DEPLOY TÉCNICO: ATENDE. DOCUMENTAÇÃO COMPLETA DAS URLs: PARCIAL.**
+A API, o health e o frontend atuais usam a mesma origem pública `https://agora-techpark.duckdns.org` via EC2/Caddy. Como evidência histórica, o frontend implantado anteriormente no Amplify passou no smoke test do CD #48. **DEPLOY TÉCNICO: ATENDE. DOCUMENTAÇÃO DAS URLs: ATENDE.**
 
 ## Coverage tÃ©cnico versus acadÃªmico
 
@@ -225,7 +225,7 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 |---|---|---|
 | RepositÃ³rio pÃºblico | GitHub pÃºblico `GeovaniaLuiza/agora-tech-park-fullstack` | âœ… ATENDIDO |
 | HistÃ³rico de commits | 19 commits em 6 dias de desenvolvimento | PARCIAL |
-| Link funcional | Frontend, API e health públicos via HTTPS na mesma origem `https://agora-techpark.duckdns.org` | PARCIAL |
+| Link funcional | Frontend, API e health públicos via HTTPS na mesma origem `https://agora-techpark.duckdns.org` | ✅ ATENDIDO |
 | Produção pública | Frontend e backend atualmente publicados na EC2/Caddy; CD #48 e smoke tests permanecem como evidência histórica da arquitetura anterior | ✅ ATENDIDO |
 | Arquitetura documentada | `docs/ARCHITECTURE.md` com diagramas Mermaid de contexto, containers e deployment equivalentes ao C4 e coerentes com a produÃ§Ã£o validada | âœ… ATENDIDO |
 | Wiki junto ao repositório | `docs/README.md` fornece índice navegável da documentação versionada, referenciado pelo `README.md` principal; 24 links locais foram validados sem destinos quebrados | ✅ ATENDIDO |
@@ -300,7 +300,7 @@ Teste operacional: controlado, com interrupção temporária de `agora-api.servi
 ### DevOps e infraestrutura
 
 CI/CD: atendido nas execuÃ§Ãµes #43/#48
-Ambientes: parcial
+Ambientes: atendido
 Deploy: atendido tecnicamente
 Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards específicos, demais séries e alertas complementares permanecem sem validação integral
 

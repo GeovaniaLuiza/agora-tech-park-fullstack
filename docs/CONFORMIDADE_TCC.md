@@ -68,8 +68,8 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Cloudflare Pages como frontend | âšª DOCUMENTADO / PLANEJADO | Apenas preferÃªncia do enunciado | A orientaÃ§Ã£o oficial de Web App veda plataformas otimizadas apenas para frontend; Cloudflare Pages exige decisÃ£o conservadora | NÃ£o adotar automaticamente; preferir hospedagem controlÃ¡vel ou obter confirmaÃ§Ã£o acadÃªmica |
 | SonarCloud configurado | âœ… IMPLEMENTADO E VALIDADO | Job `SonarQube Cloud Quality Gate` passou no CI #43 | Resultado refere-se Ã  execuÃ§Ã£o validada | Manter token, projeto e gate operacionais |
 | Quality Gate aprovado | âœ… IMPLEMENTADO E VALIDADO | Quality Gate passou no CI #43, apÃ³s os jobs de qualidade, testes, build e integraÃ§Ã£o | AprovaÃ§Ã£o acadÃªmica final nÃ£o decorre automaticamente do gate | Preservar o bloqueio do pipeline por Quality Gate |
-| DEV separado de produção | ✅ IMPLEMENTADO E VALIDADO | Ambiente DEV validado localmente em 10/11/2026: PostgreSQL 16 via Docker Compose na porta 5435, backend Express na porta 3002, frontend Vite na porta 5174 e provider de e-mail `mock`; health retornou `status=ok`, `api=up`, `database=up`, `email=up`, e o frontend respondeu HTTP 200 | STAGING é avaliado separadamente | Manter variáveis e infraestrutura DEV isoladas da produção |
-| PROD/STAGING separado | 🟡 PARCIAL | Produção validada em AWS EC2/Caddy com configuração distinta do DEV | Ambiente STAGING não foi comprovado | Documentar produção e decidir/validar staging conforme o critério acadêmico |
+| DEV separado de produção | ✅ IMPLEMENTADO E VALIDADO | Ambiente DEV validado localmente em 10/11/2026: PostgreSQL 16 via Docker Compose na porta 5435, backend Express na porta 3002, frontend Vite na porta 5174 e provider de e-mail `mock`; health retornou `status=ok`, `api=up`, `database=up`, `email=up`, e o frontend respondeu HTTP 200 | Nenhuma lacuna funcional observada na separação DEV/PROD | Manter variáveis e infraestrutura DEV isoladas da produção |
+| PROD separado de DEV | ✅ IMPLEMENTADO E VALIDADO | Produção validada em AWS EC2/Caddy, PostgreSQL 16 e configuração própria, distinta do ambiente DEV local | STAGING não é requisito identificado em `docs/REQUIREMENTS.md` e não integra a arquitetura atual | Manter produção isolada do DEV e documentar novos ambientes somente quando houver requisito explícito |
 | Deploy público em nuvem | ✅ IMPLEMENTADO E VALIDADO | Atualmente frontend e backend são publicados conjuntamente na AWS EC2/Caddy; como evidência histórica, o CD Production #48 implantou backend via Systems Manager e frontend no AWS Amplify e concluiu smoke tests | A evidência histórica do #48 não representa disponibilidade contínua futura | Manter a URL pública atual documentada e preservar validação pós-deploy |
 | HTTPS pÃºblico | âœ… IMPLEMENTADO E VALIDADO | `caddy.service` ativo e habilitado; Caddy serve `https://agora-techpark.duckdns.org/api` e `/api/health` por HTTPS; endpoint respondeu HTTP 200 | Nenhuma lacuna observada na validaÃ§Ã£o informada | Monitorar certificado e disponibilidade |
 | Observabilidade | ✅ IMPLEMENTADO E VALIDADO no escopo da Issue #57 | Ingestão Prometheus/Loki via Alloy comprovada em 18/09/2026; dashboard consolidado homologado em 23/09/2026; métricas e logs chegando ao Grafana Cloud, alerta da API, entrega de notificação, SLO e retenção validados em 05/10/2026 | Quatro dashboards específicos e demais séries e alertas não foram validados integralmente | Preservar as evidências e validar separadamente os itens complementares |
@@ -139,7 +139,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Email | Gmail SMTP via Nodemailer validado com `verify()`, envio real e health `email="up"` |
 | Observability | Alloy 1.19.2; `alloy.service` ativo e habilitado na EC2; remote write Prometheus e envio Loki validados em 18/09/2026; dashboard consolidado homologado em 23/09/2026; em 05/10/2026, métricas e logs chegando ao Grafana Cloud, alerta da API e entrega de notificação, SLO e retenção validados; produção restaurada após teste controlado; quatro dashboards específicos e demais alertas continuam sem validação final |
 
-Separação DEV/PROD: **IMPLEMENTADA E VALIDADA**. Em 10/11/2026, o DEV foi recriado e validado localmente com PostgreSQL 16 via Docker Compose, migrations 001–022, backend Express em `localhost:3002`, frontend Vite em `localhost:5174` e provider de e-mail `mock`. O health retornou `status=ok`, com API, banco e e-mail disponíveis, e o frontend respondeu HTTP 200. A produção permanece separada em AWS EC2/Caddy, PostgreSQL 16 e Gmail SMTP. O ambiente STAGING não foi comprovado e é avaliado separadamente.
+Separação DEV/PROD: **IMPLEMENTADA E VALIDADA**. Em 10/11/2026, o DEV foi recriado e validado localmente com PostgreSQL 16 via Docker Compose, migrations 001–022, backend Express em `localhost:3002`, frontend Vite em `localhost:5174` e provider de e-mail `mock`. O health retornou `status=ok`, com API, banco e e-mail disponíveis, e o frontend respondeu HTTP 200. A produção permanece separada em AWS EC2/Caddy, PostgreSQL 16 e Gmail SMTP. Nenhum requisito de STAGING foi identificado em `docs/REQUIREMENTS.md`; por isso ele não é tratado como pendência de conformidade.
 
 ## URLs funcionais
 
@@ -235,7 +235,7 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | CI | CI #43 passou em todos os jobs informados | âœ… ATENDIDO |
 | CD | CD Production #48 implantou backend/frontend e concluiu smoke tests | âœ… ATENDIDO |
 | DEV separado | PostgreSQL local via Docker Compose, backend em 3002 e frontend em 5174 validados em 10/11/2026; health `ok` e frontend HTTP 200 | ✅ ATENDIDO |
-| PROD separado | ProduÃ§Ã£o AWS distinta do DEV validada; STAGING nÃ£o comprovado | PARCIAL |
+| PROD separado | Produção AWS distinta do DEV validada, com configuração, banco e runtime próprios | ✅ ATENDIDO |
 | Deploy fora de localhost | Frontend e backend na EC2/Caddy; aplicação pública validada | ✅ ATENDIDO |
 | HTTPS | Caddy e endpoints pÃºblicos HTTPS validados | âœ… ATENDIDO |
 | PostgreSQL persistente | PostgreSQL 16 ativo e habilitado na EC2; integraÃ§Ã£o CI e exporter validados | âœ… ATENDIDO |
@@ -278,7 +278,7 @@ CD: `PASS` â€” CD Production #48
 
 DEV: `ATENDIDO`
 PROD: `ATENDIDO`
-STAGING: `NÃƒO COMPROVADO`
+STAGING: `NÃO EXIGIDO PELOS REQUISITOS DOCUMENTADOS`
 
 ### Sonar
 

@@ -50,7 +50,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Frontend React + Vite | 🟡 PARCIAL | React 19.2.8 e Vite 8.2.2; job de testes/build e validação do artefato passou no CI #43; atualmente o frontend é servido pela EC2/Caddy na mesma origem da aplicação; o CD #48 permanece como evidência histórica da implantação anterior no Amplify | Documentação histórica ainda contém referências da arquitetura anterior | Manter documentação alinhada à arquitetura atual EC2/Caddy |
 | Backend Express | âœ… IMPLEMENTADO E VALIDADO | Express 5.2.1; 163 testes unitÃ¡rios passando; `agora-api.service` ativo e habilitado na EC2; API responde HTTP 200 | Meta acadÃªmica de coverage Ã© avaliada separadamente | Preservar testes, health e serviÃ§o systemd |
 | PostgreSQL 16 | ✅ IMPLEMENTADO E VALIDADO | PostgreSQL 16 em produção na EC2; `postgresql.service` ativo e habilitado; integração PostgreSQL validada no CI; exporter Alloy conectado; em 09/11/2026 foi executado restore lógico isolado de `pg_dump`, com 24 tabelas públicas restauradas e 22 migrations confirmadas, incluindo `022_user_session_version.sql` | Nenhuma lacuna crítica observada na restauração lógica executada; o teste foi realizado em banco temporário isolado e removido ao final | Manter integração, backups e testes periódicos de restauração |
-| MigraÃ§Ãµes incrementais | ðŸŸ  PARCIAL | `database/migrations/001...016`; runner calcula SHA-256, usa lock e registra `schema_migrations`; migrations e integraÃ§Ã£o PostgreSQL passaram no CI #43 | Compose DEV monta 001â€“013 e 016, omitindo 014 e 015; dois fluxos duplicados permanecem | Fazer Compose usar o runner Ãºnico e validar repetiÃ§Ã£o/checksum no DEV |
+| Migrações incrementais | ✅ IMPLEMENTADO E VALIDADO | `database/migrations/001...022`; runner único calcula SHA-256, usa lock e registra `schema_migrations`; em 10/11/2026 um banco DEV vazio foi criado via Docker Compose e recebeu com sucesso as 22 migrations; nova execução retornou `No pending migrations`, comprovando idempotência | Nenhuma lacuna funcional observada na validação atual | Manter o runner único e os testes de repetição/checksum |
 | Seed separado e seguro | ðŸŸ¡ IMPLEMENTADO, PENDENTE DE VALIDAÃ‡ÃƒO | `database/seed.sql` Ã© montado apenas pelo Compose de desenvolvimento; CD nÃ£o o executa | NÃ£o validado em banco vazio; contÃ©m credenciais demonstrativas conhecidas, aceitÃ¡veis somente em DEV | Validar isolamento e impedir execuÃ§Ã£o em produÃ§Ã£o |
 | InstalaÃ§Ã£o limpa da raiz | âœ… IMPLEMENTADO E VALIDADO | `npm ci`, lint e auditoria passaram no job `Lint and dependency audit` do CI #43 | Nenhuma falha de instalaÃ§Ã£o observada nessa execuÃ§Ã£o | Manter lockfile e job verde |
 | InstalaÃ§Ã£o limpa backend | âœ… IMPLEMENTADO E VALIDADO | `npm ci --prefix backend` e testes passaram no CI #43 | Nenhuma falha de instalaÃ§Ã£o observada nessa execuÃ§Ã£o | Manter lockfile consistente |
@@ -61,14 +61,14 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Testes unitÃ¡rios frontend | âœ… IMPLEMENTADO E VALIDADO | Job `Frontend tests and build` passou no CI #43, incluindo o comando oficial de coverage | Quantidade atual de testes nÃ£o registrada nesta matriz | Registrar a contagem atual nas evidÃªncias |
 | Cobertura frontend â‰¥ 25% | âœ… IMPLEMENTADO E VALIDADO | O comando oficial `npm run test:coverage --prefix frontend` passou no CI #43 com thresholds configurados acima de 25% | Percentuais exatos da execuÃ§Ã£o #43 nÃ£o foram registrados nesta matriz | Anexar o relatÃ³rio atual como evidÃªncia quantitativa |
 | TDD verificÃ¡vel | ðŸŸ  PARCIAL | Existem testes de domÃ­nio, rotas e pÃ¡ginas | O histÃ³rico disponÃ­vel nÃ£o demonstra de forma suficiente ciclos teste-primeiro | Registrar prÃ³ximos incrementos com teste falhando â†’ implementaÃ§Ã£o â†’ refatoraÃ§Ã£o |
-| TrÃªs fluxos de negÃ³cio completos | ðŸŸ  PARCIAL | CÃ³digo e testes cobrem autenticaÃ§Ã£o, indicadores/formulÃ¡rios e importaÃ§Ãµes | NÃ£o foram validados ponta a ponta em ambiente integrado/publicado | Criar testes de aceitaÃ§Ã£o e smoke dos trÃªs fluxos |
+| Três fluxos de negócio completos | ✅ IMPLEMENTADO E VALIDADO | Em 10/11/2026 foram validados manualmente em produção três fluxos ponta a ponta: autenticação e acesso ao Dashboard; importação de empresas residentes com validação, revisão, confirmação e atualização de indicadores; e importação de eventos com validação, preview, revisão, confirmação e atualização de indicadores | A validação comprova os três fluxos selecionados em produção; outros casos de uso possuem validações próprias | Preservar as evidências de demonstração e manter testes automatizados dos fluxos |
 | CI no GitHub Actions | âœ… IMPLEMENTADO E VALIDADO | CI #43 passou: lint/audit, testes backend, testes/build frontend, integraÃ§Ã£o PostgreSQL e SonarQube Cloud Quality Gate | Nenhuma lacuna funcional observada nessa execuÃ§Ã£o | Manter o `main` protegido por CI verde |
 | CD no GitHub Actions | âœ… IMPLEMENTADO E VALIDADO | CD Production #48 passou: backend via AWS Systems Manager, frontend no AWS Amplify e smoke tests de produÃ§Ã£o | A evidÃªncia comprova a execuÃ§Ã£o #48, nÃ£o disponibilidade contÃ­nua futura | Monitorar execuÃ§Ãµes e preservar rollback |
 | AWS removida com segurança | ⚪ DOCUMENTADO / PLANEJADO | AWS permanece como infraestrutura de produção validada. EC2 e Systems Manager integram a arquitetura atual; o Amplify foi utilizado historicamente no CD #48 | Remoção da AWS não é compatível com a arquitetura produtiva atual e não foi autorizada como migração | Manter a infraestrutura validada; reavaliar remoção somente com destino substituto e autorização |
 | Cloudflare Pages como frontend | âšª DOCUMENTADO / PLANEJADO | Apenas preferÃªncia do enunciado | A orientaÃ§Ã£o oficial de Web App veda plataformas otimizadas apenas para frontend; Cloudflare Pages exige decisÃ£o conservadora | NÃ£o adotar automaticamente; preferir hospedagem controlÃ¡vel ou obter confirmaÃ§Ã£o acadÃªmica |
 | SonarCloud configurado | âœ… IMPLEMENTADO E VALIDADO | Job `SonarQube Cloud Quality Gate` passou no CI #43 | Resultado refere-se Ã  execuÃ§Ã£o validada | Manter token, projeto e gate operacionais |
 | Quality Gate aprovado | âœ… IMPLEMENTADO E VALIDADO | Quality Gate passou no CI #43, apÃ³s os jobs de qualidade, testes, build e integraÃ§Ã£o | AprovaÃ§Ã£o acadÃªmica final nÃ£o decorre automaticamente do gate | Preservar o bloqueio do pipeline por Quality Gate |
-| DEV separado de produÃ§Ã£o | ðŸŸ  PARCIAL | Compose local, `.env.example` e documentaÃ§Ã£o distinguem DEV | Fluxo de migrations do Compose Ã© inconsistente; nÃ£o hÃ¡ DEV integrado validado nesta mÃ¡quina | Corrigir e validar do zero |
+| DEV separado de produção | ✅ IMPLEMENTADO E VALIDADO | Ambiente DEV validado localmente em 10/11/2026: PostgreSQL 16 via Docker Compose na porta 5435, backend Express na porta 3002, frontend Vite na porta 5174 e provider de e-mail `mock`; health retornou `status=ok`, `api=up`, `database=up`, `email=up`, e o frontend respondeu HTTP 200 | STAGING é avaliado separadamente | Manter variáveis e infraestrutura DEV isoladas da produção |
 | PROD/STAGING separado | 🟡 PARCIAL | Produção validada em AWS EC2/Caddy com configuração distinta do DEV | Ambiente STAGING não foi comprovado | Documentar produção e decidir/validar staging conforme o critério acadêmico |
 | Deploy público em nuvem | ✅ IMPLEMENTADO E VALIDADO | Atualmente frontend e backend são publicados conjuntamente na AWS EC2/Caddy; como evidência histórica, o CD Production #48 implantou backend via Systems Manager e frontend no AWS Amplify e concluiu smoke tests | A evidência histórica do #48 não representa disponibilidade contínua futura | Manter a URL pública atual documentada e preservar validação pós-deploy |
 | HTTPS pÃºblico | âœ… IMPLEMENTADO E VALIDADO | `caddy.service` ativo e habilitado; Caddy serve `https://agora-techpark.duckdns.org/api` e `/api/health` por HTTPS; endpoint respondeu HTTP 200 | Nenhuma lacuna observada na validaÃ§Ã£o informada | Monitorar certificado e disponibilidade |
@@ -123,9 +123,9 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 |---|---|
 | Frontend | Vite em `http://localhost:5174`; executado fora do Compose |
 | Backend | Express com fallback local em `http://localhost:3002`; executado fora do Compose |
-| Database | PostgreSQL 16 no Compose, porta local 5435, volume `postgres_data`; engine local indisponÃ­vel durante a auditoria |
+| Database | PostgreSQL 16 via Docker Compose, porta local 5435 e volume `postgres_data`; ambiente recriado do zero e validado em 10/11/2026 |
 | Email | Provider mock controlado por padrÃ£o, sem SMTP externo; o Compose nÃ£o provisiona serviÃ§o de e-mail |
-| Observability | Logs Pino e endpoint Prometheus implementados; o ambiente DEV nÃ£o foi revalidado em 18/09/2026 |
+| Observability | Logs Pino e endpoint Prometheus implementados; backend DEV validado em 10/11/2026 com health operacional |
 
 ### PROD
 
@@ -139,7 +139,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Email | Gmail SMTP via Nodemailer validado com `verify()`, envio real e health `email="up"` |
 | Observability | Alloy 1.19.2; `alloy.service` ativo e habilitado na EC2; remote write Prometheus e envio Loki validados em 18/09/2026; dashboard consolidado homologado em 23/09/2026; em 05/10/2026, métricas e logs chegando ao Grafana Cloud, alerta da API e entrega de notificação, SLO e retenção validados; produção restaurada após teste controlado; quatro dashboards específicos e demais alertas continuam sem validação final |
 
-Separação DEV/PROD: **IMPLEMENTADA E VALIDADA para os ambientes comprovados**. DEV/test usam provider mock controlado sem SMTP externo, enquanto a produção usa AWS EC2/Caddy, PostgreSQL 16 e Gmail SMTP. O ambiente STAGING e a validação integrada atual do DEV não foram comprovados; por isso, o requisito agregado de ambientes permanece parcial.
+Separação DEV/PROD: **IMPLEMENTADA E VALIDADA**. Em 10/11/2026, o DEV foi recriado e validado localmente com PostgreSQL 16 via Docker Compose, migrations 001–022, backend Express em `localhost:3002`, frontend Vite em `localhost:5174` e provider de e-mail `mock`. O health retornou `status=ok`, com API, banco e e-mail disponíveis, e o frontend respondeu HTTP 200. A produção permanece separada em AWS EC2/Caddy, PostgreSQL 16 e Gmail SMTP. O ambiente STAGING não foi comprovado e é avaliado separadamente.
 
 ## URLs funcionais
 
@@ -230,11 +230,11 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | Arquitetura documentada | `docs/ARCHITECTURE.md` com diagramas Mermaid de contexto, containers e deployment equivalentes ao C4 e coerentes com a produÃ§Ã£o validada | âœ… ATENDIDO |
 | Wiki junto ao repositório | `docs/README.md` fornece índice navegável da documentação versionada, referenciado pelo `README.md` principal; 24 links locais foram validados sem destinos quebrados | ✅ ATENDIDO |
 | Requisitos, casos de uso e decisÃµes | `docs/REQUIREMENTS.md`, `docs/adr/` e `docs/RFC.md` | âœ… ATENDIDO |
-| TrÃªs fluxos de negÃ³cio completos | ImplementaÃ§Ã£o parcial sem validaÃ§Ã£o ponta a ponta em produÃ§Ã£o | PARCIAL |
+| Três fluxos de negócio completos | Autenticação, importação de residentes e importação de eventos validadas ponta a ponta em produção em 10/11/2026, incluindo confirmação das importações e atualização dos indicadores | ✅ ATENDIDO |
 | TDD | Testes presentes; histÃ³rico nÃ£o comprova integralmente teste-primeiro | PARCIAL |
 | CI | CI #43 passou em todos os jobs informados | âœ… ATENDIDO |
 | CD | CD Production #48 implantou backend/frontend e concluiu smoke tests | âœ… ATENDIDO |
-| DEV separado | Compose/variÃ¡veis locais; fluxo de migrations inconsistente | PARCIAL |
+| DEV separado | PostgreSQL local via Docker Compose, backend em 3002 e frontend em 5174 validados em 10/11/2026; health `ok` e frontend HTTP 200 | ✅ ATENDIDO |
 | PROD separado | ProduÃ§Ã£o AWS distinta do DEV validada; STAGING nÃ£o comprovado | PARCIAL |
 | Deploy fora de localhost | Frontend e backend na EC2/Caddy; aplicação pública validada | ✅ ATENDIDO |
 | HTTPS | Caddy e endpoints pÃºblicos HTTPS validados | âœ… ATENDIDO |
@@ -276,7 +276,7 @@ CD: `PASS` â€” CD Production #48
 
 ### Ambientes
 
-DEV: `PARCIAL`
+DEV: `ATENDIDO`
 PROD: `ATENDIDO`
 STAGING: `NÃƒO COMPROVADO`
 

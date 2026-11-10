@@ -27,9 +27,9 @@ Este registro atualiza a evidência de segurança da matriz, preservando as dema
 
 > Nota de vigência: este documento inclui evidências históricas e registros de conformidade anteriores. A arquitetura ativa de produção é EC2 Ubuntu 24.04 + Caddy + backend Node.js/Express + PostgreSQL 16 + GitHub Actions + OIDC + Systems Manager. Qualquer menção ao Amplify em CD Production #48 ou em evidências antigas é histórica e não representa a produção atual. O caso de segurança SEC-01 / Issue #37 permanece pendente exclusivamente quanto à confirmação do GitHub Support sobre refs/caches/objetos server-side, e a documentação não declara LGPD concluída.
 
-**Decisão atual: PARCIAL — produção funcional e tecnicamente validada, com pendências de segurança/LGPD, operação e entrega acadêmica/documental.** CI pós-merge #106 e CD Production #117 passaram; deploy, backend e frontend estão funcionando, a API e o health são públicos via HTTPS, PostgreSQL e e-mail foram validados, e o Quality Gate passou. Isso não representa aprovação final: a sanitização local já foi validada; entretanto, a confirmação do GitHub Support sobre refs/caches/objetos server-side na SEC-01 permanece pendente, e também restam pendências humanas/acadêmicas. O dashboard consolidado foi homologado em 23/09/2026; em 05/10/2026, na Issue #57, foram validados o alerta de indisponibilidade da API, a entrega da notificação, o SLO e a retenção. Na observabilidade, permanecem pendentes somente os quatro dashboards específicos, demais séries operacionais não observadas e demais alertas sem teste comprovado. Backup e restauração de EBS foram posteriormente validados por meio do AWS Backup.
+**Decisão atual: PARCIAL — produção funcional e tecnicamente validada, com pendência externa de segurança/LGPD e obrigações acadêmicas/humanas ainda em aberto.** Deploy, backend, frontend, API, health, PostgreSQL, e-mail, CI/CD, testes, Quality Gate, backup/restore e observabilidade essencial foram validados. A árvore atual do repositório está saneada quanto ao arquivo alvo e aos metadados Office verificados; entretanto, a SEC-01 permanece aberta porque refs históricas de Pull Requests ainda tornam o objeto anterior alcançável no GitHub, dependendo de avaliação/purge e confirmação server-side pelo GitHub Support. Permanecem também as obrigações acadêmicas de autoria individual, orientações, pôster/QR e participação no Demo Day.
 
-Em 05/10/2026, o fechamento técnico da Issue #57 validou a observabilidade de produção com Grafana Cloud, Grafana Alloy, Prometheus e Loki, métricas e logs recebidos, alerta de indisponibilidade da API, entrega de notificação, SLO e retenção. Essa validação atualiza as pendências operacionais de observabilidade citadas acima; os quatro dashboards específicos e demais séries e alertas sem teste continuam pendentes.
+Em 05/10/2026, o fechamento técnico da Issue #57 validou a observabilidade de produção com Grafana Cloud, Grafana Alloy, Prometheus e Loki, incluindo ingestão de métricas e logs, dashboard consolidado, alerta de indisponibilidade da API, entrega de notificação, SLO e retenção. Os quatro dashboards específicos, séries adicionais de host e alertas ainda não testados permanecem registrados como melhorias operacionais complementares, sem bloquear o atendimento do requisito acadêmico documentado.
 
 O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produção atual, sem reintrodução do Amplify. Nenhuma mudança arquitetural foi aplicada nesta baseline além da consolidação documental.
 
@@ -306,15 +306,16 @@ Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards espec
 
 ### Resultado geral
 
-**PARCIAL â€” produÃ§Ã£o funcional e tecnicamente validada, com pendÃªncias de seguranÃ§a/LGPD e de entrega acadÃªmica/documental.** O deploy funcional nÃ£o representa aprovaÃ§Ã£o final, e a recuperabilidade de possÃ­veis dados pessoais no histÃ³rico pÃºblico permanece bloqueador real atÃ© a sanitizaÃ§Ã£o.
+**PARCIAL — produção funcional e tecnicamente validada, com uma pendência externa de segurança/LGPD e obrigações acadêmicas/humanas ainda em aberto.** A SEC-01 permanece como único bloqueador técnico identificado, pois possíveis dados pessoais ainda podem ser alcançados por refs históricas mantidas server-side pelo GitHub. As demais pendências correspondem à entrega e participação acadêmica.
 
-### PendÃªncias reais
+### Pendências reais
 
-- Issue #37 / SEC-01: solicitar avaliação/purge das refs históricas de PR pelo GitHub Support e aguardar confirmação/remoção server-side. A árvore atual de `origin/main` está saneada quanto ao arquivo alvo; a sanitização LGPD permanece pendente, conforme `docs/SECURITY_DATA_REMOVAL.md`.
-- Registrar a URL pÃºblica do frontend e manter as evidÃªncias de CI #43, CD #48, Sonar e Quality Gate.
-- Validar os quatro dashboards específicos, séries operacionais ainda não observadas e os demais alertas; o dashboard consolidado, a ingestão de métricas e logs, o alerta de indisponibilidade da API e sua entrega, o SLO e a retenção já foram comprovados no escopo da Issue #57.
-- Atualizar URLs e trade-offs conforme o sistema real.
-- Cumprir orientaÃ§Ãµes, prova de autoria, pÃ´ster/QR e participaÃ§Ã£o no Demo Day.
+- Issue #37 / SEC-01: solicitar avaliação/purge das refs históricas de PR pelo GitHub Support e aguardar confirmação/remoção server-side. A árvore atual de `origin/main` está saneada quanto ao arquivo alvo; a sanitização histórica permanece pendente conforme `docs/SECURITY_DATA_REMOVAL.md`.
+- Cumprir as obrigações acadêmicas ainda abertas: prova de autoria individual, orientações obrigatórias, produção/validação do pôster com QR code e participação nas atividades do Demo Day.
+
+### Melhorias operacionais não bloqueadoras
+
+- Os quatro dashboards específicos, séries adicionais de host/disco e alertas ainda não testados podem ser evoluídos posteriormente. O dashboard consolidado, métricas e logs, alerta de indisponibilidade da API, entrega de notificação, SLO e retenção já foram validados no escopo acadêmico documentado.
 
 ## Gates executados na baseline e validaÃ§Ãµes posteriores
 

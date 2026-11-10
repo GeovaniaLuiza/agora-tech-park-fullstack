@@ -38,7 +38,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Requisito | Estado atual | EvidÃªncia objetiva | Lacuna / risco | PrÃ³xima aÃ§Ã£o mÃ­nima |
 |---|---|---|---|---|
 | RepositÃ³rio GitHub pÃºblico | âœ… IMPLEMENTADO E VALIDADO | API pÃºblica do GitHub: `GeovaniaLuiza/agora-tech-park-fullstack`, `visibility=public`, branch padrÃ£o `main` | A publicidade amplia o impacto do arquivo com possÃ­veis dados pessoais | Tratar o incidente de privacidade antes de qualquer outra publicaÃ§Ã£o |
-| HistÃ³rico contÃ­nuo de commits | ðŸŸ  PARCIAL | `git log`: 19 commits, de 03/08/2026 a 01/09/2026, distribuÃ­dos em 6 dias; 3 autores, incluindo Dependabot | HistÃ³rico curto e concentrado; merges automÃ¡ticos nÃ£o comprovam evoluÃ§Ã£o contÃ­nua do grupo | Manter commits pequenos, autorais e vinculados a decisÃµes/testes |
+| Histórico contínuo de commits | ✅ IMPLEMENTADO E VALIDADO | Em 10/11/2026, `git rev-list --count HEAD` registrou 261 commits; o histórico apresenta atividade em 40 datas distintas entre 03/08/2026 e 10/11/2026. `git shortlog -sne HEAD` identificou 254 commits associados à autora principal em duas identidades Git e 7 commits do Dependabot | A continuidade do histórico está comprovada; autoria individual e revisão humana por PR são avaliadas separadamente | Manter commits pequenos, rastreáveis e vinculados a alterações, testes ou decisões reais |
 | RevisÃ£o por PR | ðŸŸ  PARCIAL | HistÃ³rico contÃ©m merges de PRs | NÃ£o hÃ¡ evidÃªncia consolidada de revisÃ£o humana/aprovaÃ§Ã£o | Documentar o fluxo e usar revisÃ£o entre integrantes |
 | Documentação essencial | ✅ IMPLEMENTADO E VALIDADO | `README.md`, `docs/ARCHITECTURE.md`, `docs/RFC.md`, `docs/REQUIREMENTS.md`, `docs/adr/`, `docs/CI_CD.md`, `docs/MONITORING.md` e `docs/QUALITY.md`; URLs atuais, arquitetura vigente e principais decisões/trade-offs estão documentados; `docs/README.md` funciona como índice navegável da documentação | Referências à arquitetura anterior são preservadas apenas como histórico quando aplicável | Manter a documentação atualizada conforme evolução da implantação e infraestrutura |
 | Wiki ou equivalente navegável | ✅ IMPLEMENTADO E VALIDADO | `docs/README.md` funciona como índice navegável da documentação versionada no repositório, com 24 links locais verificados e nenhum link quebrado; o `README.md` principal referencia esse ponto de entrada | A GitHub Wiki permanece desabilitada, mas o requisito é atendido pelo equivalente navegável mantido junto ao código | Manter o índice e os links atualizados quando documentos forem criados, movidos ou removidos |
@@ -224,7 +224,7 @@ Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requis
 | Requisito | EvidÃªncia | Status |
 |---|---|---|
 | RepositÃ³rio pÃºblico | GitHub pÃºblico `GeovaniaLuiza/agora-tech-park-fullstack` | âœ… ATENDIDO |
-| HistÃ³rico de commits | 19 commits em 6 dias de desenvolvimento | PARCIAL |
+| Histórico de commits | 261 commits distribuídos em 40 datas entre 03/08/2026 e 10/11/2026; continuidade do desenvolvimento comprovada | ✅ ATENDIDO |
 | Link funcional | Frontend, API e health públicos via HTTPS na mesma origem `https://agora-techpark.duckdns.org` | ✅ ATENDIDO |
 | Produção pública | Frontend e backend atualmente publicados na EC2/Caddy; CD #48 e smoke tests permanecem como evidência histórica da arquitetura anterior | ✅ ATENDIDO |
 | Arquitetura documentada | `docs/ARCHITECTURE.md` com diagramas Mermaid de contexto, containers e deployment equivalentes ao C4 e coerentes com a produÃ§Ã£o validada | âœ… ATENDIDO |

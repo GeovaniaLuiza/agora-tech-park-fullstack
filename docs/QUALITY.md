@@ -49,3 +49,11 @@ O scanner aguarda o Quality Gate. `scripts/check-sonar-quality.mjs` consulta tam
 ## Dependências
 
 `npm run audit` bloqueia vulnerabilidades High/Critical. As versões vigentes ficam nos manifests/lockfiles (o frontend atual usa React Router 7); a medição acima é histórica. Dependabot abre PRs semanais agrupados. Resultados desta sincronização AWS ficam em [AWS_REPOSITORY_ALIGNMENT.md](AWS_REPOSITORY_ALIGNMENT.md).
+
+## Revisão por Pull Request
+
+As alterações devem ser submetidas por Pull Request antes da integração em `main`, preservando os checks automatizados de CI, testes, auditoria de dependências e Quality Gate aplicáveis.
+
+Quando a revisão por pares for exigida como evidência acadêmica, o Pull Request deve receber revisão explícita de outro integrante do grupo antes do merge. A aprovação deve ser registrada pelo recurso de review do GitHub, com status `Approved`, preservando no histórico do PR a autoria da revisão.
+
+A aprovação humana complementa os controles automatizados e não substitui os gates de CI, testes ou SonarQube Cloud. Pull Requests com checks obrigatórios falhando não devem ser integrados.

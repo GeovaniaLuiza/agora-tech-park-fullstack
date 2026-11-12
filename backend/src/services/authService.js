@@ -114,7 +114,7 @@ export async function verifyEmail(rawToken, ipAddress) {
     await recordDeliveryFailure(result.user.id, 'VERIFIED', error);
   }
   // A solicitação só fica disponível para análise depois da confirmação do e-mail.
-  // Após a confirmação do e-mail, notifica os administradores ativos pelo canal interno.
+  // Nesse ponto, avise todos os administradores ativos no canal interno.
   try {
     const adminIds = await users.findActiveAdminIds();
     await notifications.createMany(adminIds, {

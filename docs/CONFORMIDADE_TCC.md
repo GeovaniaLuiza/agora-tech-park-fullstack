@@ -90,7 +90,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Secrets fora do código | ✅ IMPLEMENTADO E VALIDADO | `.gitignore`, `.env.example`, validação de ambiente e ausência de `.env` real rastreado na árvore atual; `SONAR_TOKEN` armazenado como GitHub Actions Secret; variáveis não sensíveis separadas em GitHub Variables; Secret Protection e Push protection habilitados em 10/11/2026 | A validação comprova a configuração atual; a SEC-01 histórica permanece tratada separadamente | Manter secrets apenas em mecanismos próprios do ambiente e preservar Secret Protection/Push protection ativos |
 | Autoria individual | ðŸ‘¤ PENDÃŠNCIA HUMANA | Playbook exige prova individual atÃ© 30/11/2026 | NÃ£o Ã© automatizÃ¡vel | Cada integrante deve preparar explicaÃ§Ã£o e demonstraÃ§Ã£o das prÃ³prias contribuiÃ§Ãµes |
 | OrientaÃ§Ãµes obrigatÃ³rias | ðŸ‘¤ PENDÃŠNCIA HUMANA | Playbook exige 5 orientaÃ§Ãµes, com marcos em 30/09 e 30/11/2026 | NÃ£o hÃ¡ registro acadÃªmico verificÃ¡vel no repositÃ³rio | Grupo deve manter comprovantes e pauta por orientaÃ§Ã£o |
-| PÃ´ster PDF com QR code | ðŸ‘¤ PENDÃŠNCIA HUMANA | NÃ£o localizado no repositÃ³rio | Artefato e apresentaÃ§Ã£o dependem do grupo | Produzir apÃ³s URL estÃ¡vel e validar QR/link |
+| Pôster PDF com QR code | ✅ IMPLEMENTADO E VALIDADO | Pôster final em PDF A0 vertical validado quanto às dimensões, estrutura, conteúdo e QR Code funcional para acesso à aplicação pública | Alguns rótulos internos dos diagramas utilizam 18–19 pt, mas o conteúdo principal permanece legível e o pôster atende ao conjunto dos requisitos essenciais do guia oficial | Preservar a versão final do PDF e realizar teste do QR antes da apresentação |
 | Demo Day e avaliaÃ§Ãµes | ðŸ‘¤ PENDÃŠNCIA HUMANA | Datas oficiais: 10, 15 e 16/12/2026 | PresenÃ§a em uma noite distinta e avaliaÃ§Ãµes sÃ£o obrigaÃ§Ãµes humanas | Planejar escala e registrar submissÃµes dentro do prazo |
 
 ## CI/CD â€” resultado de aceite
@@ -306,14 +306,14 @@ Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards espec
 
 ### Resultado geral
 
-**PARCIAL — produção funcional e tecnicamente validada, com uma pendência externa de segurança/LGPD e requisitos acadêmicos/processuais ainda em aberto.** A SEC-01 permanece como único bloqueador técnico identificado, pois possíveis dados pessoais ainda podem ser alcançados por refs históricas mantidas server-side pelo GitHub. As demais pendências são de conformidade acadêmica e processual: revisão por pares, TDD verificável, autoria individual, orientações, pôster/QR e participação no Demo Day.
+**PARCIAL — produção funcional e tecnicamente validada, com uma pendência externa de segurança/LGPD e requisitos acadêmicos/processuais ainda em aberto.** A SEC-01 permanece como único bloqueador técnico identificado, pois possíveis dados pessoais ainda podem ser alcançados por refs históricas mantidas server-side pelo GitHub. As demais pendências são de conformidade acadêmica e processual: revisão por pares, TDD verificável, autoria individual, orientações e participação no Demo Day.
 
 ### Pendências reais
 
 - Issue #37 / SEC-01: solicitar avaliação/purge das refs históricas de PR pelo GitHub Support e aguardar confirmação/remoção server-side. A árvore atual de `origin/main` está saneada quanto ao arquivo alvo; a sanitização histórica permanece pendente conforme `docs/SECURITY_DATA_REMOVAL.md`.
 - Revisão por pares: o uso de Pull Requests está amplamente comprovado, mas ainda não há evidência consolidada de review/aprovação humana por outro integrante, conforme exigência processual do Portfolio Playbook.
 - TDD verificável: as metas de cobertura estão atendidas, porém o histórico disponível não comprova integralmente ciclos teste-primeiro durante o desenvolvimento. A lacuna é metodológica/acadêmica e não invalida os testes, coverage ou funcionamento atual do sistema.
-- Obrigações acadêmicas/humanas: concluir prova de autoria individual, orientações obrigatórias, produção/validação do pôster com QR code e participação nas atividades do Demo Day.
+- Obrigações acadêmicas/humanas: concluir prova de autoria individual, orientações obrigatórias e participação nas atividades do Demo Day. O pôster PDF com QR Code já foi validado.
 
 ### Melhorias operacionais não bloqueadoras
 

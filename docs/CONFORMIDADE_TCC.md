@@ -1,6 +1,6 @@
-﻿# Matriz de conformidade do TCC â€” Ãgora Tech Park
+﻿# Matriz de conformidade do TCC — Ágora Tech Park
 
-Baseline tÃ©cnica de 04/09/2026, com evidÃªncias de CI/CD e produÃ§Ã£o atualizadas em 18/09/2026 e homologação do dashboard consolidado de observabilidade em 23/09/2026. Esta matriz registra o estado observado antes das correÃ§Ãµes e as validaÃ§Ãµes posteriores explicitamente identificadas. Ela nÃ£o Ã© evidÃªncia de aprovaÃ§Ã£o acadÃªmica nem substitui resultados do GitHub Actions, SonarCloud, provedor de nuvem ou Grafana.
+Baseline técnica de 04/09/2026, com evidências de CI/CD e produção atualizadas em 18/09/2026 e homologação do dashboard consolidado de observabilidade em 23/09/2026. Esta matriz registra o estado observado antes das correções e as validações posteriores explicitamente identificadas. Ela não é evidência de aprovação acadêmica nem substitui resultados do GitHub Actions, SonarCloud, provedor de nuvem ou Grafana.
 
 ## Validação técnica de 05/10/2026 — Issue #37 / SEC-01
 
@@ -16,11 +16,11 @@ Este registro atualiza a evidência de segurança da matriz, preservando as dema
 
 ## Legenda
 
-- âœ… **IMPLEMENTADO E VALIDADO** â€” existe e foi verificado por execuÃ§Ã£o ou consulta objetiva.
-- ðŸŸ¡ **IMPLEMENTADO, PENDENTE DE VALIDAÃ‡ÃƒO** â€” existe, mas depende de ambiente ou serviÃ§o indisponÃ­vel.
-- ðŸŸ  **PARCIAL** â€” cobre apenas parte do requisito ou apresenta divergÃªncia.
-- âšª **DOCUMENTADO / PLANEJADO** â€” hÃ¡ intenÃ§Ã£o ou documentaÃ§Ã£o, sem implementaÃ§Ã£o comprovada.
-- ðŸ”´ **AUSENTE / FALHANDO** â€” nÃ£o existe, estÃ¡ incorreto ou falhou no gate aplicÃ¡vel.
+- ✅ **IMPLEMENTADO E VALIDADO** — existe e foi verificado por execução ou consulta objetiva.
+- 🟡 **IMPLEMENTADO, PENDENTE DE VALIDAÇÃO** — existe, mas depende de ambiente ou serviço indisponível.
+- 🟠 **PARCIAL** — cobre apenas parte do requisito ou apresenta divergência.
+- ⚪ **DOCUMENTADO / PLANEJADO** — há intenção ou documentação, sem implementação comprovada.
+- 🔴 **AUSENTE / FALHANDO** — não existe, está incorreto ou falhou no gate aplicável.
 - 👤 **PENDÊNCIA HUMANA** — exige participação, decisão ou credencial do grupo.
 - ⚪ **NÃO APLICÁVEL / DECISÃO REGISTRADA** — item analisado, mas não constitui requisito técnico pendente ou foi substituído por decisão arquitetural validada.
 
@@ -34,89 +34,89 @@ Em 05/10/2026, o fechamento técnico da Issue #57 validou a observabilidade de p
 
 O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produção atual, sem reintrodução do Amplify. Nenhuma mudança arquitetural foi aplicada nesta baseline além da consolidação documental.
 
-## Conformidade tÃ©cnica e acadÃªmica
+## Conformidade técnica e acadêmica
 
-| Requisito | Estado atual | EvidÃªncia objetiva | Lacuna / risco | PrÃ³xima aÃ§Ã£o mÃ­nima |
+| Requisito | Estado atual | Evidência objetiva | Lacuna / risco | Próxima ação mínima |
 |---|---|---|---|---|
-| RepositÃ³rio GitHub pÃºblico | âœ… IMPLEMENTADO E VALIDADO | API pÃºblica do GitHub: `GeovaniaLuiza/agora-tech-park-fullstack`, `visibility=public`, branch padrÃ£o `main` | A publicidade amplia o impacto do arquivo com possÃ­veis dados pessoais | Tratar o incidente de privacidade antes de qualquer outra publicaÃ§Ã£o |
+| Repositório GitHub público | ✅ IMPLEMENTADO E VALIDADO | API pública do GitHub: `GeovaniaLuiza/agora-tech-park-fullstack`, `visibility=public`, branch padrão `main` | A publicidade amplia o impacto do arquivo com possíveis dados pessoais | Tratar o incidente de privacidade antes de qualquer outra publicação |
 | Histórico contínuo de commits | ✅ IMPLEMENTADO E VALIDADO | Em 10/11/2026, `git rev-list --count HEAD` registrou 261 commits; o histórico apresenta atividade em 40 datas distintas entre 03/08/2026 e 10/11/2026. `git shortlog -sne HEAD` identificou 254 commits associados à autora principal em duas identidades Git e 7 commits do Dependabot | A continuidade do histórico está comprovada; autoria individual e revisão humana por PR são avaliadas separadamente | Manter commits pequenos, rastreáveis e vinculados a alterações, testes ou decisões reais |
 | Revisão por PR | ✅ IMPLEMENTADO E VALIDADO | O histórico Git comprova uso recorrente de Pull Requests e merges. No PR #145, outro integrante realizou revisão explícita pelo recurso de review do GitHub e registrou aprovação antes do merge, enquanto os 6 checks automatizados permaneceram aprovados | A evidência comprova revisão humana por pares em Pull Request; não implica que todos os PRs históricos tenham recebido revisão humana | Manter revisão por pares nos próximos PRs relevantes e preservar a evidência de aprovação no histórico do GitHub |
 | Documentação essencial | ✅ IMPLEMENTADO E VALIDADO | `README.md`, `docs/ARCHITECTURE.md`, `docs/RFC.md`, `docs/REQUIREMENTS.md`, `docs/adr/`, `docs/CI_CD.md`, `docs/MONITORING.md` e `docs/QUALITY.md`; URLs atuais, arquitetura vigente e principais decisões/trade-offs estão documentados; `docs/README.md` funciona como índice navegável da documentação | Referências à arquitetura anterior são preservadas apenas como histórico quando aplicável | Manter a documentação atualizada conforme evolução da implantação e infraestrutura |
 | Wiki ou equivalente navegável | ✅ IMPLEMENTADO E VALIDADO | `docs/README.md` funciona como índice navegável da documentação versionada no repositório, com 24 links locais verificados e nenhum link quebrado; o `README.md` principal referencia esse ponto de entrada | A GitHub Wiki permanece desabilitada, mas o requisito é atendido pelo equivalente navegável mantido junto ao código | Manter o índice e os links atualizados quando documentos forem criados, movidos ou removidos |
-| Requisitos e casos de uso completos | âœ… IMPLEMENTADO E VALIDADO | `docs/REQUIREMENTS.md` documenta 9 RFs, 8 RNFs e 8 casos de uso, com critÃ©rios de aceite e matriz de rastreabilidade | RF-004, RF-005 e RF-007 possuem cobertura automatizada insuficiente, explicitada no documento | Manter a matriz de rastreabilidade alinhada Ã  evoluÃ§Ã£o do sistema |
-| Arquitetura C4 ou equivalente | âœ… IMPLEMENTADO E VALIDADO | `docs/ARCHITECTURE.md` contÃ©m trÃªs diagramas Mermaid verificÃ¡veis: visÃ£o de contexto e visÃ£o de containers equivalentes ao C4, alÃ©m da visÃ£o de deployment; componentes, ambientes e fluxos correspondem Ã  produÃ§Ã£o validada | Nenhuma lacuna observada neste requisito | Manter os diagramas alinhados Ã  arquitetura efetivamente implantada |
+| Requisitos e casos de uso completos | ✅ IMPLEMENTADO E VALIDADO | `docs/REQUIREMENTS.md` documenta 9 RFs, 8 RNFs e 8 casos de uso, com critérios de aceite e matriz de rastreabilidade | RF-004, RF-005 e RF-007 possuem cobertura automatizada insuficiente, explicitada no documento | Manter a matriz de rastreabilidade alinhada à evolução do sistema |
+| Arquitetura C4 ou equivalente | ✅ IMPLEMENTADO E VALIDADO | `docs/ARCHITECTURE.md` contém três diagramas Mermaid verificáveis: visão de contexto e visão de containers equivalentes ao C4, além da visão de deployment; componentes, ambientes e fluxos correspondem à produção validada | Nenhuma lacuna observada neste requisito | Manter os diagramas alinhados à arquitetura efetivamente implantada |
 | ADRs / decisões arquiteturais | ✅ IMPLEMENTADO E VALIDADO | `docs/adr/` contém seis Architecture Decision Records aceitos e um índice, documentando decisões arquiteturais reais sobre separação frontend/backend, PostgreSQL, Caddy, CI/CD, e-mail e observabilidade | Nenhuma lacuna observada neste requisito | Manter os ADRs atualizados quando decisões arquiteturais relevantes forem alteradas |
 | Referência acadêmica fornecida | ⚪ NÃO APLICÁVEL / DECISÃO REGISTRADA | Tese de Nancy V. Pérez, 2022, fornecida como material de apoio à auditoria | A referência pode ser utilizada como fundamentação acadêmica, mas não constitui requisito técnico, funcional ou evidência de implementação do sistema | Incorporar somente se for útil à fundamentação teórica, com autoria e referência bibliográfica completas |
 | Link funcional público e estável | ✅ IMPLEMENTADO E VALIDADO | Frontend, API e health estão disponíveis em `https://agora-techpark.duckdns.org`; a arquitetura vigente usa EC2/Caddy na mesma origem, com evidências de deploy e smoke tests preservadas | Disponibilidade contínua futura depende da operação normal do ambiente produtivo, sem lacuna funcional observada na validação atual | Manter a URL pública documentada e preservar smoke checks periódicos |
 | Frontend React + Vite | ✅ IMPLEMENTADO E VALIDADO | React 19.2.8 e Vite 8.2.2; job de testes/build e validação do artefato passou no CI #43; atualmente o frontend é servido pela EC2/Caddy na mesma origem da aplicação | As referências ao Amplify permanecem apenas como registro histórico da arquitetura anterior | Manter documentação alinhada à arquitetura atual EC2/Caddy |
-| Backend Express | âœ… IMPLEMENTADO E VALIDADO | Express 5.2.1; 163 testes unitÃ¡rios passando; `agora-api.service` ativo e habilitado na EC2; API responde HTTP 200 | Meta acadÃªmica de coverage Ã© avaliada separadamente | Preservar testes, health e serviÃ§o systemd |
+| Backend Express | ✅ IMPLEMENTADO E VALIDADO | Express 5.2.1; 163 testes unitários passando; `agora-api.service` ativo e habilitado na EC2; API responde HTTP 200 | Meta acadêmica de coverage é avaliada separadamente | Preservar testes, health e serviço systemd |
 | PostgreSQL 16 | ✅ IMPLEMENTADO E VALIDADO | PostgreSQL 16 em produção na EC2; `postgresql.service` ativo e habilitado; integração PostgreSQL validada no CI; exporter Alloy conectado; em 09/11/2026 foi executado restore lógico isolado de `pg_dump`, com 24 tabelas públicas restauradas e 22 migrations confirmadas, incluindo `022_user_session_version.sql` | Nenhuma lacuna crítica observada na restauração lógica executada; o teste foi realizado em banco temporário isolado e removido ao final | Manter integração, backups e testes periódicos de restauração |
 | Migrações incrementais | ✅ IMPLEMENTADO E VALIDADO | `database/migrations/001...022`; runner único calcula SHA-256, usa lock e registra `schema_migrations`; em 10/11/2026 um banco DEV vazio foi criado via Docker Compose e recebeu com sucesso as 22 migrations; nova execução retornou `No pending migrations`, comprovando idempotência | Nenhuma lacuna funcional observada na validação atual | Manter o runner único e os testes de repetição/checksum |
 | Seed separado e seguro | ✅ IMPLEMENTADO E VALIDADO | `database/seed.sql` contém apenas dados demonstrativos; não é executado automaticamente pelo Compose, CI/CD ou deploy. Em 10/11/2026 foi validado em banco DEV temporário com 22 migrations aplicadas; a primeira execução inseriu os dados esperados e a segunda retornou apenas `INSERT 0 0`, mantendo as mesmas contagens | As credenciais demonstrativas conhecidas permanecem aceitáveis somente em DEV/teste e não devem ser reutilizadas em produção | Manter execução manual e restrita a ambientes não produtivos |
-| InstalaÃ§Ã£o limpa da raiz | âœ… IMPLEMENTADO E VALIDADO | `npm ci`, lint e auditoria passaram no job `Lint and dependency audit` do CI #43 | Nenhuma falha de instalaÃ§Ã£o observada nessa execuÃ§Ã£o | Manter lockfile e job verde |
-| InstalaÃ§Ã£o limpa backend | âœ… IMPLEMENTADO E VALIDADO | `npm ci --prefix backend` e testes passaram no CI #43 | Nenhuma falha de instalaÃ§Ã£o observada nessa execuÃ§Ã£o | Manter lockfile consistente |
-| InstalaÃ§Ã£o limpa frontend | âœ… IMPLEMENTADO E VALIDADO | `npm ci --prefix frontend`, testes, coverage e build passaram no CI #43 | Nenhuma falha de instalaÃ§Ã£o observada nessa execuÃ§Ã£o | Manter lockfile consistente |
-| Lint local | âœ… IMPLEMENTADO E VALIDADO | `npm run lint` concluiu localmente e no job `Lint and dependency audit` do CI #43 | Nenhuma lacuna observada nesta etapa | Manter o gate no CI |
-| Testes unitÃ¡rios backend | âœ… IMPLEMENTADO E VALIDADO | 163 testes unitÃ¡rios aprovados; job `Backend unit tests` passou no CI #43 | NÃ£o substituem a meta acadÃªmica de coverage | Preservar e ampliar suÃ­te |
+| Instalação limpa da raiz | ✅ IMPLEMENTADO E VALIDADO | `npm ci`, lint e auditoria passaram no job `Lint and dependency audit` do CI #43 | Nenhuma falha de instalação observada nessa execução | Manter lockfile e job verde |
+| Instalação limpa backend | ✅ IMPLEMENTADO E VALIDADO | `npm ci --prefix backend` e testes passaram no CI #43 | Nenhuma falha de instalação observada nessa execução | Manter lockfile consistente |
+| Instalação limpa frontend | ✅ IMPLEMENTADO E VALIDADO | `npm ci --prefix frontend`, testes, coverage e build passaram no CI #43 | Nenhuma falha de instalação observada nessa execução | Manter lockfile consistente |
+| Lint local | ✅ IMPLEMENTADO E VALIDADO | `npm run lint` concluiu localmente e no job `Lint and dependency audit` do CI #43 | Nenhuma lacuna observada nesta etapa | Manter o gate no CI |
+| Testes unitários backend | ✅ IMPLEMENTADO E VALIDADO | 163 testes unitários aprovados; job `Backend unit tests` passou no CI #43 | Não substituem a meta acadêmica de coverage | Preservar e ampliar suíte |
 | Cobertura backend ≥ 75% | ✅ IMPLEMENTADO E VALIDADO | `npm run test:coverage --prefix backend`, validado localmente em 05/10/2026: 45 arquivos e 357 testes aprovados; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04% | Nenhuma lacuna no threshold exigido de 75% nas quatro métricas | Preservar o threshold e as evidências de cobertura |
-| Testes unitÃ¡rios frontend | âœ… IMPLEMENTADO E VALIDADO | Job `Frontend tests and build` passou no CI #43, incluindo o comando oficial de coverage | Quantidade atual de testes nÃ£o registrada nesta matriz | Registrar a contagem atual nas evidÃªncias |
-| Cobertura frontend â‰¥ 25% | âœ… IMPLEMENTADO E VALIDADO | O comando oficial `npm run test:coverage --prefix frontend` passou no CI #43 com thresholds configurados acima de 25% | Percentuais exatos da execuÃ§Ã£o #43 nÃ£o foram registrados nesta matriz | Anexar o relatÃ³rio atual como evidÃªncia quantitativa |
+| Testes unitários frontend | ✅ IMPLEMENTADO E VALIDADO | Job `Frontend tests and build` passou no CI #43, incluindo o comando oficial de coverage | Quantidade atual de testes não registrada nesta matriz | Registrar a contagem atual nas evidências |
+| Cobertura frontend ≥ 25% | ✅ IMPLEMENTADO E VALIDADO | O comando oficial `npm run test:coverage --prefix frontend` passou no CI #43 com thresholds configurados acima de 25% | Percentuais exatos da execução #43 não foram registrados nesta matriz | Anexar o relatório atual como evidência quantitativa |
 | TDD verificável | 🟡 PARCIAL | O projeto possui ampla suíte automatizada, coverage acima dos thresholds acadêmicos e CI validado; o direcionamento Web Apps do Portfolio Playbook estabelece TDD e cobertura mínima de 75% no backend e 25% no frontend | Os thresholds de cobertura estão atendidos, porém o histórico disponível não permite comprovar integralmente ciclos teste-primeiro ao longo do desenvolvimento | Preservar os thresholds e demonstrar TDD de forma explícita nos próximos incrementos, com teste escrito antes da implementação |
 | Três fluxos de negócio completos | ✅ IMPLEMENTADO E VALIDADO | Em 10/11/2026 foram validados manualmente em produção três fluxos ponta a ponta: autenticação e acesso ao Dashboard; importação de empresas residentes com validação, revisão, confirmação e atualização de indicadores; e importação de eventos com validação, preview, revisão, confirmação e atualização de indicadores | A validação comprova os três fluxos selecionados em produção; outros casos de uso possuem validações próprias | Preservar as evidências de demonstração e manter testes automatizados dos fluxos |
-| CI no GitHub Actions | âœ… IMPLEMENTADO E VALIDADO | CI #43 passou: lint/audit, testes backend, testes/build frontend, integraÃ§Ã£o PostgreSQL e SonarQube Cloud Quality Gate | Nenhuma lacuna funcional observada nessa execuÃ§Ã£o | Manter o `main` protegido por CI verde |
-| CD no GitHub Actions | âœ… IMPLEMENTADO E VALIDADO | CD Production #48 passou: backend via AWS Systems Manager, frontend no AWS Amplify e smoke tests de produÃ§Ã£o | A evidÃªncia comprova a execuÃ§Ã£o #48, nÃ£o disponibilidade contÃ­nua futura | Monitorar execuÃ§Ãµes e preservar rollback |
+| CI no GitHub Actions | ✅ IMPLEMENTADO E VALIDADO | CI #43 passou: lint/audit, testes backend, testes/build frontend, integração PostgreSQL e SonarQube Cloud Quality Gate | Nenhuma lacuna funcional observada nessa execução | Manter o `main` protegido por CI verde |
+| CD no GitHub Actions | ✅ IMPLEMENTADO E VALIDADO | CD Production #48 passou: backend via AWS Systems Manager, frontend no AWS Amplify e smoke tests de produção | A evidência comprova a execução #48, não disponibilidade contínua futura | Monitorar execuções e preservar rollback |
 | AWS removida com segurança | ⚪ NÃO APLICÁVEL / DECISÃO REGISTRADA | A AWS permanece como infraestrutura de produção validada. EC2 e Systems Manager integram a arquitetura vigente; o Amplify foi utilizado apenas historicamente | A remoção da AWS não constitui pendência da arquitetura atual e não foi autorizada como migração; a infraestrutura produtiva vigente está validada | Manter a infraestrutura atual e reavaliar eventual migração somente mediante requisito, destino substituto e autorização |
 | Cloudflare Pages como frontend | ⚪ NÃO APLICÁVEL / DECISÃO REGISTRADA | Cloudflare Pages foi considerada como alternativa de hospedagem, mas a arquitetura vigente utiliza EC2/Caddy na mesma origem, já validada em produção | A alternativa não adotada não constitui lacuna de conformidade; a decisão arquitetural vigente prioriza hospedagem controlável e integração same-origin | Manter EC2/Caddy enquanto permanecer a arquitetura aprovada; reavaliar somente diante de novo requisito arquitetural |
-| SonarCloud configurado | âœ… IMPLEMENTADO E VALIDADO | Job `SonarQube Cloud Quality Gate` passou no CI #43 | Resultado refere-se Ã  execuÃ§Ã£o validada | Manter token, projeto e gate operacionais |
-| Quality Gate aprovado | âœ… IMPLEMENTADO E VALIDADO | Quality Gate passou no CI #43, apÃ³s os jobs de qualidade, testes, build e integraÃ§Ã£o | AprovaÃ§Ã£o acadÃªmica final nÃ£o decorre automaticamente do gate | Preservar o bloqueio do pipeline por Quality Gate |
+| SonarCloud configurado | ✅ IMPLEMENTADO E VALIDADO | Job `SonarQube Cloud Quality Gate` passou no CI #43 | Resultado refere-se à execução validada | Manter token, projeto e gate operacionais |
+| Quality Gate aprovado | ✅ IMPLEMENTADO E VALIDADO | Quality Gate passou no CI #43, após os jobs de qualidade, testes, build e integração | Aprovação acadêmica final não decorre automaticamente do gate | Preservar o bloqueio do pipeline por Quality Gate |
 | DEV separado de produção | ✅ IMPLEMENTADO E VALIDADO | Ambiente DEV validado localmente em 10/11/2026: PostgreSQL 16 via Docker Compose na porta 5435, backend Express na porta 3002, frontend Vite na porta 5174 e provider de e-mail `mock`; health retornou `status=ok`, `api=up`, `database=up`, `email=up`, e o frontend respondeu HTTP 200 | Nenhuma lacuna funcional observada na separação DEV/PROD | Manter variáveis e infraestrutura DEV isoladas da produção |
 | PROD separado de DEV | ✅ IMPLEMENTADO E VALIDADO | Produção validada em AWS EC2/Caddy, PostgreSQL 16 e configuração própria, distinta do ambiente DEV local | STAGING não é requisito identificado em `docs/REQUIREMENTS.md` e não integra a arquitetura atual | Manter produção isolada do DEV e documentar novos ambientes somente quando houver requisito explícito |
 | Deploy público em nuvem | ✅ IMPLEMENTADO E VALIDADO | Atualmente frontend e backend são publicados conjuntamente na AWS EC2/Caddy; como evidência histórica, o CD Production #48 implantou backend via Systems Manager e frontend no AWS Amplify e concluiu smoke tests | A evidência histórica do #48 não representa disponibilidade contínua futura | Manter a URL pública atual documentada e preservar validação pós-deploy |
-| HTTPS pÃºblico | âœ… IMPLEMENTADO E VALIDADO | `caddy.service` ativo e habilitado; Caddy serve `https://agora-techpark.duckdns.org/api` e `/api/health` por HTTPS; endpoint respondeu HTTP 200 | Nenhuma lacuna observada na validaÃ§Ã£o informada | Monitorar certificado e disponibilidade |
+| HTTPS público | ✅ IMPLEMENTADO E VALIDADO | `caddy.service` ativo e habilitado; Caddy serve `https://agora-techpark.duckdns.org/api` e `/api/health` por HTTPS; endpoint respondeu HTTP 200 | Nenhuma lacuna observada na validação informada | Monitorar certificado e disponibilidade |
 | Observabilidade | ✅ IMPLEMENTADO E VALIDADO no escopo da Issue #57 | Ingestão Prometheus/Loki via Alloy comprovada em 18/09/2026; dashboard consolidado homologado em 23/09/2026; métricas e logs chegando ao Grafana Cloud, alerta da API, entrega de notificação, SLO e retenção validados em 05/10/2026 | Quatro dashboards específicos e demais séries e alertas não foram validados integralmente | Preservar as evidências e validar separadamente os itens complementares |
-| Grafana Cloud recebendo dados | âœ… IMPLEMENTADO E VALIDADO | Em 18/09/2026, Explore exibiu CPU do processo via Prometheus e logs da API via Loki; em 23/09/2026, os datasources `grafanacloud-bluegerbil2886-prom` e `grafanacloud-bluegerbil2886-logs` exibiram dados reais no dashboard consolidado | Nenhuma lacuna de ingestÃ£o observada nessas validações; alertas sÃ£o avaliados separadamente | Preservar evidÃªncias sem expor credenciais e monitorar continuidade da ingestÃ£o |
-| Logs estruturados e redaction | âœ… IMPLEMENTADO E VALIDADO | Pino em journald; Alloy filtra somente `agora-api.service`; Loki recebeu JSON com `application="agora-tech-park"`, `environment="production"`, `service="agora-api"` e redaction `[REDACTED]` | A validaÃ§Ã£o comprova o fluxo e uma ocorrÃªncia de redaction, nÃ£o todas as variaÃ§Ãµes possÃ­veis de dados sensÃ­veis | Manter testes de regressÃ£o da redaction e o filtro da unit |
+| Grafana Cloud recebendo dados | ✅ IMPLEMENTADO E VALIDADO | Em 18/09/2026, Explore exibiu CPU do processo via Prometheus e logs da API via Loki; em 23/09/2026, os datasources `grafanacloud-bluegerbil2886-prom` e `grafanacloud-bluegerbil2886-logs` exibiram dados reais no dashboard consolidado | Nenhuma lacuna de ingestão observada nessas validações; alertas são avaliados separadamente | Preservar evidências sem expor credenciais e monitorar continuidade da ingestão |
+| Logs estruturados e redaction | ✅ IMPLEMENTADO E VALIDADO | Pino em journald; Alloy filtra somente `agora-api.service`; Loki recebeu JSON com `application="agora-tech-park"`, `environment="production"`, `service="agora-api"` e redaction `[REDACTED]` | A validação comprova o fluxo e uma ocorrência de redaction, não todas as variações possíveis de dados sensíveis | Manter testes de regressão da redaction e o filtro da unit |
 | Métricas HTTP/latência/erros | ✅ IMPLEMENTADO E VALIDADO | Em 23/09/2026, o dashboard consolidado exibiu requests por minuto, latência média/p95 e painel de HTTP 5xx; o painel de 5xx exibiu `0 req/s`, coerente com a ausência de erros no período observado | Não foi provocado erro HTTP 5xx real; esse teste adicional não integra o requisito acadêmico mínimo de observabilidade documentado | Manter a coleta e, como melhoria operacional, validar cenário controlado de 5xx quando conveniente |
 | Métricas CPU/memória/disco | ✅ ATENDIDO NO ESCOPO ACADÊMICO | CPU do processo Node e memória RSS foram observadas no Grafana em 18/09/2026 e 23/09/2026; a infraestrutura de métricas Prometheus/Alloy permanece operacional | Não há evidência de teste específico de disco nem de alerta explícito de RAM; esses itens permanecem como melhorias operacionais complementares, não como bloqueadores do requisito acadêmico documentado | Preservar CPU/memória e evoluir métricas de host/disco conforme necessidade operacional |
-| Health/liveness/readiness | âœ… IMPLEMENTADO E VALIDADO | `/api/health`, `/live`, `/ready`; readiness retorna 503 quando o banco crÃ­tico falha; health local e `https://agora-techpark.duckdns.org/api/health` retornaram 200; smoke de produÃ§Ã£o passou | Nenhuma lacuna funcional observada nos checks executados | Manter monitoramento e smoke pÃ³s-deploy |
+| Health/liveness/readiness | ✅ IMPLEMENTADO E VALIDADO | `/api/health`, `/live`, `/ready`; readiness retorna 503 quando o banco crítico falha; health local e `https://agora-techpark.duckdns.org/api/health` retornaram 200; smoke de produção passou | Nenhuma lacuna funcional observada nos checks executados | Manter monitoramento e smoke pós-deploy |
 | Alertas operacionais | ✅ IMPLEMENTADO E VALIDADO para indisponibilidade da API (Issue #57) | `Agora API unavailable` testado em 05/10/2026: `Normal -> Pending -> Alerting`, notificação `Firing` e `Delivery outcome: Delivered successfully` no contact point `agora-production-email`; após restauração, `Alerting -> Normal` e notificação `Resolved` | Demais regras versionadas para banco, sintético, 5xx, CPU e disco sem teste comprovado; RAM do processo Node, latência e e-mail continuam incompletos ou sem validação | Manter o alerta validado e testar separadamente as demais regras |
 | SLO de disponibilidade | ✅ IMPLEMENTADO E VALIDADO | `Agora API availability`, target 99%, janela de 28 dias, SLI baseado em `up`; em 05/10/2026, 28d SLI observado de 100.0% e Remaining error budget de 100% | A janela configurada do SLO não comprova 28 dias completos de histórico retido | Acompanhar SLI e orçamento de erro |
 | Retenção de observabilidade | ✅ IMPLEMENTADO E VALIDADO | Grafana Cloud Free: métricas Prometheus e logs Loki com retenção de 14 dias, validada em 05/10/2026 | Retenção de 14 dias distinta da janela de 28 dias do SLO | Acompanhar retenção e limites do plano |
 | Backup e recuperação | ✅ IMPLEMENTADO E VALIDADO | Dumps PostgreSQL locais existem em `/opt/agora/backups`; todos os arquivos existentes passaram em `gzip -t`; AWS Backup protege o EBS de produção diariamente com retenção de 14 dias; backup on-demand e restauração para novo volume EBS foram concluídos com sucesso; em 09/11/2026 o dump lógico do deploy `c36fe84f3a7041559352d26c4680e2a4a48737fe` foi restaurado em banco temporário isolado, com 24 tabelas públicas e 22 migrations verificadas, seguido da remoção do banco temporário | O restore lógico foi validado sem substituir ou alterar o banco de produção; o teste não representa o RTO completo da aplicação | Manter o plano AWS Backup e repetir periodicamente os testes de restauração lógica e de infraestrutura |
-| Smoke tests | âœ… IMPLEMENTADO E VALIDADO | No CD #48, `scripts/smoke-test.mjs` validou HTTP 200 do health, status `ok`/`degraded`, banco `up`, HTTP 200 do frontend apÃ³s redirects e HTML com `<!doctype html>` | NÃ£o hÃ¡ evidÃªncia de que `SMOKE_EMAIL` e `SMOKE_PASSWORD` estavam presentes no #48; sem ambos, o script ignora o login. O script nÃ£o testa CORS | Registrar se o login foi executado e adicionar check de CORS se exigido |
+| Smoke tests | ✅ IMPLEMENTADO E VALIDADO | No CD #48, `scripts/smoke-test.mjs` validou HTTP 200 do health, status `ok`/`degraded`, banco `up`, HTTP 200 do frontend após redirects e HTML com `<!doctype html>` | Não há evidência de que `SMOKE_EMAIL` e `SMOKE_PASSWORD` estavam presentes no #48; sem ambos, o script ignora o login. O script não testa CORS | Registrar se o login foi executado e adicionar check de CORS se exigido |
 | Segurança de aplicação | ✅ IMPLEMENTADO E VALIDADO | Helmet, CORS, JWT, rate limit, Zod, queries parametrizadas e auditoria de dependências High/Critical aprovada no CI; em 10/11/2026 foram validados no GitHub o Dependency graph, Dependabot alerts, Dependabot security updates, Secret Protection e Push protection | A SEC-01/LGPD histórica é tratada separadamente; em 12/11/2026 o objeto histórico deixou de ser reproduzível em dois clones mirror frescos, restando confirmação formal do GitHub Support quanto a caches/objetos server-side | Manter controles ativos, preservar auditorias no CI e revisar alertas de dependências e secrets continuamente |
 | Dados pessoais/LGPD no repositório | 🟡 PARCIAL — SEC-01 pendente de confirmação server-side | A árvore atual está saneada quanto ao arquivo alvo. Em 12/11/2026, dois clones mirror novos não localizaram `refs/pull/8/*`, o commit `55faede` nem o blob `54b236f1796d100c64259e54bfff3d43854005b5`; o fetch direto do commit retornou `upload-pack: not our ref` e `git rev-list --all --objects` não encontrou o blob. O GitHub Support foi acionado no ticket `#4997778` em 12/11/2026 | A exposição histórica não é mais reproduzível pelas refs Git atualmente anunciadas, porém ainda não há confirmação formal do GitHub Support sobre caches, garbage collection e objetos server-side residuais | Aguardar resposta formal do ticket `#4997778` e encerrar a SEC-01 somente após confirmação do GitHub Support |
 | Metadados pessoais em artefatos | ✅ IMPLEMENTADO E VALIDADO | Na árvore atual rastreada pelo Git foram verificados três artefatos Office: `docs/plataforma_de_indicadores.docx` e `frontend/imgs/Indicadores Rede de Centros de Inovação 2026_Joinville.xlsx` não possuem `docProps/core.xml`; `frontend/imgs/estatisticas.xlsx` possuía `lastModifiedBy` e teve esse metadado removido em 10/11/2026, com verificação posterior de `creator` e `lastModifiedBy` vazios | A validação cobre os artefatos Office atualmente rastreados; novos arquivos devem ser verificados antes da publicação | Manter verificação de metadados em novos DOCX/XLSX/PPTX adicionados ao repositório |
-| E-mail transacional | âœ… IMPLEMENTADO E VALIDADO | Gmail SMTP via Nodemailer validado em produÃ§Ã£o; `nodemailer.verify()` e envio real passaram; health reporta `email="up"`; DEV/test usam provider mock sem SMTP externo | Nenhuma lacuna funcional observada na validaÃ§Ã£o informada | Monitorar entrega e manter secrets fora dos logs |
+| E-mail transacional | ✅ IMPLEMENTADO E VALIDADO | Gmail SMTP via Nodemailer validado em produção; `nodemailer.verify()` e envio real passaram; health reporta `email="up"`; DEV/test usam provider mock sem SMTP externo | Nenhuma lacuna funcional observada na validação informada | Monitorar entrega e manter secrets fora dos logs |
 | Secrets fora do código | ✅ IMPLEMENTADO E VALIDADO | `.gitignore`, `.env.example`, validação de ambiente e ausência de `.env` real rastreado na árvore atual; `SONAR_TOKEN` armazenado como GitHub Actions Secret; variáveis não sensíveis separadas em GitHub Variables; Secret Protection e Push protection habilitados em 10/11/2026 | A validação comprova a configuração atual; a SEC-01 histórica permanece tratada separadamente | Manter secrets apenas em mecanismos próprios do ambiente e preservar Secret Protection/Push protection ativos |
 | Autoria individual | 🟡 PARCIAL — EVIDÊNCIA TÉCNICA PREPARADA | O histórico Git identifica duas identidades associadas à autora principal e registra 163 commits autorais sem merges pelo filtro `--author="Geovania"`. As contribuições abrangem backend, frontend, testes, documentação, GitHub Actions, deploy/AWS e scripts, com participação contínua entre agosto e novembro de 2026 | A evidência técnica comprova contribuição substancial e rastreável no repositório, mas não substitui a prova individual/apresentação exigida academicamente pelo Portfolio Playbook | Preparar a demonstração individual das principais contribuições e preservar os commits, PRs e arquivos representativos como evidência |
-| OrientaÃ§Ãµes obrigatÃ³rias | ðŸ‘¤ PENDÃŠNCIA HUMANA | Playbook exige 5 orientaÃ§Ãµes, com marcos em 30/09 e 30/11/2026 | NÃ£o hÃ¡ registro acadÃªmico verificÃ¡vel no repositÃ³rio | Grupo deve manter comprovantes e pauta por orientaÃ§Ã£o |
+| Orientações obrigatórias | 👤 PENDÊNCIA HUMANA | Playbook exige 5 orientações, com marcos em 30/09 e 30/11/2026 | Não há registro acadêmico verificável no repositório | Grupo deve manter comprovantes e pauta por orientação |
 | Pôster PDF com QR code | ✅ IMPLEMENTADO E VALIDADO | Pôster final em PDF A0 vertical validado quanto às dimensões, estrutura, conteúdo e QR Code funcional para acesso à aplicação pública | Alguns rótulos internos dos diagramas utilizam 18–19 pt, mas o conteúdo principal permanece legível e o pôster atende ao conjunto dos requisitos essenciais do guia oficial | Preservar a versão final do PDF e realizar teste do QR antes da apresentação |
-| Demo Day e avaliaÃ§Ãµes | ðŸ‘¤ PENDÃŠNCIA HUMANA | Datas oficiais: 10, 15 e 16/12/2026 | PresenÃ§a em uma noite distinta e avaliaÃ§Ãµes sÃ£o obrigaÃ§Ãµes humanas | Planejar escala e registrar submissÃµes dentro do prazo |
+| Demo Day e avaliações | 👤 PENDÊNCIA HUMANA | Datas oficiais: 10, 15 e 16/12/2026 | Presença em uma noite distinta e avaliações são obrigações humanas | Planejar escala e registrar submissões dentro do prazo |
 
-## CI/CD â€” resultado de aceite
+## CI/CD — resultado de aceite
 
-**CI: PASS.** A execuÃ§Ã£o CI #43 concluiu com sucesso os jobs `Lint and dependency audit`, `Backend unit tests`, `Frontend tests and build`, `PostgreSQL integration tests` e `SonarQube Cloud Quality Gate`.
+**CI: PASS.** A execução CI #43 concluiu com sucesso os jobs `Lint and dependency audit`, `Backend unit tests`, `Frontend tests and build`, `PostgreSQL integration tests` e `SonarQube Cloud Quality Gate`.
 
-**CD: PASS.** A execuÃ§Ã£o CD Production #48 implantou o backend na AWS EC2 via Systems Manager, publicou o frontend no AWS Amplify e concluiu os smoke tests de produÃ§Ã£o.
+**CD: PASS.** A execução CD Production #48 implantou o backend na AWS EC2 via Systems Manager, publicou o frontend no AWS Amplify e concluiu os smoke tests de produção.
 
-| Etapa | Configurada | ExecuÃ§Ã£o bem-sucedida atual |
+| Etapa | Configurada | Execução bem-sucedida atual |
 |---|---:|---:|
-| ExecuÃ§Ã£o automÃ¡tica de CI | Sim | Sim â€” CI #43 |
-| Lint | Sim | Sim â€” CI #43 |
-| Testes backend | Sim | Sim â€” 163 testes no CI #43 |
-| Testes frontend | Sim | Sim â€” CI #43 |
+| Execução automática de CI | Sim | Sim — CI #43 |
+| Lint | Sim | Sim — CI #43 |
+| Testes backend | Sim | Sim — 163 testes no CI #43 |
+| Testes frontend | Sim | Sim — CI #43 |
 | Coverage | Sim | Sim — CI #43 como evidência histórica; backend validado localmente em 05/10/2026 com 75% atendidos nas quatro métricas |
-| Audit | Sim | Sim â€” critÃ©rio High/Critical no CI #43 |
-| Build | Sim | Sim â€” artefato validado no CI #43 e implantado pelo CD #48 |
-| Sonar | Sim | Sim â€” CI #43 |
-| Quality Gate bloqueando deploy | Sim, por dependÃªncia entre jobs | Sim â€” PASS no CI #43 |
-| Critical/High bloqueando produÃ§Ã£o | Sim, por `check-sonar-quality.mjs` | Sim â€” no CI #43, o script aprovou o Quality Gate e nÃ£o encontrou issues abertas nos filtros legados `BLOCKER,CRITICAL` nem MQR `BLOCKER,HIGH` |
-| Deploy automÃ¡tico | Condicional | Sim â€” CD Production #48 |
-| Health check pÃ³s-deploy | Configurado no CD AWS | Sim â€” CD #48 e URL pÃºblica HTTP 200 |
-| Smoke test pÃ³s-deploy | Configurado no CD AWS | Sim â€” CD #48 |
+| Audit | Sim | Sim — critério High/Critical no CI #43 |
+| Build | Sim | Sim — artefato validado no CI #43 e implantado pelo CD #48 |
+| Sonar | Sim | Sim — CI #43 |
+| Quality Gate bloqueando deploy | Sim, por dependência entre jobs | Sim — PASS no CI #43 |
+| Critical/High bloqueando produção | Sim, por `check-sonar-quality.mjs` | Sim — no CI #43, o script aprovou o Quality Gate e não encontrou issues abertas nos filtros legados `BLOCKER,CRITICAL` nem MQR `BLOCKER,HIGH` |
+| Deploy automático | Condicional | Sim — CD Production #48 |
+| Health check pós-deploy | Configurado no CD AWS | Sim — CD #48 e URL pública HTTP 200 |
+| Smoke test pós-deploy | Configurado no CD AWS | Sim — CD #48 |
 
-## InventÃ¡rio de ambientes
+## Inventário de ambientes
 
 ### DEV
 
@@ -125,7 +125,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Frontend | Vite em `http://localhost:5174`; executado fora do Compose |
 | Backend | Express com fallback local em `http://localhost:3002`; executado fora do Compose |
 | Database | PostgreSQL 16 via Docker Compose, porta local 5435 e volume `postgres_data`; ambiente recriado do zero e validado em 10/11/2026 |
-| Email | Provider mock controlado por padrÃ£o, sem SMTP externo; o Compose nÃ£o provisiona serviÃ§o de e-mail |
+| Email | Provider mock controlado por padrão, sem SMTP externo; o Compose não provisiona serviço de e-mail |
 | Observability | Logs Pino e endpoint Prometheus implementados; backend DEV validado em 10/11/2026 com health operacional |
 
 ### PROD
@@ -133,10 +133,10 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Componente | Estado real |
 |---|---|
 | Frontend | Atualmente servido pela EC2/Caddy em `https://agora-techpark.duckdns.org`; o CD Production #48 permanece como evidência histórica da implantação anterior no AWS Amplify |
-| Backend | Implantado na AWS EC2; `agora-api.service` ativo e habilitado; releases em `/opt/agora/releases` e symlink `/opt/agora/current`; API pÃºblica responde HTTP 200 |
-| Database | PostgreSQL 16 em produÃ§Ã£o na EC2; `postgresql.service` ativo e habilitado; integraÃ§Ã£o CI e conexÃ£o do exporter validadas |
+| Backend | Implantado na AWS EC2; `agora-api.service` ativo e habilitado; releases em `/opt/agora/releases` e symlink `/opt/agora/current`; API pública responde HTTP 200 |
+| Database | PostgreSQL 16 em produção na EC2; `postgresql.service` ativo e habilitado; integração CI e conexão do exporter validadas |
 | Backup | AWS Backup configurado para o EBS de produção, com execução diária e retenção de 14 dias; backup on-demand e restore para volume EBS isolado validados com sucesso |
-| HTTPS | `caddy.service` ativo e habilitado; API e health pÃºblicos servidos por HTTPS |
+| HTTPS | `caddy.service` ativo e habilitado; API e health públicos servidos por HTTPS |
 | Email | Gmail SMTP via Nodemailer validado com `verify()`, envio real e health `email="up"` |
 | Observability | Alloy 1.19.2; `alloy.service` ativo e habilitado na EC2; remote write Prometheus e envio Loki validados em 18/09/2026; dashboard consolidado homologado em 23/09/2026; em 05/10/2026, métricas e logs chegando ao Grafana Cloud, alerta da API e entrega de notificação, SLO e retenção validados; produção restaurada após teste controlado; quatro dashboards específicos e demais alertas continuam sem validação final |
 
@@ -153,7 +153,7 @@ GRAFANA_URL=
 
 A API, o health e o frontend atuais usam a mesma origem pública `https://agora-techpark.duckdns.org` via EC2/Caddy. Como evidência histórica, o frontend implantado anteriormente no Amplify passou no smoke test do CD #48. **DEPLOY TÉCNICO: ATENDE. DOCUMENTAÇÃO DAS URLs: ATENDE.**
 
-## Coverage tÃ©cnico versus acadÃªmico
+## Coverage técnico versus acadêmico
 
 ### Backend
 
@@ -168,101 +168,101 @@ Validação final local em 05/10/2026 com `npm run test:coverage --prefix backen
 
 ### Frontend
 
-| MÃ©trica | Resultado diagnÃ³stico da baseline | Threshold tÃ©cnico | Meta acadÃªmica |
+| Métrica | Resultado diagnóstico da baseline | Threshold técnico | Meta acadêmica |
 |---|---:|---:|---:|
 | Statements | 58,76% | 55% | 25% |
-| Branches | 54,81% | 50% | 25% nÃ£o confirmado por mÃ©trica |
-| Functions | 45,95% | 40% | 25% nÃ£o confirmado por mÃ©trica |
+| Branches | 54,81% | 50% | 25% não confirmado por métrica |
+| Functions | 45,95% | 40% | 25% não confirmado por métrica |
 | Lines | 70,07% | 65% | 25% |
 
-Os valores quantitativos acima foram obtidos na baseline com timeout diagnÃ³stico de 15 segundos. Posteriormente, o comando oficial `npm run test:coverage --prefix frontend` passou no CI #43 e os thresholds tÃ©cnicos configurados sÃ£o superiores Ã  meta acadÃªmica de 25%. **Status acadÃªmico: ATENDIDO quanto Ã  coverage frontend.**
+Os valores quantitativos acima foram obtidos na baseline com timeout diagnóstico de 15 segundos. Posteriormente, o comando oficial `npm run test:coverage --prefix frontend` passou no CI #43 e os thresholds técnicos configurados são superiores à meta acadêmica de 25%. **Status acadêmico: ATENDIDO quanto à coverage frontend.**
 
-## Observabilidade â€” evidÃªncia funcional
+## Observabilidade — evidência funcional
 
-| Item | SituaÃ§Ã£o |
+| Item | Situação |
 |---|---|
 | Dashboard | `Agora Tech Park - Production Overview` (UID `agora-production-overview`) importado e homologado no Grafana Cloud em 23/09/2026; quatro dashboards específicos versionados sem validação final |
-| URL | URL nÃ£o registrada na matriz; acesso ao Grafana Cloud Explore validado em 18/09/2026 |
-| Alloy | VersÃ£o 1.19.2 na EC2 Ubuntu 24.04; `alloy.service` ativo, habilitado no systemd e configuraÃ§Ã£o aprovada por `alloy validate`; sem novos erros no journal apÃ³s a correÃ§Ã£o da autenticaÃ§Ã£o |
+| URL | URL não registrada na matriz; acesso ao Grafana Cloud Explore validado em 18/09/2026 |
+| Alloy | Versão 1.19.2 na EC2 Ubuntu 24.04; `alloy.service` ativo, habilitado no systemd e configuração aprovada por `alloy validate`; sem novos erros no journal após a correção da autenticação |
 | Datasource | Prometheus `grafanacloud-bluegerbil2886-prom` e Loki `grafanacloud-bluegerbil2886-logs` validados com dados reais no dashboard em 23/09/2026; `DS_LOKI` filtra fontes terminadas em `-logs` e exclui a fonte de histórico de alertas |
-| Ãšltimos dados recebidos | Em 23/09/2026, dashboard exibiu API e PostgreSQL `UP`, requests, latência média/p95, CPU e memória RSS do processo Node, conexões `active`, `idle` e `unknown`, e logs Pino reais no Loki |
+| Últimos dados recebidos | Em 23/09/2026, dashboard exibiu API e PostgreSQL `UP`, requests, latência média/p95, CPU e memória RSS do processo Node, conexões `active`, `idle` e `unknown`, e logs Pino reais no Loki |
 | Painéis sem erros | Em 23/09/2026, Erros HTTP 5xx exibiu `0 req/s` e Erros nos logs (5 min) exibiu linha em zero na ausência de registros Pino com `level >= 50`; fallback `vector(0)` validado operacionalmente, sem teste real de falha |
 | Logs | Consulta `{service="agora-api"}` validada; em 23/09/2026, painel mostrou logs Pino estruturados reais no Loki, inclusive registros com `level` 30, sem reproduzir conteúdo dos logs |
-| PostgreSQL exporter | ConexÃ£o estabelecida com PostgreSQL 16.15.0; usuÃ¡rio dedicado de observabilidade com `pg_monitor`, sem privilÃ©gios administrativos da aplicaÃ§Ã£o |
-| API / Application / Infrastructure / PostgreSQL | Dashboard consolidado operacional com mÃ©tricas reais da API e PostgreSQL e logs da aplicaÃ§Ã£o; quatro dashboards específicos e demais sÃ©ries de infraestrutura nÃ£o foram validados integralmente |
+| PostgreSQL exporter | Conexão estabelecida com PostgreSQL 16.15.0; usuário dedicado de observabilidade com `pg_monitor`, sem privilégios administrativos da aplicação |
+| API / Application / Infrastructure / PostgreSQL | Dashboard consolidado operacional com métricas reais da API e PostgreSQL e logs da aplicação; quatro dashboards específicos e demais séries de infraestrutura não foram validados integralmente |
 | Alertas mínimos | ✅ VALIDADO em 05/10/2026: `Agora API unavailable`; query `last_over_time(up{job="prometheus.scrape.agora_api"}[5m])`, condição `IS BELOW 1`, evaluation interval `1m`, pending period `1m`, contact point `agora-production-email`; demais alertas de banco, HTTP 5xx, CPU e disco sem teste comprovado |
 | Entrega de notificação | ✅ VALIDADA: notificação `Firing` gerada e Grafana registrou `Delivery outcome: Delivered successfully`; após recuperação, notificação `Resolved` gerada |
 | Teste operacional controlado | ✅ VALIDADO: interrupção temporária de `agora-api.service`, `Normal -> Pending -> Alerting`; serviço e produção restaurados, `Alerting -> Normal` |
 | SLO | ✅ VALIDADO: `Agora API availability`, target 99%, janela 28 dias, SLI baseado na métrica Prometheus `up`; labels `team_name=agora-tech-park`, `service_name=agora-api`, `environment=production`; 28d SLI observado 100.0% e Remaining error budget 100% em 05/10/2026 |
 | Retenção | ✅ VALIDADA no Grafana Cloud Free: métricas Prometheus 14 dias e logs Loki 14 dias; a janela do SLO é distinta da retenção, e o SLI observado não comprova 28 dias completos de histórico retido |
-| Alertas adicionais | RAM, latÃªncia e falhas de e-mail incompletos ou sem validaÃ§Ã£o |
+| Alertas adicionais | RAM, latência e falhas de e-mail incompletos ou sem validação |
 
-Arquitetura validada em 18/09/2026: Node/Express `/metrics` â†’ Grafana Alloy â†’ Grafana Cloud Prometheus; Pino/journald â†’ Grafana Alloy â†’ Grafana Cloud Loki; PostgreSQL exporter â†’ Grafana Alloy â†’ Grafana Cloud Prometheus.
+Arquitetura validada em 18/09/2026: Node/Express `/metrics` → Grafana Alloy → Grafana Cloud Prometheus; Pino/journald → Grafana Alloy → Grafana Cloud Loki; PostgreSQL exporter → Grafana Alloy → Grafana Cloud Prometheus.
 
 Em 23/09/2026, foram realizadas capturas de tela manuais do Grafana Cloud com API e PostgreSQL `UP`, requests, latência, conexões PostgreSQL, logs Pino no Loki, painéis de 5xx e erros nos logs em zero e datasources Prometheus e Loki selecionados corretamente. Nenhuma captura foi incorporada ou versionada nesta matriz.
 
-## Checklist da demonstraÃ§Ã£o em produÃ§Ã£o
+## Checklist da demonstração em produção
 
-Os itens abaixo permanecem como roteiro de apresentaÃ§Ã£o presencial; uma validaÃ§Ã£o tÃ©cnica automatizada nÃ£o marca, por si sÃ³, a demonstraÃ§Ã£o acadÃªmica como concluÃ­da.
+Os itens abaixo permanecem como roteiro de apresentação presencial; uma validação técnica automatizada não marca, por si só, a demonstração acadêmica como concluída.
 
-- [ ] Abrir aplicaÃ§Ã£o pÃºblica.
+- [ ] Abrir aplicação pública.
 - [ ] Executar login.
 - [ ] Navegar pelo dashboard.
 - [ ] Demonstrar funcionalidade principal.
-- [ ] Consultar PostgreSQL por meio da aplicaÃ§Ã£o.
-- [ ] Demonstrar integraÃ§Ã£o frontend/backend.
+- [ ] Consultar PostgreSQL por meio da aplicação.
+- [ ] Demonstrar integração frontend/backend.
 - [ ] Demonstrar CI/CD verde.
 - [ ] Mostrar SonarCloud.
 - [ ] Mostrar Quality Gate aprovado.
 - [ ] Mostrar Grafana com dados recentes.
-- [ ] Mostrar health pÃºblico.
-- [ ] Demonstrar e-mail real, quando aplicÃ¡vel.
+- [ ] Mostrar health público.
+- [ ] Demonstrar e-mail real, quando aplicável.
 
 ## Matriz final de requisitos de entrega
 
-Esta Ã© a tabela de aceite restrita aos trÃªs estados solicitados. Um requisito configurado, mas sem evidÃªncia funcional, nÃ£o recebe `ATENDIDO`.
+Esta é a tabela de aceite restrita aos três estados solicitados. Um requisito configurado, mas sem evidência funcional, não recebe `ATENDIDO`.
 
-| Requisito | EvidÃªncia | Status |
+| Requisito | Evidência | Status |
 |---|---|---|
-| RepositÃ³rio pÃºblico | GitHub pÃºblico `GeovaniaLuiza/agora-tech-park-fullstack` | âœ… ATENDIDO |
+| Repositório público | GitHub público `GeovaniaLuiza/agora-tech-park-fullstack` | ✅ ATENDIDO |
 | Histórico de commits | 261 commits distribuídos em 40 datas entre 03/08/2026 e 10/11/2026; continuidade do desenvolvimento comprovada | ✅ ATENDIDO |
 | Link funcional | Frontend, API e health públicos via HTTPS na mesma origem `https://agora-techpark.duckdns.org` | ✅ ATENDIDO |
 | Produção pública | Frontend e backend atualmente publicados na EC2/Caddy; CD #48 e smoke tests permanecem como evidência histórica da arquitetura anterior | ✅ ATENDIDO |
-| Arquitetura documentada | `docs/ARCHITECTURE.md` com diagramas Mermaid de contexto, containers e deployment equivalentes ao C4 e coerentes com a produÃ§Ã£o validada | âœ… ATENDIDO |
+| Arquitetura documentada | `docs/ARCHITECTURE.md` com diagramas Mermaid de contexto, containers e deployment equivalentes ao C4 e coerentes com a produção validada | ✅ ATENDIDO |
 | Wiki junto ao repositório | `docs/README.md` fornece índice navegável da documentação versionada, referenciado pelo `README.md` principal; 24 links locais foram validados sem destinos quebrados | ✅ ATENDIDO |
-| Requisitos, casos de uso e decisÃµes | `docs/REQUIREMENTS.md`, `docs/adr/` e `docs/RFC.md` | âœ… ATENDIDO |
+| Requisitos, casos de uso e decisões | `docs/REQUIREMENTS.md`, `docs/adr/` e `docs/RFC.md` | ✅ ATENDIDO |
 | Três fluxos de negócio completos | Autenticação, importação de residentes e importação de eventos validadas ponta a ponta em produção em 10/11/2026, incluindo confirmação das importações e atualização dos indicadores | ✅ ATENDIDO |
 | TDD | Não é requisito identificado em `docs/REQUIREMENTS.md`; testes automatizados, coverage e CI permanecem comprovados pelo RNF-005 | NÃO EXIGIDO |
-| CI | CI #43 passou em todos os jobs informados | âœ… ATENDIDO |
-| CD | CD Production #48 implantou backend/frontend e concluiu smoke tests | âœ… ATENDIDO |
+| CI | CI #43 passou em todos os jobs informados | ✅ ATENDIDO |
+| CD | CD Production #48 implantou backend/frontend e concluiu smoke tests | ✅ ATENDIDO |
 | DEV separado | PostgreSQL local via Docker Compose, backend em 3002 e frontend em 5174 validados em 10/11/2026; health `ok` e frontend HTTP 200 | ✅ ATENDIDO |
 | PROD separado | Produção AWS distinta do DEV validada, com configuração, banco e runtime próprios | ✅ ATENDIDO |
 | Deploy fora de localhost | Frontend e backend na EC2/Caddy; aplicação pública validada | ✅ ATENDIDO |
-| HTTPS | Caddy e endpoints pÃºblicos HTTPS validados | âœ… ATENDIDO |
-| PostgreSQL persistente | PostgreSQL 16 ativo e habilitado na EC2; integraÃ§Ã£o CI e exporter validados | âœ… ATENDIDO |
-| Sonar | Job SonarQube Cloud passou no CI #43 | âœ… ATENDIDO |
-| Quality Gate | ExecuÃ§Ã£o PASS no CI #43 | âœ… ATENDIDO |
+| HTTPS | Caddy e endpoints públicos HTTPS validados | ✅ ATENDIDO |
+| PostgreSQL persistente | PostgreSQL 16 ativo e habilitado na EC2; integração CI e exporter validados | ✅ ATENDIDO |
+| Sonar | Job SonarQube Cloud passou no CI #43 | ✅ ATENDIDO |
+| Quality Gate | Execução PASS no CI #43 | ✅ ATENDIDO |
 | Observabilidade | Dashboard consolidado homologado em 23/09/2026; Grafana Cloud, Alloy, Prometheus e Loki com métricas e logs recebidos, alerta da API e entrega de notificação, SLO e retenção validados em 05/10/2026 (Issue #57); itens complementares permanecem registrados separadamente | ✅ ATENDIDO no escopo da Issue #57 |
 | Alertas e entrega de notificação | `Agora API unavailable`: teste controlado com `Firing`, entrega registrada como `Delivered successfully`, recuperação e `Resolved`; produção restaurada | ✅ ATENDIDO para indisponibilidade da API |
 | SLO | `Agora API availability`: target 99%, janela 28 dias, SLI `up`, 28d SLI observado 100.0% e orçamento restante 100% | ✅ ATENDIDO |
 | Retenção de observabilidade | Grafana Cloud Free: Prometheus 14 dias e Loki 14 dias | ✅ ATENDIDO |
 | Grafana | `Agora Tech Park - Production Overview` importado e homologado no Grafana Cloud em 23/09/2026, com dados reais de Prometheus e Loki; os quatro dashboards específicos permanecem como artefatos complementares sem validação final | ✅ ATENDIDO |
-| Logs | Pino/journald â†’ Alloy â†’ Loki validado, com JSON, labels e redaction observados | âœ… ATENDIDO |
+| Logs | Pino/journald → Alloy → Loki validado, com JSON, labels e redaction observados | ✅ ATENDIDO |
 | Métricas | Requests, latência média/p95, CPU/memória RSS do processo e PostgreSQL foram observados no dashboard em 23/09/2026; séries adicionais de host/disco permanecem complementares | ✅ ATENDIDO |
-| Health Check | HTTP 200 local e em `https://agora-techpark.duckdns.org/api/health`; smoke #48 e Loki confirmaram o fluxo | âœ… ATENDIDO |
+| Health Check | HTTP 200 local e em `https://agora-techpark.duckdns.org/api/health`; smoke #48 e Loki confirmaram o fluxo | ✅ ATENDIDO |
 | Backup | `pg_dump` local existente e AWS Backup diário do EBS de produção com retenção de 14 dias; backup on-demand e restore para novo volume EBS concluídos com sucesso | ✅ ATENDIDO |
 | Segurança e LGPD | Controles de aplicação presentes; árvore atual saneada; em 12/11/2026 dois clones mirror frescos não localizaram mais a ref histórica, o commit ou o blob alvo, e o fetch direto retornou `not our ref`; GitHub Support acionado no ticket `#4997778`; SEC-01 permanece pendente apenas de confirmação formal sobre caches/objetos server-side | NÃO ATENDIDO |
 | Backend coverage acadêmico | Validação local em 05/10/2026: 45 arquivos e 357 testes aprovados; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04%; threshold de 75% nas quatro métricas atendido | ✅ ATENDIDO |
-| Frontend coverage acadÃªmico | Comando oficial passou no CI #43 com thresholds superiores a 25% | âœ… ATENDIDO |
+| Frontend coverage acadêmico | Comando oficial passou no CI #43 com thresholds superiores a 25% | ✅ ATENDIDO |
 
-## Conformidade â€” requisitos de entrega
+## Conformidade — requisitos de entrega
 
-### RepositÃ³rio
+### Repositório
 
-Status: `ATENDIDO` quanto Ã  visibilidade; privacidade/LGPD em `NÃƒO ATENDIDO`.
+Status: `ATENDIDO` quanto à visibilidade; privacidade/LGPD em `NÃO ATENDIDO`.
 URL: `https://github.com/GeovaniaLuiza/agora-tech-park-fullstack`
 
-### AplicaÃ§Ã£o, backend e health
+### Aplicação, backend e health
 
 Status técnico: `ATENDIDO`; registro completo de URLs: `ATENDIDO`
 Application URL: https://agora-techpark.duckdns.org
@@ -271,9 +271,9 @@ Health URL: `https://agora-techpark.duckdns.org/api/health`
 
 ### CI/CD
 
-CI: `PASS` â€” execuÃ§Ã£o #43
-CD: `PASS` â€” CD Production #48
-Ãšltimas execuÃ§Ãµes validadas: CI #43 e CD Production #48
+CI: `PASS` — execução #43
+CD: `PASS` — CD Production #48
+Últimas execuções validadas: CI #43 e CD Production #48
 
 ### Ambientes
 
@@ -284,15 +284,15 @@ STAGING: `NÃO EXIGIDO PELOS REQUISITOS DOCUMENTADOS`
 ### Sonar
 
 Quality Gate: `PASS` no CI #43
-Critical/High: `check-sonar-quality.mjs` passou no CI #43 sem issues abertas nos filtros legados `BLOCKER,CRITICAL` e MQR `BLOCKER,HIGH`; o audit de dependÃªncias High/Critical tambÃ©m passou
+Critical/High: `check-sonar-quality.mjs` passou no CI #43 sem issues abertas nos filtros legados `BLOCKER,CRITICAL` e MQR `BLOCKER,HIGH`; o audit de dependências High/Critical também passou
 Coverage backend: validado localmente em 05/10/2026; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04%; threshold de 75% atendido nas quatro métricas (evidência local, sem nova validação Sonar)
 Coverage frontend: comando oficial passou com thresholds superiores a 25%
 
 ### Observabilidade
 
 Grafana: dashboard consolidado homologado em 23/09/2026 com Prometheus e Loki; quatro dashboards específicos sem validação final
-Logs: fluxo de produÃ§Ã£o validado ponta a ponta, com estrutura JSON e redaction observadas
-Metrics: requests, latência, CPU/memória RSS do processo e PostgreSQL observados; demais sÃ©ries operacionais permanecem parciais
+Logs: fluxo de produção validado ponta a ponta, com estrutura JSON e redaction observadas
+Metrics: requests, latência, CPU/memória RSS do processo e PostgreSQL observados; demais séries operacionais permanecem parciais
 Alerts: `Agora API unavailable` validado em 05/10/2026, com `Firing`, entrega registrada como `Delivered successfully`, recuperação e `Resolved`; demais alertas sem teste comprovado
 SLO: `Agora API availability` validado, target 99%, janela 28 dias, SLI baseado em `up`, 28d SLI observado 100.0% e Remaining error budget 100%
 Retenção: validada no Grafana Cloud Free, Prometheus 14 dias e Loki 14 dias
@@ -300,7 +300,7 @@ Teste operacional: controlado, com interrupção temporária de `agora-api.servi
 
 ### DevOps e infraestrutura
 
-CI/CD: atendido nas execuÃ§Ãµes #43/#48
+CI/CD: atendido nas execuções #43/#48
 Ambientes: atendido
 Deploy: atendido tecnicamente
 Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards específicos, demais séries e alertas complementares permanecem sem validação integral
@@ -319,44 +319,44 @@ Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards espec
 
 - Os quatro dashboards específicos, séries adicionais de host/disco e alertas ainda não testados podem ser evoluídos posteriormente. O dashboard consolidado, métricas e logs, alerta de indisponibilidade da API, entrega de notificação, SLO e retenção já foram validados no escopo acadêmico documentado.
 
-## Gates executados na baseline e validaÃ§Ãµes posteriores
+## Gates executados na baseline e validações posteriores
 
 | Gate | Resultado |
 |---|---|
-| `npm ci` (raiz) | **PASS** â€” CI #43 |
-| `npm ci --prefix backend` | **PASS** â€” CI #43 |
-| `npm ci --prefix frontend` | **PASS** â€” CI #43 |
-| `npm run lint` | **PASS** â€” CI #43 |
-| Testes backend | **PASS** â€” 163 testes no CI #43 |
+| `npm ci` (raiz) | **PASS** — CI #43 |
+| `npm ci --prefix backend` | **PASS** — CI #43 |
+| `npm ci --prefix frontend` | **PASS** — CI #43 |
+| `npm run lint` | **PASS** — CI #43 |
+| Testes backend | **PASS** — 163 testes no CI #43 |
 | Cobertura backend | **PASS** local em 05/10/2026 — `npm run test:coverage --prefix backend`; 45 arquivos e 357 testes aprovados; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04%; threshold de 75% nas quatro métricas atendido |
-| Testes frontend | **PASS** â€” CI #43; contagem atual nÃ£o registrada nesta matriz |
-| Cobertura frontend padrÃ£o | **PASS** â€” CI #43 |
-| Cobertura frontend diagnÃ³stica (`--testTimeout=15000`) | EvidÃªncia histÃ³rica superada pelo **PASS** do comando oficial no CI #43 |
-| Build frontend | **PASS** â€” artefato validado no CI #43 e implantado no Amplify pelo CD #48 |
-| `npm audit --audit-level=high` | **PASS no critÃ©rio High/Critical** â€” CI #43 |
-| `docker compose config --quiet` | **PASS sintÃ¡tico** |
+| Testes frontend | **PASS** — CI #43; contagem atual não registrada nesta matriz |
+| Cobertura frontend padrão | **PASS** — CI #43 |
+| Cobertura frontend diagnóstica (`--testTimeout=15000`) | Evidência histórica superada pelo **PASS** do comando oficial no CI #43 |
+| Build frontend | **PASS** — artefato validado no CI #43 e implantado no Amplify pelo CD #48 |
+| `npm audit --audit-level=high` | **PASS no critério High/Critical** — CI #43 |
+| `docker compose config --quiet` | **PASS sintático** |
 | Integração/migrations local | **PASS** na validação local de 05/10/2026 — `repository-postgres-lot6.test.js`: 8 testes aprovados com PostgreSQL real; migrations sem pendências |
-| IntegraÃ§Ã£o PostgreSQL no CI | **PASS** â€” CI #43 |
-| CI remoto atual | **PASS** â€” CI #43 |
-| CD remoto atual | **PASS** â€” CD Production #48 |
-| SonarCloud / Quality Gate | **PASS** â€” CI #43; script sem issues abertas nos filtros `BLOCKER,CRITICAL` e `BLOCKER,HIGH` |
-| Deploy backend | **PASS** via AWS Systems Manager â€” CD #48 |
-| Deploy frontend | **PASS** no AWS Amplify â€” CD #48 |
-| Smoke tests de produÃ§Ã£o | **PASS** â€” CD #48 |
+| Integração PostgreSQL no CI | **PASS** — CI #43 |
+| CI remoto atual | **PASS** — CI #43 |
+| CD remoto atual | **PASS** — CD Production #48 |
+| SonarCloud / Quality Gate | **PASS** — CI #43; script sem issues abertas nos filtros `BLOCKER,CRITICAL` e `BLOCKER,HIGH` |
+| Deploy backend | **PASS** via AWS Systems Manager — CD #48 |
+| Deploy frontend | **PASS** no AWS Amplify — CD #48 |
+| Smoke tests de produção | **PASS** — CD #48 |
 
-## ObservaÃ§Ãµes de integridade
+## Observações de integridade
 
-- A modificaÃ§Ã£o preexistente em `backend/tests/event-import.test.js` pertence ao usuÃ¡rio e nÃ£o foi alterada nesta auditoria.
-- Os arquivos `.bak` rastreados em `backend/src/` sÃ£o duplicaÃ§Ãµes que devem ser revisadas antes de eventual remoÃ§Ã£o; nenhuma exclusÃ£o foi realizada.
+- A modificação preexistente em `backend/tests/event-import.test.js` pertence ao usuário e não foi alterada nesta auditoria.
+- Os arquivos `.bak` rastreados em `backend/src/` são duplicações que devem ser revisadas antes de eventual remoção; nenhuma exclusão foi realizada.
 - Nenhuma credencial foi solicitada, impressa ou gravada.
-- Nesta revisÃ£o documental, nenhum deploy, mutaÃ§Ã£o de infraestrutura, alteraÃ§Ã£o de banco ou reescrita de histÃ³rico Git foi executado; as evidÃªncias de deploy registradas vieram do CD Production #48 jÃ¡ concluÃ­do.
-- Os nÃºmeros de padrÃµes pessoais foram registrados apenas de forma agregada; nenhum valor da planilha foi reproduzido.
+- Nesta revisão documental, nenhum deploy, mutação de infraestrutura, alteração de banco ou reescrita de histórico Git foi executado; as evidências de deploy registradas vieram do CD Production #48 já concluído.
+- Os números de padrões pessoais foram registrados apenas de forma agregada; nenhum valor da planilha foi reproduzido.
 - A remoção local da planilha foi registrada na baseline de 04/09/2026 e sua ausência da árvore de `origin/main` foi confirmada posteriormente. Em 12/11/2026, duas validações independentes em clones mirror frescos não localizaram mais `refs/pull/8/*`, o commit `55faede` nem o blob histórico; o GitHub também recusou o fetch direto do commit com `not our ref`. A evidência atual não indica necessidade de rewrite local. A SEC-01 permanece aberta somente para confirmação formal do GitHub Support sobre caches e objetos server-side residuais.
 
-## Fontes oficiais do critÃ©rio
+## Fontes oficiais do critério
 
-- [The Portfolio Playbook â€” Portfolio](https://github.com/CatolicaSC-Portfolio/The-Portfolio-Playbook/blob/main/Portfolio.md)
+- [The Portfolio Playbook — Portfolio](https://github.com/CatolicaSC-Portfolio/The-Portfolio-Playbook/blob/main/Portfolio.md)
 - [Direcionamentos gerais](https://github.com/CatolicaSC-Portfolio/The-Portfolio-Playbook/blob/main/directions/portfolio-directions-GERAL.md)
-- [Linha de projeto â€” Web Apps](https://github.com/CatolicaSC-Portfolio/The-Portfolio-Playbook/blob/main/directions/portfolio-directions-webapp.md)
+- [Linha de projeto — Web Apps](https://github.com/CatolicaSC-Portfolio/The-Portfolio-Playbook/blob/main/directions/portfolio-directions-webapp.md)
 
-As trÃªs fontes responderam `HTTP 200` em 04/09/2026 e foram confrontadas com esta baseline.
+As três fontes responderam `HTTP 200` em 04/09/2026 e foram confrontadas com esta baseline.

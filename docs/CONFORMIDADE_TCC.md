@@ -49,7 +49,7 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Referência acadêmica fornecida | ⚪ NÃO APLICÁVEL / DECISÃO REGISTRADA | Tese de Nancy V. Pérez, 2022, fornecida como material de apoio à auditoria | A referência pode ser utilizada como fundamentação acadêmica, mas não constitui requisito técnico, funcional ou evidência de implementação do sistema | Incorporar somente se for útil à fundamentação teórica, com autoria e referência bibliográfica completas |
 | Link funcional público e estável | ✅ IMPLEMENTADO E VALIDADO | Frontend, API e health estão disponíveis em `https://agora-techpark.duckdns.org`; a arquitetura vigente usa EC2/Caddy na mesma origem, com evidências de deploy e smoke tests preservadas | Disponibilidade contínua futura depende da operação normal do ambiente produtivo, sem lacuna funcional observada na validação atual | Manter a URL pública documentada e preservar smoke checks periódicos |
 | Frontend React + Vite | ✅ IMPLEMENTADO E VALIDADO | React 19.2.8 e Vite 8.2.2; job de testes/build e validação do artefato passou no CI #43; atualmente o frontend é servido pela EC2/Caddy na mesma origem da aplicação | As referências ao Amplify permanecem apenas como registro histórico da arquitetura anterior | Manter documentação alinhada à arquitetura atual EC2/Caddy |
-| Backend Express | ✅ IMPLEMENTADO E VALIDADO | Express 5.2.1; 163 testes unitários passando; `agora-api.service` ativo e habilitado na EC2; API responde HTTP 200 | Meta acadêmica de coverage é avaliada separadamente | Preservar testes, health e serviço systemd |
+| Backend Express | ✅ IMPLEMENTADO E VALIDADO | Express 5.2.1; CI #340, commit `3eca8be`, aprovou 69 arquivos e 749 testes backend; `agora-api.service` ativo e habilitado na EC2; API responde HTTP 200 | Meta acadêmica de coverage é avaliada separadamente | Preservar testes, health e serviço systemd |
 | PostgreSQL 16 | ✅ IMPLEMENTADO E VALIDADO | PostgreSQL 16 em produção na EC2; `postgresql.service` ativo e habilitado; integração PostgreSQL validada no CI; exporter Alloy conectado; em 09/11/2026 foi executado restore lógico isolado de `pg_dump`, com 24 tabelas públicas restauradas e 22 migrations confirmadas, incluindo `022_user_session_version.sql` | Nenhuma lacuna crítica observada na restauração lógica executada; o teste foi realizado em banco temporário isolado e removido ao final | Manter integração, backups e testes periódicos de restauração |
 | Migrações incrementais | ✅ IMPLEMENTADO E VALIDADO | `database/migrations/001...022`; runner único calcula SHA-256, usa lock e registra `schema_migrations`; em 10/11/2026 um banco DEV vazio foi criado via Docker Compose e recebeu com sucesso as 22 migrations; nova execução retornou `No pending migrations`, comprovando idempotência | Nenhuma lacuna funcional observada na validação atual | Manter o runner único e os testes de repetição/checksum |
 | Seed separado e seguro | ✅ IMPLEMENTADO E VALIDADO | `database/seed.sql` contém apenas dados demonstrativos; não é executado automaticamente pelo Compose, CI/CD ou deploy. Em 10/11/2026 foi validado em banco DEV temporário com 22 migrations aplicadas; a primeira execução inseriu os dados esperados e a segunda retornou apenas `INSERT 0 0`, mantendo as mesmas contagens | As credenciais demonstrativas conhecidas permanecem aceitáveis somente em DEV/teste e não devem ser reutilizadas em produção | Manter execução manual e restrita a ambientes não produtivos |
@@ -57,13 +57,13 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 | Instalação limpa backend | ✅ IMPLEMENTADO E VALIDADO | `npm ci --prefix backend` e testes passaram no CI #43 | Nenhuma falha de instalação observada nessa execução | Manter lockfile consistente |
 | Instalação limpa frontend | ✅ IMPLEMENTADO E VALIDADO | `npm ci --prefix frontend`, testes, coverage e build passaram no CI #43 | Nenhuma falha de instalação observada nessa execução | Manter lockfile consistente |
 | Lint local | ✅ IMPLEMENTADO E VALIDADO | `npm run lint` concluiu localmente e no job `Lint and dependency audit` do CI #43 | Nenhuma lacuna observada nesta etapa | Manter o gate no CI |
-| Testes unitários backend | ✅ IMPLEMENTADO E VALIDADO | 163 testes unitários aprovados; job `Backend unit tests` passou no CI #43 | Não substituem a meta acadêmica de coverage | Preservar e ampliar suíte |
-| Cobertura backend ≥ 75% | ✅ IMPLEMENTADO E VALIDADO | `npm run test:coverage --prefix backend`, validado localmente em 05/10/2026: 45 arquivos e 357 testes aprovados; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04% | Nenhuma lacuna no threshold exigido de 75% nas quatro métricas | Preservar o threshold e as evidências de cobertura |
-| Testes unitários frontend | ✅ IMPLEMENTADO E VALIDADO | Job `Frontend tests and build` passou no CI #43, incluindo o comando oficial de coverage | Quantidade atual de testes não registrada nesta matriz | Registrar a contagem atual nas evidências |
-| Cobertura frontend ≥ 25% | ✅ IMPLEMENTADO E VALIDADO | O comando oficial `npm run test:coverage --prefix frontend` passou no CI #43 com thresholds configurados acima de 25% | Percentuais exatos da execução #43 não foram registrados nesta matriz | Anexar o relatório atual como evidência quantitativa |
+| Testes unitários backend | ✅ IMPLEMENTADO E VALIDADO | CI #340, commit `3eca8be`: 69 arquivos de teste backend e 749 testes aprovados no job `Backend unit tests` | A aprovação integral da suíte atual não substitui a avaliação específica dos thresholds de coverage | Preservar e ampliar a suíte |
+| Cobertura backend ≥ 75% | ✅ IMPLEMENTADO E VALIDADO | CI #340, commit `3eca8be`, executado após o merge do PR #155: 69 arquivos de teste backend e 749 testes aprovados; artifact `backend-coverage` gerado com sucesso. A validação anterior de 05/10/2026 registrou Statements 79.38%, Branches 75.83%, Functions 76.00% e Lines 84.04% | A execução atual confirma aprovação integral da suíte executada e preserva a geração do artifact de cobertura; os percentuais históricos permanecem como evidência quantitativa conhecida | Preservar o threshold e os artifacts de coverage gerados pelo CI |
+| Testes unitários frontend | ✅ IMPLEMENTADO E VALIDADO | CI #340, commit `3eca8be`: 26 arquivos de teste frontend e 495 testes aprovados no job `Frontend tests and build`; artifact `frontend-coverage` gerado com sucesso | Nenhuma falha observada na suíte atual | Preservar a suíte e o artifact de coverage |
+| Cobertura frontend ≥ 25% | ✅ IMPLEMENTADO E VALIDADO | CI #340, commit `3eca8be`: job `Frontend tests and build` aprovado, com 26 arquivos e 495 testes; artifact `frontend-coverage` gerado. O threshold acadêmico configurado permanece acima de 25% | Os percentuais exatos da execução #340 não foram transcritos para esta matriz | Preservar o threshold e anexar o relatório de coverage quando necessário |
 | TDD verificável | 🟡 PARCIAL | O projeto possui ampla suíte automatizada, coverage acima dos thresholds acadêmicos e CI validado; o direcionamento Web Apps do Portfolio Playbook estabelece TDD e cobertura mínima de 75% no backend e 25% no frontend | Os thresholds de cobertura estão atendidos, porém o histórico disponível não permite comprovar integralmente ciclos teste-primeiro ao longo do desenvolvimento | Preservar os thresholds e demonstrar TDD de forma explícita nos próximos incrementos, com teste escrito antes da implementação |
 | Três fluxos de negócio completos | ✅ IMPLEMENTADO E VALIDADO | Em 10/11/2026 foram validados manualmente em produção três fluxos ponta a ponta: autenticação e acesso ao Dashboard; importação de empresas residentes com validação, revisão, confirmação e atualização de indicadores; e importação de eventos com validação, preview, revisão, confirmação e atualização de indicadores | A validação comprova os três fluxos selecionados em produção; outros casos de uso possuem validações próprias | Preservar as evidências de demonstração e manter testes automatizados dos fluxos |
-| CI no GitHub Actions | ✅ IMPLEMENTADO E VALIDADO | CI #43 passou: lint/audit, testes backend, testes/build frontend, integração PostgreSQL e SonarQube Cloud Quality Gate | Nenhuma lacuna funcional observada nessa execução | Manter o `main` protegido por CI verde |
+| CI no GitHub Actions | ✅ IMPLEMENTADO E VALIDADO | CI #340, commit `3eca8be`, concluído com sucesso em 13/11/2026: lint/dependency audit, backend unit tests, frontend tests/build, PostgreSQL integration tests e SonarQube Cloud Quality Gate aprovados | Execução atual sem falhas | Manter `main` protegida por CI verde |
 | CD no GitHub Actions | ✅ IMPLEMENTADO E VALIDADO | CD Production #48 passou: backend via AWS Systems Manager, frontend no AWS Amplify e smoke tests de produção | A evidência comprova a execução #48, não disponibilidade contínua futura | Monitorar execuções e preservar rollback |
 | AWS removida com segurança | ⚪ NÃO APLICÁVEL / DECISÃO REGISTRADA | A AWS permanece como infraestrutura de produção validada. EC2 e Systems Manager integram a arquitetura vigente; o Amplify foi utilizado apenas historicamente | A remoção da AWS não constitui pendência da arquitetura atual e não foi autorizada como migração; a infraestrutura produtiva vigente está validada | Manter a infraestrutura atual e reavaliar eventual migração somente mediante requisito, destino substituto e autorização |
 | Cloudflare Pages como frontend | ⚪ NÃO APLICÁVEL / DECISÃO REGISTRADA | Cloudflare Pages foi considerada como alternativa de hospedagem, mas a arquitetura vigente utiliza EC2/Caddy na mesma origem, já validada em produção | A alternativa não adotada não constitui lacuna de conformidade; a decisão arquitetural vigente prioriza hospedagem controlável e integração same-origin | Manter EC2/Caddy enquanto permanecer a arquitetura aprovada; reavaliar somente diante de novo requisito arquitetural |
@@ -96,16 +96,16 @@ O repositório mantém a arquitetura React + Vite, Express e PostgreSQL na produ
 
 ## CI/CD — resultado de aceite
 
-**CI: PASS.** A execução CI #43 concluiu com sucesso os jobs `Lint and dependency audit`, `Backend unit tests`, `Frontend tests and build`, `PostgreSQL integration tests` e `SonarQube Cloud Quality Gate`.
+**CI: PASS.** A execução CI #340, commit `3eca8be`, concluiu com sucesso os jobs `Lint and dependency audit`, `Backend unit tests`, `Frontend tests and build`, `PostgreSQL integration tests` e `SonarQube Cloud Quality Gate`.
 
 **CD: PASS.** A execução CD Production #48 implantou o backend na AWS EC2 via Systems Manager, publicou o frontend no AWS Amplify e concluiu os smoke tests de produção.
 
 | Etapa | Configurada | Execução bem-sucedida atual |
 |---|---:|---:|
-| Execução automática de CI | Sim | Sim — CI #43 |
+| Execução automática de CI | Sim | Sim — CI #340, commit `3eca8be` |
 | Lint | Sim | Sim — CI #43 |
-| Testes backend | Sim | Sim — 163 testes no CI #43 |
-| Testes frontend | Sim | Sim — CI #43 |
+| Testes backend | Sim | Sim — CI #340: 69 arquivos e 749 testes aprovados |
+| Testes frontend | Sim | Sim — CI #340: 26 arquivos e 495 testes aprovados |
 | Coverage | Sim | Sim — CI #43 como evidência histórica; backend validado localmente em 05/10/2026 com 75% atendidos nas quatro métricas |
 | Audit | Sim | Sim — critério High/Critical no CI #43 |
 | Build | Sim | Sim — artefato validado no CI #43 e implantado pelo CD #48 |
@@ -233,7 +233,7 @@ Esta é a tabela de aceite restrita aos três estados solicitados. Um requisito 
 | Requisitos, casos de uso e decisões | `docs/REQUIREMENTS.md`, `docs/adr/` e `docs/RFC.md` | ✅ ATENDIDO |
 | Três fluxos de negócio completos | Autenticação, importação de residentes e importação de eventos validadas ponta a ponta em produção em 10/11/2026, incluindo confirmação das importações e atualização dos indicadores | ✅ ATENDIDO |
 | TDD | O direcionamento Web Apps do Portfolio Playbook exige TDD. O projeto possui testes automatizados, coverage acima dos thresholds acadêmicos e CI validado, porém o histórico disponível não comprova integralmente ciclos teste-primeiro ao longo do desenvolvimento | NÃO ATENDIDO |
-| CI | CI #43 passou em todos os jobs informados | ✅ ATENDIDO |
+| CI | CI #340, commit `3eca8be`, passou em lint/dependency audit, backend unit tests, frontend tests/build, PostgreSQL integration tests e SonarQube Cloud Quality Gate | ✅ ATENDIDO |
 | CD | CD Production #48 implantou backend/frontend e concluiu smoke tests | ✅ ATENDIDO |
 | DEV separado | PostgreSQL local via Docker Compose, backend em 3002 e frontend em 5174 validados em 10/11/2026; health `ok` e frontend HTTP 200 | ✅ ATENDIDO |
 | PROD separado | Produção AWS distinta do DEV validada, com configuração, banco e runtime próprios | ✅ ATENDIDO |
@@ -252,8 +252,8 @@ Esta é a tabela de aceite restrita aos três estados solicitados. Um requisito 
 | Health Check | HTTP 200 local e em `https://agora-techpark.duckdns.org/api/health`; smoke #48 e Loki confirmaram o fluxo | ✅ ATENDIDO |
 | Backup | `pg_dump` local existente e AWS Backup diário do EBS de produção com retenção de 14 dias; backup on-demand e restore para novo volume EBS concluídos com sucesso | ✅ ATENDIDO |
 | Segurança e LGPD | Controles de aplicação presentes; árvore atual saneada; em 12/11/2026 dois clones mirror frescos não localizaram mais a ref histórica, o commit ou o blob alvo, e o fetch direto retornou `not our ref`; GitHub Support acionado no ticket `#4997778`; SEC-01 permanece pendente apenas de confirmação formal sobre caches/objetos server-side | NÃO ATENDIDO |
-| Backend coverage acadêmico | Validação local em 05/10/2026: 45 arquivos e 357 testes aprovados; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04%; threshold de 75% nas quatro métricas atendido | ✅ ATENDIDO |
-| Frontend coverage acadêmico | Comando oficial passou no CI #43 com thresholds superiores a 25% | ✅ ATENDIDO |
+| Backend coverage acadêmico | CI #340 confirmou 69 arquivos de teste e 749 testes backend aprovados, com artifact `backend-coverage` gerado; a validação quantitativa histórica de 05/10/2026 permanece em Statements 79.38%, Branches 75.83%, Functions 76.00% e Lines 84.04%, acima do threshold de 75% nas quatro métricas | ✅ ATENDIDO |
+| Frontend coverage acadêmico | CI #340 confirmou 26 arquivos e 495 testes frontend aprovados, com artifact `frontend-coverage` gerado e threshold acadêmico configurado acima de 25% | ✅ ATENDIDO |
 
 ## Conformidade — requisitos de entrega
 
@@ -271,9 +271,9 @@ Health URL: `https://agora-techpark.duckdns.org/api/health`
 
 ### CI/CD
 
-CI: `PASS` — execução #43
+CI: `PASS` — execução #340, commit `3eca8be`
 CD: `PASS` — CD Production #48
-Últimas execuções validadas: CI #43 e CD Production #48
+Últimas execuções validadas: CI #340, commit `3eca8be`, e CD Production #48
 
 ### Ambientes
 
@@ -283,7 +283,7 @@ STAGING: `NÃO EXIGIDO PELOS REQUISITOS DOCUMENTADOS`
 
 ### Sonar
 
-Quality Gate: `PASS` no CI #43
+Quality Gate: `PASS` no CI #340, commit `3eca8be`
 Critical/High: `check-sonar-quality.mjs` passou no CI #43 sem issues abertas nos filtros legados `BLOCKER,CRITICAL` e MQR `BLOCKER,HIGH`; o audit de dependências High/Critical também passou
 Coverage backend: validado localmente em 05/10/2026; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04%; threshold de 75% atendido nas quatro métricas (evidência local, sem nova validação Sonar)
 Coverage frontend: comando oficial passou com thresholds superiores a 25%
@@ -327,19 +327,19 @@ Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards espec
 | `npm ci --prefix backend` | **PASS** — CI #43 |
 | `npm ci --prefix frontend` | **PASS** — CI #43 |
 | `npm run lint` | **PASS** — CI #43 |
-| Testes backend | **PASS** — 163 testes no CI #43 |
+| Testes backend | **PASS** — CI #340, commit `3eca8be`: 69 arquivos e 749 testes aprovados |
 | Cobertura backend | **PASS** local em 05/10/2026 — `npm run test:coverage --prefix backend`; 45 arquivos e 357 testes aprovados; Statements 79.38%, Branches 75.83%, Functions 76.00%, Lines 84.04%; threshold de 75% nas quatro métricas atendido |
-| Testes frontend | **PASS** — CI #43; contagem atual não registrada nesta matriz |
+| Testes frontend | **PASS** — CI #340, commit `3eca8be`: 26 arquivos e 495 testes aprovados |
 | Cobertura frontend padrão | **PASS** — CI #43 |
 | Cobertura frontend diagnóstica (`--testTimeout=15000`) | Evidência histórica superada pelo **PASS** do comando oficial no CI #43 |
 | Build frontend | **PASS** — artefato validado no CI #43 e implantado no Amplify pelo CD #48 |
 | `npm audit --audit-level=high` | **PASS no critério High/Critical** — CI #43 |
 | `docker compose config --quiet` | **PASS sintático** |
 | Integração/migrations local | **PASS** na validação local de 05/10/2026 — `repository-postgres-lot6.test.js`: 8 testes aprovados com PostgreSQL real; migrations sem pendências |
-| Integração PostgreSQL no CI | **PASS** — CI #43 |
-| CI remoto atual | **PASS** — CI #43 |
+| Integração PostgreSQL no CI | **PASS** — CI #340, commit `3eca8be`: 11 arquivos e 137 testes aprovados |
+| CI remoto atual | **PASS** — CI #340, commit `3eca8be` |
 | CD remoto atual | **PASS** — CD Production #48 |
-| SonarCloud / Quality Gate | **PASS** — CI #43; script sem issues abertas nos filtros `BLOCKER,CRITICAL` e `BLOCKER,HIGH` |
+| SonarCloud / Quality Gate | **PASS** — CI #340, commit `3eca8be`; Quality Gate aprovado |
 | Deploy backend | **PASS** via AWS Systems Manager — CD #48 |
 | Deploy frontend | **PASS** no AWS Amplify — CD #48 |
 | Smoke tests de produção | **PASS** — CD #48 |

@@ -1,4 +1,4 @@
-﻿# Matriz de conformidade do TCC — Ágora Tech Park
+# Matriz de conformidade do TCC — Ágora Tech Park
 
 Baseline técnica de 04/09/2026, com evidências de CI/CD e produção atualizadas em 18/09/2026 e homologação do dashboard consolidado de observabilidade em 23/09/2026. Esta matriz registra o estado observado antes das correções e as validações posteriores explicitamente identificadas. Ela não é evidência de aprovação acadêmica nem substitui resultados do GitHub Actions, SonarCloud, provedor de nuvem ou Grafana.
 
@@ -360,3 +360,24 @@ Observabilidade: atendida no escopo da Issue #57 em 05/10/2026; dashboards espec
 - [Linha de projeto — Web Apps](https://github.com/CatolicaSC-Portfolio/The-Portfolio-Playbook/blob/main/directions/portfolio-directions-webapp.md)
 
 As três fontes responderam `HTTP 200` em 04/09/2026 e foram confrontadas com esta baseline.
+
+## Atualização da validação técnica — 13/11/2026
+
+Versão avaliada: commit `0f69ad85835cd352704d7d70811fe82d7adf1a51`, da branch `main`.
+
+| Verificação | Resultado |
+|---|---|
+| Frontend | 495 testes aprovados, em 26 arquivos |
+| Backend | 749 testes aprovados, em 69 arquivos |
+| Integração PostgreSQL | 137 testes aprovados, em 11 arquivos |
+| Cobertura backend | Instruções: 87,68%; ramificações: 84,49%; funções: 87,88%; linhas: 91,60% |
+| Cobertura frontend | Instruções: 77,05%; ramificações: 78,06%; funções: 69,12%; linhas: 85,25% |
+| Lint e build frontend | Aprovados; build com VITE_API_URL=/api |
+| Validação do artefato frontend | 14 testes aprovados; bundle validado sem endereços de desenvolvimento |
+| Auditoria de dependências | Zero vulnerabilidades reportadas na raiz, backend e frontend |
+| CI nº 336 | Cinco jobs aprovados, incluindo SonarQube Cloud Quality Gate |
+| CD Production nº 353 | Deploy e smoke tests aprovados; vínculo com o commit implantado ainda não conferido nesta revisão |
+
+As suítes locais de frontend, backend e integração passaram com `--maxWorkers=1`. Os testes adicionais de deploy e recuperação apresentaram falhas no Windows; o job correspondente de qualidade passou no ambiente Linux do CI nº 336.
+
+Esta atualização complementa as evidências históricas. Permanecem as ressalvas de TDD não integralmente comprovado, confirmação externa da SEC-01 e obrigações acadêmicas de autoria individual, orientações e DemoDay. A decisão global permanece PARCIAL.

@@ -232,7 +232,7 @@ Esta é a tabela de aceite restrita aos três estados solicitados. Um requisito 
 | Wiki junto ao repositório | `docs/README.md` fornece índice navegável da documentação versionada, referenciado pelo `README.md` principal; 24 links locais foram validados sem destinos quebrados | ✅ ATENDIDO |
 | Requisitos, casos de uso e decisões | `docs/REQUIREMENTS.md`, `docs/adr/` e `docs/RFC.md` | ✅ ATENDIDO |
 | Três fluxos de negócio completos | Autenticação, importação de residentes e importação de eventos validadas ponta a ponta em produção em 10/11/2026, incluindo confirmação das importações e atualização dos indicadores | ✅ ATENDIDO |
-| TDD | Não é requisito identificado em `docs/REQUIREMENTS.md`; testes automatizados, coverage e CI permanecem comprovados pelo RNF-005 | NÃO EXIGIDO |
+| TDD | O direcionamento Web Apps do Portfolio Playbook exige TDD. O projeto possui testes automatizados, coverage acima dos thresholds acadêmicos e CI validado, porém o histórico disponível não comprova integralmente ciclos teste-primeiro ao longo do desenvolvimento | NÃO ATENDIDO |
 | CI | CI #43 passou em todos os jobs informados | ✅ ATENDIDO |
 | CD | CD Production #48 implantou backend/frontend e concluiu smoke tests | ✅ ATENDIDO |
 | DEV separado | PostgreSQL local via Docker Compose, backend em 3002 e frontend em 5174 validados em 10/11/2026; health `ok` e frontend HTTP 200 | ✅ ATENDIDO |
